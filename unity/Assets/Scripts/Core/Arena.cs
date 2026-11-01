@@ -21,7 +21,7 @@ namespace TapArena
         public float xp;
         public int kills, deaths;
 
-        public float stunT, slowT, invulnT, hurtT, shield, shieldT, thornT;
+        public float stunT, slowT, invulnT, hurtT, shield, shieldT, thornT, calmT;
         public float atkAnim, castAnim, hurtAnim, dieT, respawnT;
         public float walkT;
         public bool moving;
@@ -68,7 +68,7 @@ namespace TapArena
         public static Arena I;
 
         public const float MapW = 3000f, MapH = 1600f;
-        public const float SuddenDeathTime = 480f;   // 8 分钟终极对决
+        public const float SuddenDeathTime = 360f;   // 6 分钟终极对决
         public const float RespawnTime = 6f;
         public const float WaveInterval = 22f;
 
@@ -86,15 +86,16 @@ namespace TapArena
         public bool over, started, suddenDeath;
         public int scoreBlue, scoreRed;
 
+        /* 兵线拉直：镜头朝 +Z，孩子只要按“右”就能一路推过去 */
         public static readonly Vector3[] Lane =
         {
-            new Vector3(300f, 0f, 1010f),
-            new Vector3(760f, 0f, 1105f),
-            new Vector3(1180f, 0f, 1040f),
-            new Vector3(1500f, 0f, 930f),
+            new Vector3(300f, 0f, 800f),
+            new Vector3(760f, 0f, 800f),
+            new Vector3(1180f, 0f, 800f),
+            new Vector3(1500f, 0f, 800f),
             new Vector3(1900f, 0f, 800f),
-            new Vector3(2320f, 0f, 690f),
-            new Vector3(2700f, 0f, 600f),
+            new Vector3(2320f, 0f, 800f),
+            new Vector3(2700f, 0f, 800f),
         };
 
         int _uid;
@@ -123,13 +124,13 @@ namespace TapArena
                 (others[i], others[j]) = (others[j], others[i]);
             }
 
-            baseBlue = MakeBase(Team.Blue, new Vector3(230f, 0f, 1010f));
-            baseRed = MakeBase(Team.Red, new Vector3(2770f, 0f, 590f));
+            baseBlue = MakeBase(Team.Blue, new Vector3(230f, 0f, 800f));
+            baseRed = MakeBase(Team.Red, new Vector3(2770f, 0f, 800f));
 
-            towersBlue.Add(MakeTower(Team.Blue, 0, new Vector3(760f, 0f, 1105f)));
-            towersBlue.Add(MakeTower(Team.Blue, 1, new Vector3(1180f, 0f, 1040f)));
+            towersBlue.Add(MakeTower(Team.Blue, 0, new Vector3(760f, 0f, 800f)));
+            towersBlue.Add(MakeTower(Team.Blue, 1, new Vector3(1180f, 0f, 800f)));
             towersRed.Add(MakeTower(Team.Red, 0, new Vector3(1900f, 0f, 800f)));
-            towersRed.Add(MakeTower(Team.Red, 1, new Vector3(2320f, 0f, 690f)));
+            towersRed.Add(MakeTower(Team.Red, 1, new Vector3(2320f, 0f, 800f)));
 
             var blueIds = new List<HeroId> { playerHero, others[0], others[1] };
             var redIds = new List<HeroId> { others[2], others[3], others[4] };
@@ -157,7 +158,7 @@ namespace TapArena
         Unit MakeBase(Team team, Vector3 pos)
         {
             var u = NewUnit(UnitKind.Base, team, team == Team.Blue ? "清清水晶" : "红红水晶", pos);
-            u.hp = u.maxHp = 3600f;
+            u.hp = u.maxHp = 3200f;
             u.radius = 90f; u.height = 150f; u.range = 380f; u.dmg = 110f;
             u.atkInterval = 1.2f; u.atkTimer = 1f;
             return u;
@@ -166,7 +167,7 @@ namespace TapArena
         Unit MakeTower(Team team, int tier, Vector3 pos)
         {
             var u = NewUnit(UnitKind.Tower, team, tier == 0 ? "外塔" : "内塔", pos);
-            u.hp = u.maxHp = 2600f;
+            u.hp = u.maxHp = 2200f;
             u.radius = 58f; u.height = 140f;
             u.range = 340f; u.dmg = 92f; u.atkInterval = 1.1f; u.atkTimer = Rand(0f, 1f);
             u.level = tier;
@@ -196,7 +197,7 @@ namespace TapArena
         /* ================= 主循环 ================= */
         void Update()
         {
-            if (!started || over) return;
+            if (!started || over || Boot.Paused) return;
             float dt = Time.deltaTime;
             clock += dt;
 
@@ -211,6 +212,18 @@ namespace TapArena
             if (waveT <= 0f) { waveT = WaveInterval; SpawnWave(Team.Blue); SpawnWave(Team.Red); }
 
             for (int i = 0; i < units.Count; i++) StepUnit(units[i], dt);
+            for (int i = 0; i < heroes.Count; i++)
+                if (heroes[i].alive) AddXp(heroes[i], 2f * dt);
+
+            /* 兜底：8 分钟按水晶剩余血量判定，绝不让一局无限拖下去 */
+            if (!over && clock >= 480f)
+            {
+                float b = baseBlue.hp / baseBlue.maxHp, r = baseRed.hp / baseRed.maxHp;
+                if (Mathf.Abs(b - r) < 0.01f) EndMatch(scoreBlue >= scoreRed ? Team.Blue : Team.Red);
+                else EndMatch(b > r ? Team.Blue : Team.Red);
+                Fx.Banner("时间到！按水晶血量判定", 4f);
+                return;
+            }
             StepProjectiles(dt);
             StepZones(dt);
             CleanupDead();
@@ -228,8 +241,8 @@ namespace TapArena
                 m.hp = m.maxHp = 260f;
                 m.radius = 20f; m.height = 46f; m.range = 118f; m.dmg = 20f;
                 m.atkInterval = 0.9f; m.atkTimer = Rand(0f, 0.6f); m.moveSpeed = 172f;
-                m.laneIndex = team == Team.Blue ? 0 : Lane.Length - 1;
-                m.laneTarget = team == Team.Blue ? 1 : Lane.Length - 2;
+                m.laneIndex = team == Team.Blue ? 1 : Lane.Length - 2;
+                m.laneTarget = m.laneIndex;
                 minions.Add(m);
             }
         }
@@ -246,6 +259,9 @@ namespace TapArena
             u.thornT = Mathf.Max(0f, u.thornT - dt);
             if (u.shieldT <= 0f) u.shield = 0f;
 
+            for (int i = 0; i < u.cds.Length; i++) u.cds[i] = Mathf.Max(0f, u.cds[i] - dt);
+            u.calmT += dt;
+
             if (!u.alive)
             {
                 if (u.kind == UnitKind.Hero)
@@ -258,7 +274,10 @@ namespace TapArena
             }
 
             u.atkTimer -= dt;
-            for (int i = 0; i < u.cds.Length; i++) u.cds[i] = Mathf.Max(0f, u.cds[i] - dt);
+
+            /* 脱战 5 秒后缓慢回血，孩子被塔打残了不用一直回城 */
+            if (u.kind == UnitKind.Hero && u.calmT > 5f && u.hp < u.maxHp)
+                u.hp = Mathf.Min(u.maxHp, u.hp + u.maxHp * 0.015f * dt);
 
             if (u.stunT > 0f) { u.moving = false; return; }
 
@@ -356,7 +375,8 @@ namespace TapArena
                 if (o.kind == UnitKind.Tower && IsTowerProtected(o)) continue;
                 if (o.kind == UnitKind.Base && IsBaseProtected(o)) continue;
                 float d = Vector3.Distance(h.pos, o.pos);
-                float w = d + (o.kind == UnitKind.Hero ? -120f : 0f);
+                float w = d + (o.kind == UnitKind.Hero ? -40f : 0f);
+                if (suddenDeath && o.kind == UnitKind.Base) w -= 1200f;
                 if (w < bd) { bd = w; best = o; }
             }
             return best;
@@ -373,19 +393,29 @@ namespace TapArena
                 {
                     m.atkTimer = m.atkInterval;
                     m.atkAnim = 0.22f;
-                    HitWithFx(foe, m.dmg, m, 0);
+                    /* 小兵对塔/水晶有攻城加成，保证兵线真的能推塔 */
+                    float dmg = (foe.kind == UnitKind.Tower || foe.kind == UnitKind.Base) ? m.dmg * 3.0f : m.dmg;
+                    HitWithFx(foe, dmg, m, 0);
                 }
                 return;
             }
 
-            /* 沿兵线走 */
-            int next = m.laneIndex + (m.team == Team.Blue ? 1 : -1);
-            if (next < 0 || next >= Lane.Length) { next = Mathf.Clamp(next, 0, Lane.Length - 1); }
-            m.laneIndex = next;
-            Vector3 goal = Lane[next];
+            /* 沿兵线走：到达当前路点才推进，不能每帧把索引往后跳 */
+            int stepDir = m.team == Team.Blue ? 1 : -1;
+            int idx = Mathf.Clamp(m.laneIndex, 0, Lane.Length - 1);
+            Vector3 goal = Lane[idx];
+            for (int guard = 0; guard < Lane.Length; guard++)
+            {
+                if ((goal - m.pos).sqrMagnitude > 70f * 70f) break;
+                int nextIdx = idx + stepDir;
+                if (nextIdx < 0 || nextIdx >= Lane.Length) break;
+                idx = nextIdx;
+                goal = Lane[idx];
+            }
+            m.laneIndex = idx;
             Vector3 to = goal - m.pos;
             float d = to.magnitude;
-            if (d < 8f) return;
+            if (d < 10f) return;
             to /= d;
             m.moveDir = to;
             m.facing = to.x >= 0f ? 1f : -1f;
@@ -502,7 +532,7 @@ namespace TapArena
             if (src != null && src.isPlayer && amount >= 45f && Time.timeScale > 0.5f) HitStop(0.045f);
         }
 
-        public void DealDamage(Unit target, float amount, Unit src)
+        public void DealDamage(Unit target, float amount, Unit src, bool reflect = true)
         {
             if (target == null || !target.alive) return;
             if (target.kind == UnitKind.Hero && target.invulnT > 0f) return;
@@ -510,9 +540,9 @@ namespace TapArena
             if (target.kind == UnitKind.Base && IsBaseProtected(target)) { Fx.Text(target.pos, "水晶被保护着", new Color(1f, 0.95f, 0.7f)); return; }
 
             /* 刺球反伤：打它的人被扎回去 */
-            if (target.thornT > 0f && src != null && src != target && src.alive && src.kind == UnitKind.Hero)
+            if (reflect && target.thornT > 0f && src != null && src != target && src.alive && src.kind == UnitKind.Hero)
             {
-                DealDamage(src, 24f + target.level * 5f, target);
+                DealDamage(src, 24f + target.level * 5f, target, false);
                 Fx.Hit(src.pos + Vector3.up * 40f, new Color(1f, 0.85f, 0.66f), false);
             }
 
@@ -523,8 +553,10 @@ namespace TapArena
                 amount -= absorb;
             }
             target.hp -= amount;
-            Fx.Text(target.pos + Vector3.up * (target.height + 24f), Mathf.RoundToInt(amount).ToString(),
-                target.team == Team.Blue ? new Color(1f, 0.78f, 0.72f) : new Color(1f, 1f, 0.82f));
+            if (amount > 0.1f) target.calmT = 0f;
+            if (amount >= 1f)
+                Fx.Text(target.pos + Vector3.up * (target.height + 24f), Mathf.RoundToInt(amount).ToString(),
+                    target.team == Team.Blue ? new Color(1f, 0.78f, 0.72f) : new Color(1f, 1f, 0.82f));
 
             if (target.hp <= 0f) Kill(target, src);
         }
@@ -538,15 +570,12 @@ namespace TapArena
             {
                 target.deaths++;
                 target.respawnT = RespawnTime;
+                if (killer != null) killer.kills++;
+                if (killer != null && killer.kind == UnitKind.Hero) AddXp(killer, 140f);
                 if (killer != null)
-                {
-                    killer.kills++;
-                    if (killer.kind == UnitKind.Hero)
-                    {
-                        killer.xp += 140f;
-                        if (killer.xp >= 300f && killer.level < 2) { killer.level = 2; Fx.Text(killer.pos, "二级解锁大招！", new Color(1f, 0.95f, 0.6f)); }
-                    }
-                }
+                    foreach (var a in heroes)
+                        if (a != killer && a.alive && a.team == killer.team && Vector3.Distance(a.pos, target.pos) < 700f)
+                            AddXp(a, 60f);
                 if (target.team == Team.Blue) scoreRed++; else scoreBlue++;
                 Fx.Banner($"{killer?.name ?? "？"} 击败了 {target.name}", 1.8f);
                 Sfx.Play("ult");
@@ -555,6 +584,15 @@ namespace TapArena
             {
                 Fx.Banner(target.team == Team.Blue ? "我方蘑菇塔被拆了！" : "拆掉一座敌方蘑菇塔！", 2f);
                 Sfx.Play("boom");
+                foreach (var a in heroes)
+                    if (a.alive && a.team != target.team) AddXp(a, 80f);
+            }
+            else if (target.kind == UnitKind.Minion)
+            {
+                if (killer != null && killer.kind == UnitKind.Hero) AddXp(killer, 14f);
+                foreach (var a in heroes)
+                    if (a != killer && a.alive && killer != null && a.team == killer.team &&
+                        Vector3.Distance(a.pos, target.pos) < 450f) AddXp(a, 7f);
             }
             else if (target.kind == UnitKind.Base)
             {
@@ -562,13 +600,27 @@ namespace TapArena
             }
         }
 
+        void AddXp(Unit h, float add)
+        {
+            if (h == null || add <= 0f || h.level >= 2) return;
+            h.xp += add;
+            if (h.xp >= 300f)
+            {
+                h.level = 2;
+                Fx.Text(h.pos, "二级解锁大招！", new Color(1f, 0.95f, 0.6f));
+                if (h.isPlayer) { Fx.Banner("大招解锁！按右上的技能键放出来", 1.8f); Sfx.Play("ult"); }
+            }
+        }
+
         void Respawn(Unit h)
         {
             h.hp = h.maxHp;
-            h.pos = BasePos(h.team);
+            h.pos = BasePos(h.team) + new Vector3(h.team == Team.Blue ? 150f : -150f, 0f, 0f);
             h.invulnT = 1.6f;
-            h.stunT = 0f; h.slowT = 0f;
-            h.laneIndex = h.team == Team.Blue ? 0 : Lane.Length - 1;
+            h.stunT = 0f; h.slowT = 0f; h.shield = 0f; h.thornT = 0f;
+            h.moveDir = Vector3.zero;
+            h.atkTimer = 0.3f;
+            Fx.Ring(h.pos, 90f, h.team == Team.Blue ? new Color(0.6f, 0.95f, 1f) : new Color(1f, 0.7f, 0.6f), 0.5f);
         }
 
         public void AreaDamage(Vector3 center, float radius, float dmg, Unit src, Team team,
@@ -581,7 +633,7 @@ namespace TapArena
                 DealDamage(u, dmg, src);
                 if (slow > 0f) u.slowT = Mathf.Max(u.slowT, slow);
                 if (stun > 0f) u.stunT = Mathf.Max(u.stunT, stun);
-                if (knock > 0f)
+                if (knock > 0f && u.kind != UnitKind.Tower && u.kind != UnitKind.Base)
                 {
                     Vector3 n = (u.pos - center).normalized;
                     MoveTo(u, u.pos + n * knock);
@@ -785,7 +837,8 @@ namespace TapArena
                         if (Vector3.Dot(to.normalized, aimDir) < 0.35f) continue;
                         DealDamage(u, s.dmg, h);
                         u.slowT = Mathf.Max(u.slowT, s.slow);
-                        if (s.knock > 0f) MoveTo(u, u.pos + to.normalized * s.knock);
+                        if (s.knock > 0f && u.kind != UnitKind.Tower && u.kind != UnitKind.Base)
+                            MoveTo(u, u.pos + to.normalized * s.knock);
                         Fx.Hit(u.pos + Vector3.up * 30f, s.color, true);
                     }
                     Fx.Ring(h.pos + aimDir * 70f, s.radius * 0.8f, s.color, 0.4f);
@@ -818,7 +871,7 @@ namespace TapArena
                 case SkillKind.Pull:
                 {
                     var t = NearestHero(h, s.range);
-                    if (t == null) { Fx.Text(h.pos, "抱不到人…", s.color); break; }
+                    if (t == null) { Fx.Text(h.pos, "抱不到人…", s.color); h.cds[index] = 0.8f; break; }
                     Vector3 toH = h.pos + aimDir * 62f;
                     Fx.Trail(t.pos + Vector3.up * 30f, toH + Vector3.up * 30f, s.color);
                     MoveTo(t, toH);
@@ -836,7 +889,6 @@ namespace TapArena
                     Vector3 from = h.pos;
                     MoveTo(h, dest);
                     Fx.Trail(from + Vector3.up * 40f, h.pos + Vector3.up * 40f, s.color);
-                    Invoke(nameof(Noop), 0f);
                     LeapLand(h, dest, s);
                     break;
                 }
@@ -849,8 +901,6 @@ namespace TapArena
                 }
             }
         }
-
-        void Noop() { }
 
         void LeapLand(Unit h, Vector3 dest, SkillDef s)
         {
@@ -865,6 +915,7 @@ namespace TapArena
         {
             for (int k = 0; k < s.count; k++)
             {
+                if (h == null || !h.alive) yield break;
                 Vector3 at = center + new Vector3(Rand(-60f, 60f), 0f, Rand(-45f, 45f));
                 Fx.Ring(at, s.radius, s.color, 0.3f);
                 yield return new WaitForSeconds(s.delay);
@@ -896,7 +947,7 @@ namespace TapArena
             float prev = Time.timeScale;
             Time.timeScale = 0.18f;
             yield return new WaitForSecondsRealtime(seconds);
-            Time.timeScale = prev;
+            Time.timeScale = Boot.Paused ? 0f : prev;
         }
     }
 }

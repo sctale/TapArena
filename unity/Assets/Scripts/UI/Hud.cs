@@ -276,7 +276,7 @@ namespace TapArena
                 cxp += cw + h * 0.012f;
             }
 
-            Label(new Rect(w * 0.78f, h * 0.9f, w * 0.2f, h * 0.05f), "Unity 版 v2.0", _hudSmall,
+            Label(new Rect(w * 0.78f, h * 0.9f, w * 0.2f, h * 0.05f), "Unity 版 v2.0.1", _hudSmall,
                 new Color(1f, 1f, 1f, 0.55f));
         }
 
@@ -373,11 +373,32 @@ namespace TapArena
                 _num.normal.textColor = Color.white;
             }
 
+            /* 塔 / 水晶血条：投影到模型头顶，推塔时能看到进度 */
+            var c0 = CameraRig.I != null ? CameraRig.I.cam : Camera.main;
+            if (c0 != null)
+            {
+                foreach (var u in a.units)
+                {
+                    if (!u.alive || (u.kind != UnitKind.Tower && u.kind != UnitKind.Base)) continue;
+                    Vector3 wp = u.pos + Vector3.up * (u.height * 0.55f + 20f);
+                    Vector3 sp = c0.WorldToScreenPoint(wp);
+                    if (sp.z <= 0f || sp.x < -80f || sp.x > w + 80f) continue;
+                    float bw = u.kind == UnitKind.Base ? w * 0.09f : w * 0.065f;
+                    float by = Mathf.Clamp(Screen.height - sp.y - 10f, h * 0.03f, h * 0.9f);
+                    var br = new Rect(sp.x - bw * 0.5f, by, bw, h * 0.011f);
+                    Rounded(br, new Color(0.03f, 0.08f, 0.07f, 0.8f));
+                    float hpK = Mathf.Clamp01(u.hp / u.maxHp);
+                    if (hpK > 0.005f)
+                        Rounded(new Rect(br.x, br.y, br.width * hpK, br.height),
+                            u.team == Team.Blue ? new Color(0.5f, 0.9f, 1f, 0.95f) : new Color(1f, 0.62f, 0.55f, 0.95f));
+                }
+            }
+
             /* 左上：英雄状态 */
             if (a.player != null)
             {
                 var p = a.player;
-                var plate = new Rect(w * 0.012f, h * 0.022f, w * 0.315f, h * 0.105f);
+                var plate = new Rect(w * 0.012f, h * 0.022f, w * 0.315f, h * 0.116f);
                 Rounded(plate, CPanel);
                 var av = new Rect(plate.x + h * 0.012f, plate.y + h * 0.012f, h * 0.082f, h * 0.082f);
                 Circle(new Rect(av.x - 3f, av.y - 3f, av.width + 6f, av.height + 6f), new Color(1f, 0.82f, 0.42f, 0.9f));
@@ -402,6 +423,19 @@ namespace TapArena
                     var sb = new Rect(bar.x, bar.yMax + h * 0.004f, (bar.width) * Mathf.Clamp01(p.shield / p.maxHp), h * 0.012f);
                     Rounded(sb, new Color(0.6f, 0.9f, 1f, 0.9f));
                 }
+                /* 大招经验：2 级前是一根细金条，解锁后变成"大招就绪" */
+                var xb = new Rect(bar.x, bar.yMax + h * 0.021f, bar.width, h * 0.008f);
+                Rounded(xb, new Color(0.03f, 0.08f, 0.07f, 0.72f));
+                if (p.level < 2)
+                {
+                    float k = Mathf.Clamp01(p.xp / 300f);
+                    if (k > 0.01f) Rounded(new Rect(xb.x, xb.y, xb.width * k, xb.height),
+                        new Color(1f, 0.80f, 0.35f, 0.95f));
+                    Circle(new Rect(xb.x - h * 0.006f, xb.y - h * 0.003f, h * 0.014f, h * 0.014f),
+                        new Color(1f, 0.86f, 0.45f, 0.9f));
+                }
+                else
+                    Rounded(new Rect(xb.x, xb.y, xb.width, xb.height), new Color(1f, 0.80f, 0.35f, 0.92f));
             }
 
             /* 中上：比分与时间 */
@@ -458,12 +492,18 @@ namespace TapArena
                 }
                 else
                 {
-                    Label(new Rect(r.x, r.y + r.height * 0.12f, r.width, r.height * 0.62f), s != null ? s.name : "技能",
-                        _cardName, CInk);
-                    if (p2 != null && p2.cds[i] > 0f)
+                    bool cooling = p2 != null && p2.cds[i] > 0f;
+                    Label(new Rect(r.x, r.y + r.height * (cooling ? 0.08f : 0.26f), r.width,
+                        r.height * (cooling ? 0.30f : 0.42f)),
+                        s != null ? s.name : "技能", cooling ? _chip : _cardName,
+                        cooling ? new Color(1f, 0.95f, 0.85f, 0.85f) : CInk);
+                    if (cooling)
                     {
-                        Circle(r, new Color(0.04f, 0.08f, 0.07f, 0.62f));
-                        Label(r, Mathf.CeilToInt(p2.cds[i]).ToString(), _center, Color.white);
+                        Circle(r, new Color(0.04f, 0.08f, 0.07f, 0.55f));
+                        Label(new Rect(r.x, r.y + r.height * 0.06f, r.width, r.height * 0.28f),
+                            s != null ? s.name : "技能", _chip, new Color(1f, 0.95f, 0.85f, 0.9f));
+                        Label(new Rect(r.x, r.y + r.height * 0.36f, r.width, r.height * 0.5f),
+                            Mathf.CeilToInt(p2.cds[i]).ToString(), _center, Color.white);
                     }
                     else if (ready && i == 2)
                     {
@@ -574,8 +614,6 @@ namespace TapArena
         {
             float w = Screen.width, h = Screen.height;
             Fill(new Rect(0, 0, w, h), new Color(0.03f, 0.10f, 0.09f, 0.72f), _white);
-            /* 先铺一层整屏的透明按钮，暂停时点不到后面的技能键 */
-            GUI.Button(new Rect(0, 0, w, h), GUIContent.none, _btnSmall);
             var panel = new Rect(w * 0.32f, h * 0.16f, w * 0.36f, h * 0.68f);
             Rounded(new Rect(panel.x, panel.y + 6f, panel.width, panel.height), new Color(0.02f, 0.06f, 0.05f, 0.35f));
             Rounded(panel, new Color(0.10f, 0.24f, 0.20f, 0.98f));
@@ -635,6 +673,7 @@ namespace TapArena
         void Update()
         {
             if (GameFlow.screen != UiScreen.Battle) return;
+            if (Boot.Paused) return;          // 暂停时不吃技能触摸（Esc 由 Boot 统一处理）
             /* 触屏点技能键：OnGUI 里算好的矩形 */
             if (Input.touchCount > 0)
             {
@@ -647,7 +686,6 @@ namespace TapArena
                         if (_skillRects[k].Contains(p)) InputHub.SetSkill(k);
                 }
             }
-            if (Input.GetKeyDown(KeyCode.Escape)) Boot.Pause(!Boot.Paused);
         }
     }
 }

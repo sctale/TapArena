@@ -54,51 +54,106 @@ namespace TapArena
 
             /* ---- 步态 ---- */
             bool moving = unit.moving;
-            _walkPhase += dt * (moving ? 7.6f : 0f);
+            _walkPhase += dt * (moving ? 8.2f : 0f);
             float swing = moving ? Mathf.Sin(_walkPhase) : 0f;
-            float atk = unit.atkAnim > 0f ? 1f - unit.atkAnim / 0.26f : 0f;   // 0→1
+            float atk = unit.atkAnim > 0f ? 1f - unit.atkAnim / 0.26f : 0f;
             float cast = unit.castAnim > 0f ? 1f - unit.castAnim / 0.42f : 0f;
             float hurt = unit.hurtAnim > 0f ? unit.hurtAnim / 0.22f : 0f;
-            float atkArc = Mathf.Sin(atk * Mathf.PI);                          // 挥出去的弧度
+            float atkArc = Mathf.Sin(atk * Mathf.PI);
 
-            /* ---- 躯干：转体发力 + 挤压 ---- */
-            float wantTwist = atk > 0f ? Mathf.Lerp(-26f, 30f, atk) : (moving ? swing * 5f : 0f);
-            _bodyTwist = Mathf.Lerp(_bodyTwist, wantTwist, 1f - Mathf.Exp(-18f * dt));
+            /* ---- 躯干：转体、前倾、受击后仰 ---- */
+            float wantTwist = atk > 0f ? Mathf.Lerp(-24f, 26f, atk) : (moving ? swing * 4f : 0f);
+            _bodyTwist = Mathf.Lerp(_bodyTwist, wantTwist, 1f - Mathf.Exp(-16f * dt));
             var body = t.body;
             body.localRotation = Quaternion.Euler(
-                atkArc * 8f - hurt * 14f - cast * 6f,
-                _bodyTwist,
-                (moving ? Mathf.Abs(swing) * 2f : 0f) - hurt * 8f);
-            float wantSquash = 1f + (moving ? Mathf.Abs(swing) * 0.035f : Mathf.Sin(Time.time * 1.6f) * 0.012f)
-                               - hurt * 0.06f;
+                hurt * 7f,                                   // 侧倾
+                _bodyTwist,                                  // 扭转
+                -atkArc * 9f + hurt * 12f + cast * 5f);      // 前倾（+Z 是后仰）
+            float wantSquash = 1f + (moving ? Mathf.Abs(swing) * 0.04f : Mathf.Sin(Time.time * 1.6f) * 0.012f)
+                               - hurt * 0.055f;
             _squash = Mathf.Lerp(_squash, wantSquash, 1f - Mathf.Exp(-14f * dt));
             body.localScale = new Vector3(1f / _squash, _squash, 1f / _squash);
 
-            /* ---- 腿：走路交替，出手时前腿撑地 ---- */
-            float legAmp = moving ? 34f : 0f;
-            t.legL.localRotation = Quaternion.Euler(swing * legAmp + atkArc * 10f, 0f, 0f);
-            t.legR.localRotation = Quaternion.Euler(-swing * legAmp - atkArc * 6f, 0f, 0f);
+            /* ---- 腿：前后摆（Z 轴），膝盖反向弯 ---- */
+            float legAmp = moving ? 30f : 0f;
+            SmoothEuler(t.legL, 0f, 0f, swing * legAmp + atkArc * 5f, 24f, dt);
+            SmoothEuler(t.legR, 0f, 0f, -swing * legAmp - atkArc * 4f, 24f, dt);
+            float kneeL = moving ? Mathf.Max(0f, swing) * 32f : 3f;
+            float kneeR = moving ? Mathf.Max(0f, -swing) * 32f : 3f;
+            SmoothEuler(t.shinL, 0f, 0f, -kneeL - atkArc * 4f, 24f, dt);
+            SmoothEuler(t.shinR, 0f, 0f, -kneeR - atkArc * 2f, 24f, dt);
 
-            /* ---- 手臂：攻击前挥（前后摆用 X 轴），施法上举 ---- */
-            float armSwing = moving ? -swing * 26f : 0f;
-            float atkArm = atk > 0f ? Mathf.Lerp(-55f, 105f, Mathf.Sin(atk * Mathf.PI * 0.85f)) : 0f;
-            t.armR.localRotation = Quaternion.Euler(armSwing + atkArm + cast * -130f, 0f, 0f);
-            t.armL.localRotation = Quaternion.Euler(-armSwing + atkArm * 0.45f + cast * -130f, 0f, 0f);
+            /* ---- 手臂：走路对摆；攻击是蓄力→甩出，施法抬臂 ---- */
+            float armSwing = moving ? swing * 22f : 0f;
+            float zL = -armSwing, zR = armSwing;
+            float elbowL = 12f, elbowR = 12f;
 
-            /* ---- 头：滞后跟随 + 呼吸 ---- */
-            _headLag = Mathf.Lerp(_headLag, -_bodyTwist * 0.45f, 1f - Mathf.Exp(-9f * dt));
-            t.head.localRotation = Quaternion.Euler(
-                atkArc * -10f + cast * 14f - hurt * 18f + Mathf.Sin(Time.time * 1.5f) * 2.2f,
-                _headLag, hurt * 10f);
+            if (atk > 0f)
+            {
+                if (atk < 0.35f)
+                {
+                    float k = atk / 0.35f;
+                    zR = Mathf.Lerp(zR, -72f, k);
+                    zL = Mathf.Lerp(zL, -34f, k);
+                    elbowR = Mathf.Lerp(elbowR, 78f, k);
+                    elbowL = Mathf.Lerp(elbowL, 42f, k);
+                }
+                else
+                {
+                    float k = Mathf.Clamp01((atk - 0.35f) / 0.65f);
+                    float hit = Mathf.Sin(k * Mathf.PI * 0.92f);
+                    zR = Mathf.Lerp(-72f, 98f, hit);
+                    zL = Mathf.Lerp(-34f, 34f, hit);
+                    elbowR = Mathf.Lerp(78f, 6f, k);
+                    elbowL = Mathf.Lerp(42f, 14f, k);
+                }
+            }
+            if (cast > 0f)
+            {
+                float k = Mathf.Sin(Mathf.Clamp01(cast) * Mathf.PI);
+                zR = Mathf.Lerp(zR, 108f, k);
+                zL = Mathf.Lerp(zL, 54f, k);
+                elbowR = Mathf.Lerp(elbowR, 18f, k);
+                elbowL = Mathf.Lerp(elbowL, 30f, k);
+            }
+            if (hurt > 0f)
+            {
+                zR = Mathf.Lerp(zR, 40f, hurt);
+                zL = Mathf.Lerp(zL, -20f, hurt);
+                elbowR = Mathf.Lerp(elbowR, 55f, hurt);
+            }
+            SmoothEuler(t.armL, 5f, 0f, zL, 22f, dt);
+            SmoothEuler(t.armR, -5f, 0f, zR, 22f, dt);
+            SmoothEuler(t.forearmL, 0f, 0f, elbowL, 22f, dt);
+            SmoothEuler(t.forearmR, 0f, 0f, elbowR, 22f, dt);
+
+            /* ---- 头：滞后跟随 + 转向镜头（让玩家看得见脸）+ 呼吸 ---- */
+            _headLag = Mathf.Lerp(_headLag, -_bodyTwist * 0.4f, 1f - Mathf.Exp(-9f * dt));
+            float lookYaw = 0f;
+            var cam = CameraRig.I != null ? CameraRig.I.cam : null;
+            if (cam != null)
+            {
+                Vector3 cd = cam.transform.position - t.head.position;
+                float camYaw = Mathf.Atan2(-cd.z, cd.x) * Mathf.Rad2Deg;
+                float k = moving ? 0.55f : 1f;
+                if (atk > 0f || cast > 0f) k *= 0.45f;
+                if (hurt > 0f) k *= 0.4f;
+                lookYaw = Mathf.Clamp(Mathf.DeltaAngle(transform.eulerAngles.y + _bodyTwist, camYaw) * 0.5f, -30f, 30f) * k;
+            }
+            SmoothEuler(t.head, hurt * -8f,
+                _headLag + lookYaw,
+                -atkArc * 9f + cast * 12f - hurt * 5f + Mathf.Sin(Time.time * 1.5f) * 2.2f, 12f, dt);
 
             /* ---- 尾巴与耳朵：次级运动 ---- */
             if (t.tail != null)
-                t.tail.localRotation = Quaternion.Euler(
-                    Mathf.Sin(Time.time * 2.4f) * 8f,
-                    Mathf.Sin(Time.time * 2.1f) * 16f + _bodyTwist * 0.6f,
-                    -hurt * 14f + atkArc * 12f);
-            if (t.earL != null) t.earL.localRotation = Quaternion.Euler(Mathf.Sin(Time.time * 2.2f) * 6f - hurt * 20f, 0f, 0f);
-            if (t.earR != null) t.earR.localRotation = Quaternion.Euler(Mathf.Sin(Time.time * 2.2f + 1.2f) * 6f - hurt * 20f, 0f, 0f);
+                SmoothEuler(t.tail,
+                    Mathf.Sin(Time.time * 2.4f) * 6f,
+                    Mathf.Sin(Time.time * 2.1f) * 14f + _bodyTwist * 0.6f,
+                    -hurt * 12f + atkArc * 10f, 14f, dt);
+            if (t.earL != null)
+                SmoothEuler(t.earL, -8f + Mathf.Sin(Time.time * 2.2f) * 5f - hurt * 16f, 0f, 0f, 14f, dt);
+            if (t.earR != null)
+                SmoothEuler(t.earR, 8f + Mathf.Sin(Time.time * 2.2f + 1.2f) * 5f - hurt * 16f, 0f, 0f, 14f, dt);
 
             /* ---- 眨眼 ---- */
             _blinkT += dt;
@@ -116,6 +171,13 @@ namespace TapArena
             for (int i = 0; i < t.mats.Length; i++)
                 t.mats[i].color = Color.Lerp(t.baseCols[i], Color.white, _flash * 0.75f);
         }
+
+        static void SmoothEuler(Transform tr, float x, float y, float z, float rate, float dt)
+        {
+            if (tr == null) return;
+            tr.localRotation = Quaternion.Slerp(tr.localRotation, Quaternion.Euler(x, y, z),
+                1f - Mathf.Exp(-rate * dt));
+        }
     }
 
     /// <summary>世界表现层：地图、道具、塔、小兵、弹道、减速区、英雄视图。</summary>
@@ -129,9 +191,10 @@ namespace TapArena
         readonly List<GameObject> _zoneGo = new List<GameObject>();
         Material _zoneMat;
 
-        public static WorldView Attach(Arena a)
+        public static WorldView Attach(Arena a, Transform parent)
         {
             var go = new GameObject("WorldView");
+            go.transform.SetParent(parent, false);
             var v = go.AddComponent<WorldView>();
             v.arena = a;
             v.Build();
@@ -235,7 +298,7 @@ namespace TapArena
                 Art.GrassTuft(scenery, p, rr(0.9f, 1.5f), i);
             }
             /* 兵线跨河的木桥 */
-            Art.Bridge(scenery, new Vector3(1500f, -0.8f, 930f), 18.4f);
+            Art.Bridge(scenery, new Vector3(1500f, -0.8f, 800f), 0f);
             StaticBatchingUtility.Combine(scenery.gameObject);
 
             /* 塔与水晶 */
@@ -298,7 +361,12 @@ namespace TapArena
             if (arena == null) return;
             float dt = Time.deltaTime;
 
-            /* 小兵 */
+            /* 小兵：清理掉已经阵亡/被移除的模型，别留下满地尸体 */
+            var liveMinions = new HashSet<int>();
+            foreach (var m in arena.minions) if (m.alive) liveMinions.Add(m.uid);
+            foreach (var kv in _minionGo)
+                if (!liveMinions.Contains(kv.Key)) kv.Value.SetActive(false);
+
             foreach (var m in arena.minions)
             {
                 if (!m.alive) continue;
@@ -317,7 +385,9 @@ namespace TapArena
             /* 塔 / 水晶 存活状态 */
             foreach (var kv in _structureGo)
             {
-                var u = arena.units.Find(x => x.uid == kv.Key);
+                Unit u = null;
+                for (int i = 0; i < arena.units.Count; i++)
+                    if (arena.units[i].uid == kv.Key) { u = arena.units[i]; break; }
                 if (u == null) { kv.Value.SetActive(false); continue; }
                 kv.Value.SetActive(u.alive);
             }

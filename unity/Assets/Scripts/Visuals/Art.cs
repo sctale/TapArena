@@ -116,8 +116,11 @@ namespace TapArena
                 /* 底面朝下 */
                 tris[seg * 3 + i * 3] = 1; tris[seg * 3 + i * 3 + 1] = cur; tris[seg * 3 + i * 3 + 2] = nxt;
             }
-            _cone = new Mesh { name = "cone", vertices = verts, triangles = tris };
+            var uvs = new Vector2[verts.Length];
+            for (int i = 0; i < verts.Length; i++) uvs[i] = new Vector2(0.5f, 0.5f);
+            _cone = new Mesh { name = "cone", vertices = verts, triangles = tris, uv = uvs };
             _cone.RecalculateNormals();
+            _cone.tangents = MakeTangents(verts.Length);
             return _cone;
         }
 
@@ -157,8 +160,11 @@ namespace TapArena
                 verts.Add(bottom); verts.Add(a); verts.Add(b);
                 tris.Add(verts.Count - 3); tris.Add(verts.Count - 2); tris.Add(verts.Count - 1);
             }
-            _octa = new Mesh { name = "octa", vertices = verts.ToArray(), triangles = tris.ToArray() };
+            var uvs = new Vector2[verts.Count];
+            for (int i = 0; i < uvs.Length; i++) uvs[i] = new Vector2(0.5f, 0.5f);
+            _octa = new Mesh { name = "octa", vertices = verts.ToArray(), triangles = tris.ToArray(), uv = uvs };
             _octa.RecalculateNormals();
+            _octa.tangents = MakeTangents(verts.Count);
             return _octa;
         }
 
@@ -175,6 +181,101 @@ namespace TapArena
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             mr.receiveShadows = true;
             return go;
+        }
+
+        static Vector4[] MakeTangents(int n)
+        {
+            var t = new Vector4[n];
+            for (int i = 0; i < n; i++) t[i] = new Vector4(1f, 0f, 0f, -1f);
+            return t;
+        }
+
+        static Texture2D _fabric;
+        /// <summary>细密的布料/绒毛噪点，给纯色材质一点手感。</summary>
+        public static Texture2D FabricTex()
+        {
+            if (_fabric != null) return _fabric;
+            const int s = 64;
+            var tex = new Texture2D(s, s, TextureFormat.RGB24, true)
+            { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
+            var px = new Color32[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float n = Mathf.PerlinNoise(x * 0.42f + 3.1f, y * 0.42f + 7.7f) * 0.55f
+                              + Mathf.PerlinNoise(x * 1.7f + 11f, y * 1.7f + 5f) * 0.45f;
+                    float weave = (Mathf.Sin(x * 1.9f) + Mathf.Sin(y * 1.9f)) * 0.012f;
+                    float v = Mathf.Clamp01(0.9f + n * 0.12f + weave);
+                    byte b = (byte)(v * 255f);
+                    px[y * s + x] = new Color32(b, b, b, 255);
+                }
+            tex.SetPixels32(px); tex.Apply();
+            _fabric = tex;
+            return tex;
+        }
+
+        static Material MatFur(Color c, float outline)
+        {
+            var m = Mat(c, 0.22f, 0f, outline);
+            if (m.HasProperty("_MainTex"))
+            {
+                m.mainTexture = FabricTex();
+                m.mainTextureScale = new Vector2(2.2f, 2.2f);
+            }
+            return m;
+        }
+
+        static GameObject Ball(Transform p, Vector3 pos, Vector3 scale, Material m, Quaternion? q = null)
+            => Prim(PrimitiveType.Sphere, p, pos, scale, m, q);
+        static GameObject Box(Transform p, Vector3 pos, Vector3 scale, Material m, Quaternion? q = null)
+            => Prim(PrimitiveType.Cube, p, pos, scale, m, q);
+        static GameObject Tube(Transform p, Vector3 pos, Vector3 scale, Material m, Quaternion? q = null)
+            => Prim(PrimitiveType.Capsule, p, pos, scale, m, q);
+        static GameObject Cyl(Transform p, Vector3 pos, Vector3 scale, Material m, Quaternion? q = null)
+            => Prim(PrimitiveType.Cylinder, p, pos, scale, m, q);
+
+        /// <summary>把一个骨骼节点下的直系零件按材质合成一个网格，减少 draw call；子骨骼组不受影响。</summary>
+        public static void Batch(Transform g)
+        {
+            if (g == null || g.childCount == 0) return;
+            var byMat = new Dictionary<Material, List<MeshFilter>>();
+            for (int i = 0; i < g.childCount; i++)
+            {
+                var child = g.GetChild(i);
+                var mf = child.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                var mr = child.GetComponent<MeshRenderer>();
+                if (mr == null || mr.sharedMaterial == null) continue;
+                if (!byMat.TryGetValue(mr.sharedMaterial, out var list))
+                {
+                    list = new List<MeshFilter>();
+                    byMat[mr.sharedMaterial] = list;
+                }
+                list.Add(mf);
+            }
+            foreach (var kv in byMat)
+            {
+                var list = kv.Value;
+                if (list.Count < 2) continue;
+                var combines = new CombineInstance[list.Count];
+                for (int i = 0; i < list.Count; i++)
+                {
+                    combines[i].mesh = list[i].sharedMesh;
+                    combines[i].transform = g.worldToLocalMatrix * list[i].transform.localToWorldMatrix;
+                    combines[i].subMeshIndex = 0;
+                }
+                var mesh = new Mesh { name = "batch_" + kv.Key.name, hideFlags = HideFlags.DontSave };
+                mesh.CombineMeshes(combines, true, true);
+                mesh.RecalculateBounds();
+                var go = new GameObject("b");
+                go.transform.SetParent(g, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr2 = go.AddComponent<MeshRenderer>();
+                mr2.sharedMaterial = kv.Key;
+                mr2.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                mr2.receiveShadows = true;
+                for (int i = 0; i < list.Count; i++) Object.Destroy(list[i].gameObject);
+            }
         }
 
         public static GameObject Group(Transform parent, Vector3 localPos, string name = "part")
@@ -297,6 +398,7 @@ namespace TapArena
         public class Rig
         {
             public Transform root, body, head, armL, armR, legL, legR, tail, weapon, earL, earR, eyes;
+            public Transform forearmL, forearmR, shinL, shinR;
             public float height;
             public Material[] mats;
             public Color[] baseCols;
@@ -311,237 +413,449 @@ namespace TapArena
             Color fur = d.fur, dark = d.dark, cream = d.cream, accent = d.accent;
             float h = d.height;
             float hip = h * 0.40f;
-            float torsoR = h * 0.21f;
+            float torsoR = h * 0.23f;
+            float headR = h * 0.225f;
+            float headY = hip + h * 0.42f;
 
-            var mFur = Mat(fur, 0.2f, 0f, h * 0.016f);
-            var mDark = Mat(dark, 0.2f, 0f, h * 0.014f);
-            var mCream = Mat(cream, 0.15f, 0f, h * 0.012f);
-            var mAccent = Mat(accent, 0.25f, 0f, h * 0.012f);
-            var mBlack = Mat(new Color(0.18f, 0.12f, 0.12f), 0.5f);
-            var mWhite = Mat(Color.white, 0.4f);
-            var mPink = Mat(new Color(1f, 0.62f, 0.66f), 0.2f);
-            rig.mats = new[] { mFur, mDark, mCream, mAccent };
-            rig.baseCols = new[] { fur, dark, cream, accent };
+            var mFur = MatFur(fur, h * 0.016f);
+            var mDark = MatFur(dark, h * 0.014f);
+            var mCream = MatFur(cream, h * 0.012f);
+            var mAccent = MatFur(accent, h * 0.012f);
+            var mInk = Mat(new Color(0.17f, 0.11f, 0.12f), 0.4f);
+            var mWhite = Mat(Color.white, 0.35f);
+            var mPink = Mat(new Color(1f, 0.60f, 0.66f), 0.25f);
+            var mGold = Mat(new Color(0.96f, 0.78f, 0.34f), 0.5f);
+            var mLeaf = Mat(new Color(0.34f, 0.62f, 0.33f), 0.3f);
+            var mWood = Mat(new Color(0.44f, 0.29f, 0.19f), 0.2f);
+            var mFurL = MatFur(fur, 0f);
+            var mDarkL = MatFur(dark, 0f);
+            var mCreamL = MatFur(cream, 0f);
+            rig.mats = new[] { mFur, mDark, mCream, mAccent, mFurL, mDarkL, mCreamL };
+            rig.baseCols = new[] { fur, dark, cream, accent, fur, dark, cream };
 
-            /* 躯干：髋部为原点，方便整体挤压 */
+            /* ---------- 躯干：梨形，下宽上窄 ---------- */
             var body = Group(root.transform, Vector3.zero, "body");
             rig.body = body.transform;
+            Ball(body.transform, new Vector3(0f, hip + h * 0.10f, 0f),
+                new Vector3(torsoR * 2.00f, torsoR * 1.75f, torsoR * 1.82f), mFur);
+            Ball(body.transform, new Vector3(0f, hip + h * 0.30f, 0f),
+                new Vector3(torsoR * 1.64f, torsoR * 1.32f, torsoR * 1.56f), mFur);
+            Ball(body.transform, new Vector3(torsoR * 0.18f, hip + h * 0.11f, 0f),
+                new Vector3(torsoR * 1.18f, torsoR * 1.42f, torsoR * 1.30f), mCream);
+            Ball(body.transform, new Vector3(0f, hip + h * 0.375f, 0f),
+                new Vector3(torsoR * 1.02f, torsoR * 0.42f, torsoR * 0.95f), mFur);
+            Cyl(body.transform, new Vector3(0f, hip + h * 0.045f, 0f),
+                new Vector3(torsoR * 1.94f, h * 0.014f, torsoR * 1.80f), mDark);
+            Box(body.transform, new Vector3(torsoR * 0.92f, hip + h * 0.045f, 0f),
+                new Vector3(h * 0.045f, h * 0.04f, h * 0.02f), mGold);
 
-            Prim(PrimitiveType.Sphere, body.transform, new Vector3(0f, hip + torsoR * 0.25f, 0f),
-                new Vector3(torsoR * 2.05f, torsoR * 2.25f, torsoR * 1.85f), mFur);
-            /* 肚皮 */
-            Prim(PrimitiveType.Sphere, body.transform, new Vector3(torsoR * 0.45f, hip + torsoR * 0.12f, 0f),
-                new Vector3(torsoR * 1.12f, torsoR * 1.55f, torsoR * 1.22f), mCream);
-
-            /* 头 */
-            var head = Group(body.transform, new Vector3(0f, hip + torsoR * 2.12f, 0f), "head");
+            /* ---------- 头 ---------- */
+            var head = Group(body.transform, new Vector3(0f, headY, 0f), "head");
             rig.head = head.transform;
-            float headR = h * 0.205f;
-            Prim(PrimitiveType.Sphere, head.transform, Vector3.zero,
-                new Vector3(headR * 2.05f, headR * 1.95f, headR * 1.9f), mFur);
-            /* 口鼻 */
-            Prim(PrimitiveType.Sphere, head.transform, new Vector3(headR * 0.74f, -headR * 0.24f, 0f),
-                new Vector3(headR * 0.92f, headR * 0.66f, headR * 0.86f), mCream);
-            /* 鼻子 */
-            Prim(PrimitiveType.Sphere, head.transform, new Vector3(headR * 1.18f, -headR * 0.12f, 0f),
-                new Vector3(headR * 0.22f, headR * 0.16f, headR * 0.26f), mBlack);
-            /* 嘴：小小的深色弧 */
-            Prim(PrimitiveType.Sphere, head.transform, new Vector3(headR * 1.05f, -headR * 0.46f, 0f),
-                new Vector3(headR * 0.16f, headR * 0.1f, headR * 0.3f), mBlack);
-            /* 腮红 */
+            Ball(head.transform, Vector3.zero,
+                new Vector3(headR * 2.02f, headR * 1.95f, headR * 1.88f), mFur);
+            /* 小口鼻：只占脸的下半小块，不再像戴了白口罩 */
             for (int s = -1; s <= 1; s += 2)
-                Prim(PrimitiveType.Sphere, head.transform,
-                    new Vector3(headR * 0.62f, -headR * 0.3f, s * headR * 0.68f),
-                    new Vector3(headR * 0.34f, headR * 0.2f, headR * 0.24f), mPink);
+                Ball(head.transform, new Vector3(headR * 0.58f, -headR * 0.30f, s * headR * 0.42f),
+                    new Vector3(headR * 0.44f, headR * 0.34f, headR * 0.42f), mCream);
+            Ball(head.transform, new Vector3(headR * 0.84f, -headR * 0.32f, 0f),
+                new Vector3(headR * 0.80f, headR * 0.52f, headR * 0.86f), mCream);
+            Ball(head.transform, new Vector3(headR * 1.17f, -headR * 0.15f, 0f),
+                new Vector3(headR * 0.21f, headR * 0.15f, headR * 0.27f), mInk);
+            /* 小小的微笑：中间一点 + 两边上翘 */
+            for (int i = -2; i <= 2; i++)
+                Ball(head.transform,
+                    new Vector3(headR * (1.21f - Mathf.Abs(i) * 0.012f), -headR * (0.46f + (2 - Mathf.Abs(i)) * 0.025f),
+                        i * headR * 0.06f),
+                    new Vector3(headR * 0.055f, headR * 0.035f, headR * 0.05f), mInk);
+            for (int s = -1; s <= 1; s += 2)
+                Ball(head.transform, new Vector3(headR * 0.62f, -headR * 0.28f, s * headR * 0.82f),
+                    new Vector3(headR * 0.30f, headR * 0.17f, headR * 0.22f), mPink);
 
-            /* 眼睛：眼白 + 瞳孔 + 高光，眨眼时整组压扁 */
-            var eyes = Group(head.transform, new Vector3(headR * 0.86f, headR * 0.2f, 0f), "eyes");
+            /* 眼睛：大而张开，双高光；没有压眼皮 */
+            var eyes = Group(head.transform, new Vector3(headR * 0.86f, headR * 0.06f, 0f), "eyes");
             rig.eyes = eyes.transform;
             for (int s = -1; s <= 1; s += 2)
             {
-                Prim(PrimitiveType.Sphere, eyes.transform, new Vector3(0f, 0f, s * headR * 0.37f),
-                    new Vector3(headR * 0.3f, headR * 0.52f, headR * 0.44f), mWhite);
-                Prim(PrimitiveType.Sphere, eyes.transform, new Vector3(headR * 0.1f, 0f, s * headR * 0.37f),
-                    new Vector3(headR * 0.22f, headR * 0.4f, headR * 0.32f), mBlack);
-                Prim(PrimitiveType.Sphere, eyes.transform, new Vector3(headR * 0.21f, headR * 0.14f, s * headR * 0.37f),
-                    Vector3.one * headR * 0.13f, mWhite);
+                Ball(eyes.transform, new Vector3(0f, 0f, s * headR * 0.40f),
+                    new Vector3(headR * 0.36f, headR * 0.60f, headR * 0.48f), mWhite);
+                Ball(eyes.transform, new Vector3(headR * 0.09f, 0f, s * headR * 0.40f),
+                    new Vector3(headR * 0.28f, headR * 0.48f, headR * 0.36f), mInk);
+                Ball(eyes.transform, new Vector3(headR * 0.21f, headR * 0.17f, s * headR * 0.40f),
+                    Vector3.one * headR * 0.15f, mWhite);
+                Ball(eyes.transform, new Vector3(headR * 0.24f, -headR * 0.15f, s * headR * 0.40f),
+                    Vector3.one * headR * 0.07f, mWhite);
+                /* 外眼角的细睫毛 */
+                Box(eyes.transform, new Vector3(headR * 0.16f, headR * 0.30f, s * headR * 0.60f),
+                    new Vector3(headR * 0.04f, headR * 0.035f, headR * 0.12f), mDark,
+                    Quaternion.Euler(0f, 0f, s * 18f));
+            }
+            for (int s = -1; s <= 1; s += 2)
+                Box(eyes.transform, new Vector3(headR * 0.18f, headR * 0.52f, s * headR * 0.40f),
+                    new Vector3(headR * 0.035f, headR * 0.035f, headR * 0.20f), mDark,
+                    Quaternion.Euler(0f, 0f, 0f));
+
+            /* 耳朵先建组，具体形状在角色分支里填 */
+            var earL = Group(head.transform, new Vector3(-headR * 0.06f, headR * 0.78f, -headR * 0.55f), "earL");
+            var earR = Group(head.transform, new Vector3(-headR * 0.06f, headR * 0.78f, headR * 0.55f), "earR");
+            rig.earL = earL.transform; rig.earR = earR.transform;
+            earL.transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+            earR.transform.localRotation = Quaternion.Euler(8f, 0f, 0f);
+
+            /* ---------- 手臂：肩、上臂、前臂、手掌、拇指 ---------- */
+            var armL = Group(body.transform, new Vector3(h * 0.02f, hip + h * 0.26f, -torsoR * 1.02f), "armL");
+            var armR = Group(body.transform, new Vector3(h * 0.02f, hip + h * 0.26f, torsoR * 1.02f), "armR");
+            rig.armL = armL.transform; rig.armR = armR.transform;
+            float upper = h * 0.14f;
+            float fore = h * 0.13f;
+            for (int side = 0; side < 2; side++)
+            {
+                var arm = side == 0 ? armL.transform : armR.transform;
+                Ball(arm, Vector3.zero, new Vector3(h * 0.13f, h * 0.12f, h * 0.13f), mFurL);
+                Tube(arm, new Vector3(0f, -upper * 0.5f, 0f),
+                    new Vector3(h * 0.115f, upper * 0.56f, h * 0.115f), mFurL);
+                var foreG = Group(arm, new Vector3(0f, -upper * 0.90f, 0f), side == 0 ? "foreL" : "foreR");
+                if (side == 0) rig.forearmL = foreG.transform; else rig.forearmR = foreG.transform;
+                Tube(foreG.transform, new Vector3(0f, -fore * 0.52f, 0f),
+                    new Vector3(h * 0.105f, fore * 0.58f, h * 0.105f), mFurL);
+                Ball(foreG.transform, new Vector3(h * 0.008f, -fore * 1.02f, 0f),
+                    new Vector3(h * 0.125f, h * 0.11f, h * 0.11f), mCreamL);
+                float inner = side == 0 ? 1f : -1f;
+                Ball(foreG.transform, new Vector3(h * 0.055f, -fore * 0.94f, inner * h * 0.06f),
+                    new Vector3(h * 0.055f, h * 0.06f, h * 0.045f), mCreamL);
             }
 
-            /* 眉毛：轻轻上挑，表情更精神 */
-            for (int s = -1; s <= 1; s += 2)
-                Prim(PrimitiveType.Cube, eyes.transform, new Vector3(headR * 0.02f, headR * 0.38f, s * headR * 0.37f),
-                    new Vector3(headR * 0.08f, headR * 0.06f, headR * 0.28f), mDark,
-                    Quaternion.Euler(s * 8f, 0f, s * -7f));
-
-            /* 耳朵：默认圆耳，兔/狐/熊各改形状 */
-            var earL = Group(head.transform, new Vector3(-headR * 0.1f, headR * 0.8f, headR * 0.52f), "earL");
-            var earR = Group(head.transform, new Vector3(-headR * 0.1f, headR * 0.8f, -headR * 0.52f), "earR");
-            rig.earL = earL.transform; rig.earR = earR.transform;
-            float earS = headR * 0.54f;
-            Prim(PrimitiveType.Sphere, earL.transform, Vector3.zero, new Vector3(earS * 0.6f, earS, earS * 0.56f), mFur);
-            Prim(PrimitiveType.Sphere, earR.transform, Vector3.zero, new Vector3(earS * 0.6f, earS, earS * 0.56f), mFur);
-
-            /* 手臂 */
-            var armL = Group(body.transform, new Vector3(0f, hip + torsoR * 1.5f, -torsoR * 1.02f), "armL");
-            var armR = Group(body.transform, new Vector3(0f, hip + torsoR * 1.5f, torsoR * 1.02f), "armR");
-            rig.armL = armL.transform; rig.armR = armR.transform;
-            float armLen = h * 0.26f;
-            Prim(PrimitiveType.Capsule, armL.transform, new Vector3(0f, -armLen * 0.5f, 0f),
-                new Vector3(torsoR * 0.42f, armLen * 0.5f, torsoR * 0.42f), mFur);
-            Prim(PrimitiveType.Sphere, armL.transform, new Vector3(0f, -armLen, 0f), Vector3.one * torsoR * 0.52f, mCream);
-            Prim(PrimitiveType.Capsule, armR.transform, new Vector3(0f, -armLen * 0.5f, 0f),
-                new Vector3(torsoR * 0.42f, armLen * 0.5f, torsoR * 0.42f), mFur);
-            Prim(PrimitiveType.Sphere, armR.transform, new Vector3(0f, -armLen, 0f), Vector3.one * torsoR * 0.52f, mCream);
-
-            /* 腿 */
-            var legL = Group(root.transform, new Vector3(0f, hip * 0.92f, -torsoR * 0.62f), "legL");
-            var legR = Group(root.transform, new Vector3(0f, hip * 0.92f, torsoR * 0.62f), "legR");
+            /* ---------- 腿：大腿、膝、小腿、脚 ---------- */
+            var legL = Group(root.transform, new Vector3(0f, hip, -torsoR * 0.55f), "legL");
+            var legR = Group(root.transform, new Vector3(0f, hip, torsoR * 0.55f), "legR");
             rig.legL = legL.transform; rig.legR = legR.transform;
-            float legLen = hip * 0.92f;
-            Prim(PrimitiveType.Capsule, legL.transform, new Vector3(0f, -legLen * 0.5f, 0f),
-                new Vector3(torsoR * 0.5f, legLen * 0.5f, torsoR * 0.5f), mDark);
-            Prim(PrimitiveType.Sphere, legL.transform, new Vector3(h * 0.07f, -legLen, 0f),
-                new Vector3(torsoR * 0.68f, torsoR * 0.36f, torsoR * 0.6f), mCream);
-            Prim(PrimitiveType.Capsule, legR.transform, new Vector3(0f, -legLen * 0.5f, 0f),
-                new Vector3(torsoR * 0.5f, legLen * 0.5f, torsoR * 0.5f), mDark);
-            Prim(PrimitiveType.Sphere, legR.transform, new Vector3(h * 0.07f, -legLen, 0f),
-                new Vector3(torsoR * 0.68f, torsoR * 0.36f, torsoR * 0.6f), mCream);
+            float thigh = h * 0.19f;
+            float shin = h * 0.18f;
+            for (int side = 0; side < 2; side++)
+            {
+                var leg = side == 0 ? legL.transform : legR.transform;
+                Tube(leg, new Vector3(0f, -thigh * 0.5f, 0f),
+                    new Vector3(h * 0.13f, thigh * 0.52f, h * 0.13f), mDarkL);
+                Ball(leg, new Vector3(0f, -thigh, 0f),
+                    new Vector3(h * 0.115f, h * 0.115f, h * 0.115f), mDarkL);
+                var shinG = Group(leg, new Vector3(0f, -thigh, 0f), side == 0 ? "shinL" : "shinR");
+                if (side == 0) rig.shinL = shinG.transform; else rig.shinR = shinG.transform;
+                Tube(shinG.transform, new Vector3(0f, -shin * 0.52f, 0f),
+                    new Vector3(h * 0.115f, shin * 0.56f, h * 0.115f), mDarkL);
+                Ball(shinG.transform, new Vector3(h * 0.035f, -shin * 1.02f, 0f),
+                    new Vector3(h * 0.16f, h * 0.085f, h * 0.125f), mCreamL);
+            }
 
-            /* 尾巴 */
-            /* 尾巴：贴着身后往下垂，正面看不会长出一条"第三条手臂" */
-            var tail = Group(body.transform, new Vector3(-torsoR * 0.85f, hip * 0.55f, 0f), "tail");
+            /* ---------- 尾巴：各角色在分支里填 ---------- */
+            var tail = Group(body.transform, new Vector3(-torsoR * 0.82f, hip + h * 0.08f, 0f), "tail");
             rig.tail = tail.transform;
-            Prim(PrimitiveType.Capsule, tail.transform, new Vector3(-torsoR * 0.55f, -torsoR * 0.25f, 0f),
-                new Vector3(torsoR * 0.36f, torsoR * 0.7f, torsoR * 0.36f), mFur,
-                Quaternion.Euler(0f, 0f, 138f));
-            Prim(PrimitiveType.Sphere, tail.transform, new Vector3(-torsoR * 1.15f, -torsoR * 0.72f, 0f),
-                Vector3.one * torsoR * 0.34f, mFur);
 
-            /* ------- 各英雄的识别部件 ------- */
+            /* ---------- 角色差异 ---------- */
             switch (d.id)
             {
                 case HeroId.Tiger:
-                    /* 虎纹：背侧三道短条纹，斜着贴 */
-                    for (int i = 0; i < 3; i++)
+                {
+                    EarRound(earL.transform, headR, mFur, mCream);
+                    EarRound(earR.transform, headR, mFur, mCream);
+                    for (int i = -1; i <= 1; i++)
+                        Box(head.transform,
+                            new Vector3(headR * 0.92f, headR * 0.36f, i * headR * 0.18f),
+                            new Vector3(headR * 0.03f, headR * 0.17f, headR * 0.07f), mDark,
+                            Quaternion.Euler(0f, 0f, i * 6f));
+                    Box(body.transform, new Vector3(torsoR * 1.02f, hip + h * 0.20f, 0f),
+                        new Vector3(h * 0.055f, h * 0.30f, h * 0.025f), mWood,
+                        Quaternion.Euler(0f, 0f, 30f));
+                    head.transform.localScale = new Vector3(1.02f, 1.0f, 1.0f);
+                    for (int s = -1; s <= 1; s += 2)
                     {
-                        float y = hip + torsoR * (0.45f + i * 0.5f);
-                        Prim(PrimitiveType.Cube, body.transform, new Vector3(-torsoR * 0.72f, y, 0f),
-                            new Vector3(torsoR * 0.5f, torsoR * 0.16f, torsoR * 1.35f), mDark,
-                            Quaternion.Euler(0f, 0f, -18f));
+                        Box(head.transform, new Vector3(headR * 0.12f, -headR * 0.12f, s * headR * 0.88f),
+                            new Vector3(headR * 0.45f, headR * 0.07f, headR * 0.05f), mDark,
+                            Quaternion.Euler(0f, s * 10f, 0f));
+                        Box(head.transform, new Vector3(headR * 0.46f, -headR * 0.20f, s * headR * 0.82f),
+                            new Vector3(headR * 0.28f, headR * 0.06f, headR * 0.05f), mDark,
+                            Quaternion.Euler(0f, s * 16f, 0f));
                     }
-                    /* 围巾 + 飘带 */
-                    Prim(PrimitiveType.Cylinder, body.transform, new Vector3(0f, hip + torsoR * 1.46f, 0f),
-                        new Vector3(torsoR * 1.42f, torsoR * 0.19f, torsoR * 1.3f), mAccent);
-                    Prim(PrimitiveType.Cube, body.transform, new Vector3(-torsoR * 0.9f, hip + torsoR * 1.1f, torsoR * 0.55f),
-                        new Vector3(torsoR * 0.34f, torsoR * 0.75f, torsoR * 0.14f), mAccent,
-                        Quaternion.Euler(12f, 0f, 18f));
+                    /* 侧脸的小毛簇 */
+                    for (int s = -1; s <= 1; s += 2)
+                        Cone(head.transform, new Vector3(headR * 0.30f, -headR * 0.02f, s * headR * 0.92f),
+                            new Vector3(headR * 0.22f, headR * 0.26f, headR * 0.18f), mFur,
+                            Quaternion.Euler(0f, s * 70f, s * -60f));
+                    Cyl(body.transform, new Vector3(0f, hip + h * 0.285f, 0f),
+                        new Vector3(torsoR * 1.72f, h * 0.020f, torsoR * 1.62f), mAccent);
+                    Ball(body.transform, new Vector3(torsoR * 0.98f, hip + h * 0.285f, torsoR * 0.28f),
+                        new Vector3(h * 0.07f, h * 0.07f, h * 0.055f), mAccent);
+                    Box(body.transform, new Vector3(-torsoR * 0.30f, hip + h * 0.27f, torsoR * 0.50f),
+                        new Vector3(h * 0.05f, h * 0.17f, h * 0.02f), mAccent,
+                        Quaternion.Euler(0f, 0f, 16f));
+                    Box(body.transform, new Vector3(-torsoR * 0.38f, hip + h * 0.20f, torsoR * 0.56f),
+                        new Vector3(h * 0.045f, h * 0.12f, h * 0.018f), mAccent,
+                        Quaternion.Euler(0f, 0f, -6f));
+                    Cyl(rig.forearmL, new Vector3(0f, -h * 0.015f, 0f),
+                        new Vector3(h * 0.095f, h * 0.01f, h * 0.095f), mAccent);
+                    Cyl(rig.forearmR, new Vector3(0f, -h * 0.015f, 0f),
+                        new Vector3(h * 0.095f, h * 0.01f, h * 0.095f), mAccent);
+                    Cone(head.transform, new Vector3(headR * 0.12f, headR * 0.98f, headR * 0.10f),
+                        new Vector3(headR * 0.24f, headR * 0.34f, headR * 0.24f), mFur,
+                        Quaternion.Euler(0f, 0f, -22f));
+                    Cone(head.transform, new Vector3(headR * 0.06f, headR * 1.0f, -headR * 0.12f),
+                        new Vector3(headR * 0.18f, headR * 0.26f, headR * 0.18f), mDark,
+                        Quaternion.Euler(0f, 0f, 12f));
+                    TailDefault(tail.transform, torsoR, h, mFur);
                     break;
-
+                }
                 case HeroId.Fox:
-                    /* 巫师帽：圆锥 + 帽檐 + 星星 */
-                    Prim(PrimitiveType.Cylinder, head.transform, new Vector3(0f, headR * 0.94f, 0f),
-                        new Vector3(headR * 2.35f, headR * 0.06f, headR * 2.35f), mAccent);
-                    Cone(head.transform, new Vector3(0f, headR * 1.6f, 0f),
-                        new Vector3(headR * 1.55f, headR * 1.15f, headR * 1.55f), mAccent,
-                        Quaternion.Euler(0f, 0f, -8f));
-                    Prim(PrimitiveType.Sphere, head.transform, new Vector3(headR * 0.2f, headR * 1.55f, headR * 0.6f),
-                        Vector3.one * headR * 0.16f, Emissive(new Color(1f, 0.9f, 0.5f), 2.4f));
-                    /* 法杖 */
-                    {
-                        var w = Group(armR.transform, new Vector3(0f, -armLen, 0f), "weapon");
-                        rig.weapon = w.transform;
-                        Prim(PrimitiveType.Cylinder, w.transform, new Vector3(0f, h * 0.16f, 0f),
-                            new Vector3(2.4f, h * 0.3f, 2.4f), mDark);
-                        Prim(PrimitiveType.Sphere, w.transform, new Vector3(0f, h * 0.33f, 0f),
-                            Vector3.one * h * 0.105f, Emissive(new Color(1f, 0.84f, 0.4f), 2.6f));
-                    }
-                    /* 大尾巴：三段 */
-                    for (int i = 0; i < 3; i++)
-                        Prim(PrimitiveType.Sphere, tail.transform,
-                            new Vector3(-torsoR * (0.5f + i * 0.4f), torsoR * (0.1f + i * 0.34f), 0f),
-                            Vector3.one * torsoR * (1.15f - i * 0.18f), i == 2 ? mCream : mFur);
-                    break;
-
-                case HeroId.Rabbit:
-                    /* 超长耳朵：内侧粉色 */
-                    Object.Destroy(earL.transform.GetChild(0).gameObject);
-                    Object.Destroy(earR.transform.GetChild(0).gameObject);
-                    Prim(PrimitiveType.Capsule, earL.transform, new Vector3(0f, headR * 1.15f, 0f),
-                        new Vector3(headR * 0.52f, headR * 1.3f, headR * 0.42f), mFur);
-                    Prim(PrimitiveType.Capsule, earR.transform, new Vector3(0f, headR * 1.15f, 0f),
-                        new Vector3(headR * 0.52f, headR * 1.3f, headR * 0.42f), mFur);
-                    Prim(PrimitiveType.Capsule, earL.transform, new Vector3(headR * 0.12f, headR * 1.12f, 0f),
-                        new Vector3(headR * 0.24f, headR * 0.98f, headR * 0.2f), mAccent);
-                    Prim(PrimitiveType.Capsule, earR.transform, new Vector3(headR * 0.12f, headR * 1.12f, 0f),
-                        new Vector3(headR * 0.24f, headR * 0.98f, headR * 0.2f), mAccent);
-                    /* 裙摆 */
-                    Cone(body.transform, new Vector3(0f, hip - torsoR * 0.35f, 0f),
-                        new Vector3(torsoR * 2.25f, torsoR * 0.95f, torsoR * 2.25f), mAccent,
-                        Quaternion.Euler(180f, 0f, 0f));
-                    /* 头花 */
+                {
+                    Cone(earL.transform, new Vector3(0f, headR * 0.22f, 0f),
+                        new Vector3(headR * 0.72f, headR * 0.9f, headR * 0.5f), mFur,
+                        Quaternion.Euler(0f, 0f, -12f));
+                    Cone(earR.transform, new Vector3(0f, headR * 0.22f, 0f),
+                        new Vector3(headR * 0.72f, headR * 0.9f, headR * 0.5f), mFur,
+                        Quaternion.Euler(0f, 0f, -12f));
+                    Ball(earL.transform, new Vector3(headR * 0.16f, headR * 0.18f, 0f),
+                        new Vector3(headR * 0.28f, headR * 0.42f, headR * 0.18f), mPink);
+                    Ball(earR.transform, new Vector3(headR * 0.16f, headR * 0.18f, 0f),
+                        new Vector3(headR * 0.28f, headR * 0.42f, headR * 0.18f), mPink);
+                    Cyl(head.transform, new Vector3(0f, headR * 0.68f, 0f),
+                        new Vector3(headR * 2.55f, headR * 0.035f, headR * 2.55f), mAccent);
+                    Cyl(head.transform, new Vector3(0f, headR * 0.76f, 0f),
+                        new Vector3(headR * 2.30f, headR * 0.02f, headR * 2.30f), mGold);
+                    Cone(head.transform, new Vector3(0f, headR * 1.18f, 0f),
+                        new Vector3(headR * 1.45f, headR * 1.05f, headR * 1.45f), mAccent,
+                        Quaternion.Euler(0f, 0f, -7f));
+                    Cone(head.transform, new Vector3(headR * 0.42f, headR * 1.50f, 0f),
+                        new Vector3(headR * 0.55f, headR * 0.50f, headR * 0.55f), mAccent,
+                        Quaternion.Euler(0f, 0f, -58f));
+                    Ball(head.transform, new Vector3(headR * 0.58f, headR * 0.92f, headR * 0.35f),
+                        Vector3.one * headR * 0.14f, mGold);
+                    Ball(head.transform, new Vector3(headR * 1.08f, -headR * 0.34f, 0f),
+                        new Vector3(headR * 0.46f, headR * 0.30f, headR * 0.42f), mCream);
+                    Ball(head.transform, new Vector3(headR * 1.34f, -headR * 0.32f, 0f),
+                        new Vector3(headR * 0.14f, headR * 0.11f, headR * 0.16f), mInk);
+                    for (int s = -1; s <= 1; s += 2)
+                        Cone(head.transform, new Vector3(headR * 0.34f, -headR * 0.24f, s * headR * 0.88f),
+                            new Vector3(headR * 0.30f, headR * 0.32f, headR * 0.18f), mCream,
+                            Quaternion.Euler(0f, s * 75f, s * -70f));
+                    Ball(body.transform, new Vector3(torsoR * 0.42f, hip + h * 0.30f, 0f),
+                        new Vector3(torsoR * 0.9f, torsoR * 0.55f, torsoR * 0.8f), mCream);
+                    head.transform.localScale = new Vector3(0.94f, 1.0f, 0.92f);
+                    Cone(body.transform, new Vector3(0f, hip - h * 0.01f, 0f),
+                        new Vector3(h * 0.50f, h * 0.28f, h * 0.50f), mAccent);
+                    Cyl(body.transform, new Vector3(0f, hip + h * 0.02f, 0f),
+                        new Vector3(torsoR * 1.88f, h * 0.010f, torsoR * 1.72f), mGold);
+                    Ball(body.transform, new Vector3(-h * 0.02f, hip + h * 0.04f, -torsoR * 0.92f),
+                        new Vector3(h * 0.15f, h * 0.13f, h * 0.09f), mWood);
+                    var wp = Group(rig.forearmR, new Vector3(0f, -h * 0.13f, 0f), "weapon");
+                    rig.weapon = wp.transform;
+                    Cyl(wp.transform, new Vector3(0f, h * 0.12f, 0f),
+                        new Vector3(h * 0.035f, h * 0.30f, h * 0.035f), mWood);
+                    Cyl(wp.transform, new Vector3(0f, h * 0.36f, 0f),
+                        new Vector3(h * 0.06f, h * 0.012f, h * 0.06f), mGold);
+                    Ball(wp.transform, new Vector3(0f, h * 0.42f, 0f),
+                        Vector3.one * h * 0.10f, Emissive(new Color(1f, 0.83f, 0.40f), 1.8f));
                     for (int i = 0; i < 4; i++)
                     {
                         float a = i * Mathf.PI * 0.5f;
-                        Prim(PrimitiveType.Sphere, head.transform,
-                            new Vector3(headR * 0.15f, headR * 0.74f, 0f) +
-                            new Vector3(Mathf.Cos(a) * headR * 0.44f, Mathf.Sin(a) * headR * 0.18f, Mathf.Sin(a) * headR * 0.44f),
-                            Vector3.one * headR * 0.24f, Mat(new Color(1f, 0.7f, 0.84f), 0.2f, 0f, headR * 0.06f));
+                        Ball(wp.transform, new Vector3(Mathf.Cos(a) * h * 0.075f, h * 0.47f, Mathf.Sin(a) * h * 0.075f),
+                            Vector3.one * h * 0.025f, mGold);
                     }
+                    for (int i = 0; i < 3; i++)
+                        Ball(tail.transform,
+                            new Vector3(-torsoR * (0.45f + i * 0.42f), torsoR * (0.18f + i * 0.34f), 0f),
+                            Vector3.one * torsoR * (0.95f - i * 0.15f), i == 2 ? mCream : mFur);
                     break;
-
+                }
+                case HeroId.Rabbit:
+                {
+                    Tube(earL.transform, new Vector3(0f, headR * 0.86f, 0f),
+                        new Vector3(headR * 0.52f, headR * 0.98f, headR * 0.40f), mFur);
+                    Tube(earR.transform, new Vector3(0f, headR * 0.86f, 0f),
+                        new Vector3(headR * 0.52f, headR * 0.98f, headR * 0.40f), mFur);
+                    Tube(earL.transform, new Vector3(headR * 0.12f, headR * 0.84f, 0f),
+                        new Vector3(headR * 0.28f, headR * 0.78f, headR * 0.20f), mPink);
+                    Tube(earR.transform, new Vector3(headR * 0.12f, headR * 0.84f, 0f),
+                        new Vector3(headR * 0.28f, headR * 0.78f, headR * 0.20f), mPink);
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float z = Mathf.Lerp(-headR * 0.55f, headR * 0.55f, i / 4f);
+                        float y = headR * 0.84f + Mathf.Cos((i - 2) / 4f * Mathf.PI) * headR * 0.08f;
+                        var c = new Vector3(headR * 0.34f, y, z);
+                        Ball(head.transform, c, Vector3.one * headR * 0.15f, mGold);
+                        for (int k = 0; k < 4; k++)
+                        {
+                            float a = k * Mathf.PI * 0.5f;
+                            Ball(head.transform, c + new Vector3(Mathf.Cos(a) * headR * 0.12f, headR * 0.03f,
+                                Mathf.Sin(a) * headR * 0.12f), new Vector3(headR * 0.14f, headR * 0.09f, headR * 0.14f), mPink);
+                        }
+                    }
+                    Cone(body.transform, new Vector3(0f, hip - h * 0.02f, 0f),
+                        new Vector3(h * 0.50f, h * 0.24f, h * 0.50f), mAccent);
+                    Cone(body.transform, new Vector3(0f, hip - h * 0.10f, 0f),
+                        new Vector3(h * 0.58f, h * 0.22f, h * 0.58f), mCream);
+                    Ball(body.transform, new Vector3(torsoR * 0.62f, hip + h * 0.325f, -torsoR * 0.52f),
+                        new Vector3(h * 0.06f, h * 0.045f, h * 0.07f), mPink);
+                    Ball(body.transform, new Vector3(torsoR * 0.62f, hip + h * 0.325f, torsoR * 0.52f),
+                        new Vector3(h * 0.06f, h * 0.045f, h * 0.07f), mPink);
+                    Ball(body.transform, new Vector3(torsoR * 0.66f, hip + h * 0.325f, 0f),
+                        new Vector3(h * 0.04f, h * 0.04f, h * 0.04f), mGold);
+                    Ball(head.transform, new Vector3(headR * 1.20f, -headR * 0.15f, 0f),
+                        new Vector3(headR * 0.15f, headR * 0.12f, headR * 0.16f), mPink);
+                    Ball(body.transform, new Vector3(h * 0.18f, hip + h * 0.20f, 0f),
+                        new Vector3(h * 0.32f, h * 0.24f, h * 0.34f), mAccent);
+                    Cyl(body.transform, new Vector3(0f, hip + h * 0.31f, 0f),
+                        new Vector3(torsoR * 1.50f, h * 0.012f, torsoR * 1.40f), mCream);
+                    head.transform.localScale = new Vector3(0.98f, 1.02f, 0.98f);
+                    var wp = Group(rig.forearmR, new Vector3(0f, -h * 0.13f, 0f), "weapon");
+                    rig.weapon = wp.transform;
+                    Cyl(wp.transform, new Vector3(0f, h * 0.08f, 0f),
+                        new Vector3(h * 0.028f, h * 0.20f, h * 0.028f), mWood);
+                    Octa(wp.transform, new Vector3(0f, h * 0.29f, 0f),
+                        new Vector3(h * 0.16f, h * 0.22f, h * 0.16f), Emissive(new Color(1f, 0.86f, 0.50f), 1.7f));
+                    Ball(tail.transform, new Vector3(-torsoR * 0.35f, torsoR * 0.05f, 0f),
+                        Vector3.one * torsoR * 0.5f, mCream);
+                    break;
+                }
                 case HeroId.Bear:
-                    /* 荷叶盾 */
-                    {
-                        var w = Group(armL.transform, new Vector3(0f, -armLen * 0.7f, 0f), "weapon");
-                        rig.weapon = w.transform;
-                        Prim(PrimitiveType.Cylinder, w.transform, new Vector3(0f, 0f, -torsoR * 0.35f),
-                            new Vector3(torsoR * 1.75f, 5f, torsoR * 1.75f), mAccent,
-                            Quaternion.Euler(90f, 0f, 0f));
-                        Prim(PrimitiveType.Sphere, w.transform, new Vector3(0f, 0f, -torsoR * 0.35f),
-                            Vector3.one * torsoR * 0.42f, Emissive(new Color(0.55f, 0.95f, 0.6f), 1.2f));
-                    }
-                    earL.transform.localScale = Vector3.one * 1.25f;
-                    earR.transform.localScale = Vector3.one * 1.25f;
+                {
+                    earL.transform.localScale = Vector3.one * 1.18f;
+                    earR.transform.localScale = Vector3.one * 1.18f;
+                    EarRound(earL.transform, headR, mFur, mCream);
+                    EarRound(earR.transform, headR, mFur, mCream);
+                    var wp = Group(rig.forearmL, new Vector3(h * 0.065f, -h * 0.13f, -h * 0.10f), "weapon");
+                    rig.weapon = wp.transform;
+                    Cyl(wp.transform, Vector3.zero, new Vector3(h * 0.34f, h * 0.012f, h * 0.34f), mLeaf,
+                        Quaternion.Euler(0f, -22f, 90f));
+                    Box(wp.transform, new Vector3(h * 0.015f, 0f, 0f),
+                        new Vector3(h * 0.012f, h * 0.28f, h * 0.03f), mAccent);
+                    Box(wp.transform, new Vector3(h * 0.015f, 0f, 0f),
+                        new Vector3(h * 0.012f, h * 0.03f, h * 0.28f), mAccent);
+                    Box(wp.transform, new Vector3(h * 0.015f, 0f, 0f),
+                        new Vector3(h * 0.012f, h * 0.20f, h * 0.03f), mAccent,
+                        Quaternion.Euler(40f, 0f, 0f));
+                    Ball(wp.transform, new Vector3(h * 0.03f, 0f, 0f), Vector3.one * h * 0.06f, mGold);
+                    Cyl(body.transform, new Vector3(0f, hip + h * 0.03f, 0f),
+                        new Vector3(torsoR * 1.99f, h * 0.008f, torsoR * 1.86f), mWood);
+                    Box(body.transform, new Vector3(torsoR * 0.92f, hip + h * 0.03f, 0f),
+                        new Vector3(h * 0.05f, h * 0.05f, h * 0.03f), mGold);
+                    Cone(head.transform, new Vector3(headR * 0.10f, headR * 1.02f, 0f),
+                        new Vector3(headR * 0.35f, headR * 0.40f, headR * 0.20f), mLeaf,
+                        Quaternion.Euler(0f, 0f, -20f));
+                    Ball(body.transform, new Vector3(-h * 0.24f, hip + h * 0.20f, 0f),
+                        new Vector3(h * 0.18f, h * 0.36f, h * 0.46f), mLeaf);
+                    Ball(body.transform, new Vector3(torsoR * 0.86f, hip + h * 0.29f, 0f),
+                        new Vector3(h * 0.08f, h * 0.07f, h * 0.08f), mLeaf);
+                    head.transform.localScale = new Vector3(1.06f, 0.98f, 1.06f);
+                    TailDefault(tail.transform, torsoR, h, mFur);
                     break;
-
+                }
                 case HeroId.Otter:
-                    /* 扁平大尾巴 */
-                    Object.Destroy(tail.transform.GetChild(0).gameObject);
-                    Object.Destroy(tail.transform.GetChild(1).gameObject);
-                    Prim(PrimitiveType.Capsule, tail.transform, new Vector3(-torsoR * 1.1f, -torsoR * 0.15f, 0f),
-                        new Vector3(torsoR * 0.55f, torsoR * 1.5f, torsoR * 0.22f), mFur,
-                        Quaternion.Euler(0f, 0f, 88f));
-                    /* 水草项圈 + 头顶水泡 */
-                    Prim(PrimitiveType.Cylinder, body.transform, new Vector3(0f, hip + torsoR * 1.46f, 0f),
-                        new Vector3(torsoR * 1.36f, torsoR * 0.12f, torsoR * 1.26f), mAccent);
+                {
+                    EarRound(earL.transform, headR, mFur, mPink);
+                    EarRound(earR.transform, headR, mFur, mPink);
+                    Cyl(body.transform, new Vector3(0f, hip + h * 0.30f, 0f),
+                        new Vector3(torsoR * 1.58f, h * 0.016f, torsoR * 1.46f), mAccent);
+                    Ball(body.transform, new Vector3(torsoR * 0.70f, hip + h * 0.325f, 0f),
+                        new Vector3(h * 0.07f, h * 0.07f, h * 0.055f), mGold);
+                    for (int s2 = -1; s2 <= 1; s2 += 2)
+                        Ball(body.transform, new Vector3(h * 0.19f, hip + h * 0.18f, s2 * h * 0.10f),
+                            new Vector3(h * 0.26f, h * 0.22f, h * 0.14f), mAccent);
+                    head.transform.localScale = new Vector3(0.98f, 1.0f, 0.98f);
+                    var bub = Group(head.transform, new Vector3(h * 0.02f, h * 0.42f, 0f), "bubble");
+                    Ball(bub.transform, new Vector3(0f, h * 0.10f, 0f), Vector3.one * h * 0.16f,
+                        Emissive(new Color(0.55f, 0.86f, 1f), 0.55f));
+                    bub.AddComponent<Bobber>();
+                    for (int s = -1; s <= 1; s += 2)
                     {
-                        var bub = Prim(PrimitiveType.Sphere, head.transform, new Vector3(headR * 0.1f, headR * 2.35f, 0f),
-                            Vector3.one * headR * 0.72f, Mat(new Color(0.75f, 0.92f, 1f, 0.6f), 0.9f));
-                        var mr = bub.GetComponent<MeshRenderer>();
-                        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                        bub.AddComponent<Bobber>();
+                        Cyl(head.transform, new Vector3(headR * 0.92f, -headR * 0.30f, s * headR * 0.62f),
+                            new Vector3(h * 0.003f, headR * 0.16f, h * 0.003f), mWhite,
+                            Quaternion.Euler(90f, 0f, 0f));
+                        Cyl(head.transform, new Vector3(headR * 0.88f, -headR * 0.38f, s * headR * 0.60f),
+                            new Vector3(h * 0.003f, headR * 0.13f, h * 0.003f), mWhite,
+                            Quaternion.Euler(90f, 0f, -12f));
                     }
+                    Cone(head.transform, new Vector3(headR * 0.14f, headR * 0.96f, 0f),
+                        new Vector3(headR * 0.22f, headR * 0.30f, headR * 0.22f), mFur,
+                        Quaternion.Euler(0f, 0f, -18f));
+                    Tube(tail.transform, new Vector3(-torsoR * 0.55f, -torsoR * 0.10f, 0f),
+                        new Vector3(h * 0.075f, h * 0.26f, h * 0.045f), mFur,
+                        Quaternion.Euler(0f, 0f, 100f));
+                    Ball(tail.transform, new Vector3(-torsoR * 0.95f, -torsoR * 0.16f, 0f),
+                        new Vector3(h * 0.075f, h * 0.11f, h * 0.05f), mFur);
                     break;
-
-                case HeroId.Hedgehog:
-                    /* 背刺：两排圆锥 */
-                    for (int i = 0; i < 11; i++)
-                    {
-                        float a = Mathf.Lerp(-1.15f, 1.15f, i / 10f);
-                        float y = hip + torsoR * (0.5f + Mathf.Cos(a) * 0.6f);
-                        Cone(body.transform,
-                            new Vector3(-torsoR * 1.02f, y, Mathf.Sin(a) * torsoR * 0.9f),
-                            new Vector3(torsoR * 0.32f, torsoR * 1.0f, torsoR * 0.32f), mDark,
-                            Quaternion.Euler(0f, 90f, -58f + Mathf.Sin(a) * 6f));
-                    }
-                    /* 红色背带 */
-                    Prim(PrimitiveType.Cube, body.transform, new Vector3(torsoR * 0.05f, hip + torsoR * 0.85f, 0f),
-                        new Vector3(torsoR * 1.92f, torsoR * 0.18f, torsoR * 0.16f), mAccent,
-                        Quaternion.Euler(0f, 0f, 34f));
+                }
+                default: /* Hedgehog */
+                {
+                    EarRound(earL.transform, headR * 0.85f, mFur, mCream);
+                    EarRound(earR.transform, headR * 0.85f, mFur, mCream);
+                    for (int row = 0; row < 3; row++)
+                        for (int i = -2; i <= 2; i++)
+                        {
+                            float y0 = hip + h * 0.20f + row * h * 0.085f;
+                            float z0 = i * h * 0.085f;
+                            Cone(body.transform, new Vector3(-torsoR * 0.95f - row * h * 0.02f, y0, z0),
+                                new Vector3(h * 0.075f, h * 0.19f, h * 0.075f),
+                                (row & 1) == 0 ? mDark : mFur,
+                                Quaternion.Euler(0f, i * 8f, 55f));
+                        }
+                    Box(body.transform, new Vector3(torsoR * 0.58f, hip + h * 0.22f, 0f),
+                        new Vector3(h * 0.05f, h * 0.34f, h * 0.025f), mAccent,
+                        Quaternion.Euler(0f, 0f, 28f));
+                    Ball(body.transform, new Vector3(torsoR * 0.52f, hip + h * 0.10f, 0f),
+                        Vector3.one * h * 0.045f, mGold);
+                    Ball(body.transform, new Vector3(-torsoR * 0.15f, hip + h * 0.02f, -torsoR * 0.95f),
+                        new Vector3(h * 0.14f, h * 0.13f, h * 0.09f), mWood);
+                    Ball(head.transform, new Vector3(headR * 1.02f, -headR * 0.32f, 0f),
+                        new Vector3(headR * 0.44f, headR * 0.30f, headR * 0.38f), mCream);
+                    Ball(head.transform, new Vector3(headR * 1.28f, -headR * 0.30f, 0f),
+                        new Vector3(headR * 0.13f, headR * 0.10f, headR * 0.15f), mInk);
+                    for (int i = -1; i <= 1; i++)
+                        Cone(head.transform, new Vector3(-headR * 0.15f, headR * 0.95f, i * headR * 0.22f),
+                            new Vector3(headR * 0.16f, headR * 0.42f, headR * 0.16f), mDark,
+                            Quaternion.Euler(0f, i * 12f, 25f));
+                    for (int row = 0; row < 2; row++)
+                        for (int s = -1; s <= 1; s += 2)
+                            Cone(body.transform,
+                                new Vector3(-h * 0.055f, hip + h * (0.24f + row * 0.14f), s * h * 0.215f),
+                                new Vector3(h * 0.08f, h * 0.20f, h * 0.08f),
+                                row == 0 ? mFur : mDark,
+                                Quaternion.Euler(s * 80f, 0f, 0f));
+                    head.transform.localScale = new Vector3(0.98f, 0.97f, 0.95f);
+                    Ball(tail.transform, new Vector3(-torsoR * 0.30f, -torsoR * 0.05f, 0f),
+                        Vector3.one * torsoR * 0.28f, mFur);
                     break;
+                }
             }
 
+            /* ---------- 合批：每个骨骼组里同材质的零件合成一个 mesh ---------- */
+            Batch(body.transform);
+            Batch(head.transform);
+            Batch(eyes.transform);
+            Batch(earL.transform);
+            Batch(earR.transform);
+            Batch(armL.transform);
+            Batch(armR.transform);
+            Batch(rig.forearmL);
+            Batch(rig.forearmR);
+            Batch(legL.transform);
+            Batch(legR.transform);
+            Batch(rig.shinL);
+            Batch(rig.shinR);
+            Batch(tail.transform);
+            if (rig.weapon != null) Batch(rig.weapon);
+
             return rig;
+        }
+
+        static void EarRound(Transform ear, float r, Material fur, Material inner)
+        {
+            Ball(ear, new Vector3(0f, r * 0.12f, 0f), new Vector3(r * 0.60f, r * 0.80f, r * 0.45f), fur);
+            Ball(ear, new Vector3(r * 0.12f, r * 0.12f, 0f), new Vector3(r * 0.34f, r * 0.50f, r * 0.20f), inner);
+        }
+
+        static void TailDefault(Transform tail, float torsoR, float h, Material fur)
+        {
+            Tube(tail, new Vector3(-torsoR * 0.30f, -h * 0.02f, 0f),
+                new Vector3(h * 0.09f, h * 0.12f, h * 0.09f), fur, Quaternion.Euler(0f, 0f, 138f));
+            Ball(tail, new Vector3(-torsoR * 0.55f, -h * 0.12f, 0f), Vector3.one * h * 0.09f, fur);
         }
 
         /* ---------------- 场景道具 ---------------- */

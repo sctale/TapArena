@@ -129,7 +129,7 @@ namespace TapArena
             ClearWorld();
             GameFlow.picked = hero;
             var arena = Arena.Create(hero, _worldRoot);
-            WorldView.Attach(arena);
+            WorldView.Attach(arena, _worldRoot);
             _follow.position = arena.player.pos;
             CameraRig.I.SetTarget(_follow, _follow.position);
             CameraRig.I.Snap();
@@ -155,6 +155,8 @@ namespace TapArena
                 Destroy(_worldRoot.GetChild(i).gameObject);
             Fx.Texts.Clear();
             Fx.Banners.Clear();
+            InputHub.Move = Vector3.zero;
+            for (int i = 0; i < InputHub.SkillFlag.Length; i++) InputHub.SkillFlag[i] = false;
             Paused = false;
             Time.timeScale = 1f;
         }
@@ -163,6 +165,12 @@ namespace TapArena
         {
             Paused = on;
             Time.timeScale = on ? 0f : 1f;
+            if (on)
+            {
+                /* 暂停时清掉输入，避免恢复瞬间放出一个攒着的技能 */
+                InputHub.Move = Vector3.zero;
+                for (int i = 0; i < InputHub.SkillFlag.Length; i++) InputHub.SkillFlag[i] = false;
+            }
         }
 
         void Update()
