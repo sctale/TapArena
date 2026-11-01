@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1c5c50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>萌兽峡谷 · 小英雄大冒险</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= 首页 ================= -->
+  <section id="screen-home" class="screen is-active home">
+    <div class="home-art">
+      <img src="assets/keyart.jpg" alt="萌兽峡谷" draggable="false">
+    </div>
+    <div class="home-shade"></div>
+    <div class="petals" id="homePetals" aria-hidden="true"></div>
+
+    <div class="home-topbar">
+      <div class="home-brand">
+        <span class="brand-dot"></span>萌兽峡谷<span class="brand-ver">v1.2</span>
+      </div>
+      <div class="home-top-actions">
+        <button class="icon-btn" id="btnSoundHome" aria-label="音效开关" title="音效开关">
+          <svg viewBox="0 0 24 24" class="ico-sound-on"><path d="M4 9h3.5L13 4.5v15L7.5 15H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 24 24" class="ico-sound-off"><path d="M4 9h3.5L13 4.5v15L7.5 15H4z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="btn-ghost" id="btnHelpHome">玩法说明</button>
+      </div>
+    </div>
+
+    <div class="home-content">
+      <div class="logo-block">
+        <div class="logo-kicker"><span class="leaf-dot"></span>森林里的英雄对决</div>
+        <h1 class="game-logo" aria-label="萌兽峡谷">萌兽峡谷</h1>
+        <div class="logo-row">
+          <span class="logo-sub">小英雄 · 大冒险</span>
+          <span class="logo-eng">TAP&nbsp;ARENA</span>
+        </div>
+      </div>
+
+      <div class="home-cta">
+        <button class="btn-primary btn-big" id="btnStart">
+          <span class="btn-star">★</span>
+          开始冒险
+          <span class="btn-tail">3v3 推塔</span>
+        </button>
+
+        <div class="mode-pick">
+          <div class="mode-label">选择难度</div>
+          <div class="segmented" id="difficultyPick" role="group" aria-label="难度">
+            <button class="seg is-on" data-diff="easy">轻松<span>6-9 岁</span></button>
+            <button class="seg" data-diff="normal">挑战<span>9-12 岁</span></button>
+          </div>
+        </div>
+
+        <div class="home-note">
+          <span>无内购</span><i></i><span>无广告</span><i></i><span>不联网也能玩</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-footer">
+      <span>适合 6-12 岁 · 一局约 4 分钟</span>
+      <span class="footer-tip">提示：横屏玩更舒服</span>
+    </div>
+  </section>
+
+  <!-- ================= 选英雄 ================= -->
+  <section id="screen-select" class="screen select">
+    <div class="select-bg" aria-hidden="true"></div>
+    <header class="select-head">
+      <button class="btn-back" id="btnBackHome" aria-label="返回">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        返回
+      </button>
+      <div class="select-title">
+        <h2>选一位小英雄</h2>
+        <p>别担心，队友会来帮你的！</p>
+      </div>
+      <div class="select-head-right">
+        <span class="pill-badge" id="selectDiffBadge">难度 · 轻松</span>
+      </div>
+    </header>
+
+    <div class="select-body">
+      <div class="hero-cards" id="heroCards" role="listbox" aria-label="选择英雄"></div>
+
+      <aside class="hero-detail">
+        <div class="detail-top">
+          <span class="role-chip" id="detailRole">战士</span>
+          <span class="diff-dots" id="detailDiff" title="上手难度"></span>
+        </div>
+        <h3 class="detail-name" id="detailName">阿虎</h3>
+        <p class="detail-title" id="detailTitle">勇气小虎</p>
+        <p class="detail-tagline" id="detailTagline">冲在最前面，替小伙伴挡住危险！</p>
+
+        <div class="detail-skills" id="detailSkills"></div>
+
+        <div class="detail-bottom">
+          <div class="detail-stat-row">
+            <div class="stat-pill"><b id="detailHp">1080</b><span>生命</span></div>
+            <div class="stat-pill"><b id="detailAtk">54</b><span>攻击</span></div>
+            <div class="stat-pill"><b id="detailRange">近战</b><span>攻击距离</span></div>
+          </div>
+          <button class="btn-primary btn-go" id="btnGo">
+            <span class="btn-star">★</span>出发！
+          </button>
+          <p class="go-note">对面也是三个小萌兽，别害怕～</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= 战斗 ================= -->
+  <section id="screen-battle" class="screen battle">
+    <canvas id="game" aria-label="萌兽峡谷战斗画面"></canvas>
+    <!-- Phaser 特效层：WebGL 粒子，Phaser 不可用时自动退回 Canvas 特效 -->
+    <div id="fxStage" aria-hidden="true"></div>
+
+    <div class="hud" id="battleHud">
+      <div class="hud-top">
+        <div class="hero-plate">
+          <div class="avatar-wrap">
+            <img id="hudAvatar" src="assets/tiger.jpg" alt="" draggable="false">
+            <div class="lvl-badge" id="hudLvl">1</div>
+          </div>
+          <div class="hero-bars">
+            <div class="bar hp"><i id="hudHpFill"></i><span id="hudHpText">1080 / 1080</span></div>
+            <div class="bar xp"><i id="hudXpFill"></i></div>
+          </div>
+        </div>
+
+        <div class="match-center">
+          <div class="score-pill">
+            <span class="team-dot blue"></span>
+            <b id="scoreBlue">0</b>
+            <span class="clock" id="matchClock">00:00</span>
+            <b id="scoreRed">0</b>
+            <span class="team-dot red"></span>
+          </div>
+          <div class="objective" id="objective">先拆掉两座蘑菇塔，再点亮敌方水晶！</div>
+        </div>
+
+        <div class="hud-right">
+          <div class="minimap-wrap">
+            <canvas id="minimap" width="220" height="120" aria-hidden="true"></canvas>
+            <div class="minimap-tag">峡谷地图</div>
+          </div>
+          <button class="pause-btn" id="btnPause" aria-label="暂停">
+            <svg viewBox="0 0 24 24"><rect x="7" y="5" width="3.6" height="14" rx="1.6" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.6" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="killfeed" id="killfeed" aria-live="polite"></div>
+
+      <div class="joystick-hint" id="joystickHint">
+        <span class="hint-arrow">←</span> 拖动这里移动
+      </div>
+
+      <div class="skill-dock" id="skillDock">
+        <div class="skill-col">
+          <button class="skill-btn" data-skill="0" aria-label="一技能">
+            <span class="ico"></span>
+            <span class="cd-mask"></span>
+            <span class="cd-text"></span>
+            <kbd>Q</kbd>
+            <span class="skill-name"></span>
+          </button>
+          <button class="skill-btn" data-skill="1" aria-label="二技能">
+            <span class="ico"></span>
+            <span class="cd-mask"></span>
+            <span class="cd-text"></span>
+            <kbd>W</kbd>
+            <span class="skill-name"></span>
+          </button>
+        </div>
+        <button class="skill-btn skill-ult" data-skill="2" aria-label="大招">
+          <span class="ico"></span>
+          <span class="cd-mask"></span>
+          <span class="cd-text"></span>
+          <kbd>E</kbd>
+          <span class="skill-name"></span>
+          <span class="ult-lock" id="ultLock">2级解锁</span>
+        </button>
+      </div>
+
+      <div class="battle-tip" id="battleTip">靠近敌人会自动攻击 · 点击右边的技能按钮</div>
+      <div class="countdown" id="countdown" aria-live="assertive"></div>
+      <div class="levelup-banner" id="levelupBanner">升级啦！</div>
+      <div class="battle-toast" id="battleToast"></div>
+    </div>
+
+    <div class="rotate-hint" id="rotateHint">
+      <div class="rotate-phone">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="18" y="8" width="28" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="3.4"/>
+          <circle cx="32" cy="49" r="2.4" fill="currentColor"/>
+          <path d="M10 30a22 22 0 0 1 8-16M6 30h8M50 34a22 22 0 0 1-8 16M58 34h-8" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M18 48l-4-4 6-2z" fill="currentColor"/>
+        </svg>
+      </div>
+      <h3>把手机横过来呀</h3>
+      <p>横屏才能看见整条峡谷，和伙伴一起推塔！</p>
+    </div>
+
+    <div class="overlay pause-overlay" id="pauseOverlay">
+      <div class="panel-card pause-card">
+        <div class="pause-hero">
+          <img id="pauseAvatar" src="assets/tiger.jpg" alt="" draggable="false">
+        </div>
+        <h3>休息一下</h3>
+        <p class="pause-sub">小英雄在峡谷里等你回来～</p>
+        <button class="btn-primary" id="btnResume">继续战斗</button>
+        <button class="btn-soft" id="btnHelpPause">玩法说明</button>
+        <div class="pause-row">
+          <button class="btn-soft small" id="btnRestart">重新开始</button>
+          <button class="btn-soft small" id="btnQuit">回到首页</button>
+        </div>
+        <button class="btn-link" id="btnSoundPause">音效：开</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 结算 ================= -->
+  <section id="screen-result" class="screen result">
+    <div class="result-rays" aria-hidden="true"></div>
+    <div class="confetti" id="resultConfetti" aria-hidden="true"></div>
+    <div class="result-card">
+      <div class="result-head">
+        <div class="result-badge" id="resultBadge">胜利</div>
+        <h2 id="resultTitle">漂亮！水晶点亮啦！</h2>
+        <p id="resultSub">你和小伙伴们一起守护了森林。</p>
+        <div class="result-stars" id="resultStars">
+          <span>★</span><span>★</span><span>★</span>
+        </div>
+      </div>
+
+      <div class="result-body">
+        <div class="result-hero">
+          <div class="result-avatar-ring"><img id="resultAvatar" src="assets/tiger.jpg" alt="" draggable="false"></div>
+          <div class="result-hero-name" id="resultHeroName">阿虎</div>
+          <div class="result-hero-role" id="resultHeroRole">战士</div>
+        </div>
+        <div class="result-stats">
+          <div class="rstat"><span class="rstat-ico ico-time"></span><b id="rsTime">00:00</b><span>时长</span></div>
+          <div class="rstat"><span class="rstat-ico ico-kill"></span><b id="rsKills">0</b><span>击败</span></div>
+          <div class="rstat"><span class="rstat-ico ico-death"></span><b id="rsDeaths">0</b><span>回泉水</span></div>
+          <div class="rstat"><span class="rstat-ico ico-tower"></span><b id="rsTowers">0</b><span>推塔</span></div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn-primary btn-big" id="btnAgain"><span class="btn-star">★</span>再来一局</button>
+        <button class="btn-soft" id="btnChangeHero">换个英雄</button>
+        <button class="btn-link" id="btnResultHome">回到首页</button>
+      </div>
+      <p class="result-note">休息一下眼睛，再玩下一局吧～</p>
+    </div>
+  </section>
+
+  <!-- ================= 玩法说明弹窗 ================= -->
+  <div class="modal" id="helpModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="help"></div>
+    <div class="modal-card">
+      <button class="modal-close" data-close="help" aria-label="关闭">×</button>
+      <h3>怎么玩？</h3>
+      <div class="help-list">
+        <div class="help-item">
+          <div class="help-ico">1</div>
+          <div><b>拖动左边摇杆移动</b><p>电脑上也可以按 WASD 或方向键。手指按住屏幕左半边就能拖动。</p></div>
+        </div>
+        <div class="help-item">
+          <div class="help-ico">2</div>
+          <div><b>靠近敌人就会自动攻击</b><p>不用一直点攻击，专心走位和放技能就好。</p></div>
+        </div>
+        <div class="help-item">
+          <div class="help-ico">3</div>
+          <div><b>点亮右边的技能按钮</b><p>两个小技能 + 一个大招。大招要升到 2 级才会解锁。</p></div>
+        </div>
+        <div class="help-item">
+          <div class="help-ico">4</div>
+          <div><b>先拆两座蘑菇塔，再打碎水晶</b><p>跟着小果冻兵一起前进，和队友合作就能赢。</p></div>
+        </div>
+        <div class="help-item">
+          <div class="help-ico">5</div>
+          <div><b>被击败会回泉水休息</b><p>几秒后就能重新出发，不要着急。</p></div>
+        </div>
+        <div class="help-item quiet">
+          <div class="help-ico heart">♥</div>
+          <div><b>没有内购、没有广告、不用联网</b><p>这是给小学生的森林小峡谷，祝玩得开心。</p></div>
+        </div>
+      </div>
+      <button class="btn-primary modal-ok" data-close="help">知道啦</button>
+    </div>
+  </div>
+
+</div>
+<script src="js/data.js" defer></script>
+<script src="js/anim.js" defer></script>
+<script src="js/render.js" defer></script>
+<script src="js/game.js" defer></script>
+<script src="js/vendor/phaser.min.js" defer></script>
+<script src="js/stage.js" defer></script>
+</body>
+</html>

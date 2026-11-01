@@ -1,0 +1,14 @@
+TapArena（萌兽峡谷 · TapArena）
+Copyright 2026 sctale
+
+This product includes software developed as part of the TapArena project
+(https://github.com/sctale/TapArena), licensed under the Apache License,
+Version 2.0.
+
+This product bundles Phaser v3.90.0 (https://phaser.io), licensed under the
+MIT License, distributed locally as www/js/vendor/phaser.min.js so the game
+runs fully offline.
+
+All artwork in this project (home key art, hero portraits, app icon) was
+generated specifically for this project. No asset, character design, text or
+audio from any third-party commercial game is included.
