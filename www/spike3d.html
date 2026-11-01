@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>3D 可行性验证</title>
+<style>
+  html,body{margin:0;height:100%;background:#7ac69a;overflow:hidden;font-family:sans-serif}
+  #box{position:absolute;left:12px;top:12px;z-index:9;background:rgba(12,40,32,.72);color:#fff;
+       padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.5}
+  b{color:#ffe08a}
+</style>
+</head>
+<body>
+<div id="box">3D 探针启动中…</div>
+<script src="js/vendor/three.min.js"></script>
+<script>
+(function () {
+  var box = document.getElementById('box');
+  window.__SPIKE = { ok: false, error: null, fps: 0, meshes: 0, shadows: false, api: '' };
+
+  function fail(msg) {
+    window.__SPIKE.error = msg;
+    box.innerHTML = '<b>3D 探针失败</b><br>' + msg;
+  }
+
+  if (typeof THREE === 'undefined') { fail('THREE 未加载'); return; }
+
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'default' });
+  } catch (e) { fail('WebGLRenderer 构造失败: ' + e.message); return; }
+  if (!renderer || !renderer.getContext()) { fail('无 WebGL 上下文'); return; }
+
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  window.__SPIKE.api = renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
+  window.__SPIKE.maxTex = renderer.capabilities.maxTextureSize;
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8fd3a8);
+  scene.fog = new THREE.Fog(0x8fd3a8, 900, 2200);
+
+  var camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 1, 4000);
+  camera.position.set(0, 620, 520);
+  camera.lookAt(0, 0, 0);
+
+  var hemi = new THREE.HemisphereLight(0xffffff, 0x6fae86, 0.85);
+  scene.add(hemi);
+  var sun = new THREE.DirectionalLight(0xfff2cc, 1.15);
+  sun.position.set(420, 700, 320);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -900; sun.shadow.camera.right = 900;
+  sun.shadow.camera.top = 900; sun.shadow.camera.bottom = -900;
+  sun.shadow.camera.far = 2200;
+  scene.add(sun);
+
+  /* 地面 + 兵线 */
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(3000, 1600, 1, 1),
+    new THREE.MeshLambertMaterial({ color: 0x74c08c })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  var lane = new THREE.Mesh(
+    new THREE.PlaneGeometry(2600, 150, 1, 1),
+    new THREE.MeshLambertMaterial({ color: 0xe8d9ae })
+  );
+  lane.rotation.x = -Math.PI / 2;
+  lane.position.y = 0.6;
+  lane.receiveShadow = true;
+  scene.add(lane);
+
+  /* 一批低多边形"毛绒"小人：每个 1 身体 + 1 头 + 4 腿 + 1 尾，全部逐帧摆动 */
+  var crowd = new THREE.Group();
+  scene.add(crowd);
+  var bodyGeo = new THREE.SphereGeometry(16, 10, 8);
+  var headGeo = new THREE.SphereGeometry(11, 10, 8);
+  var legGeo = new THREE.BoxGeometry(6, 16, 6);
+  var tailGeo = new THREE.CylinderGeometry(2.4, 4.6, 20, 6);
+  var palette = [0xf2a94f, 0x7f9fc4, 0xc9b18f, 0xb98155, 0xfff7f3, 0xf8cd92];
+  var actors = [];
+
+  for (var i = 0; i < 90; i++) {
+    var col = palette[i % palette.length];
+    var mat = new THREE.MeshLambertMaterial({ color: col });
+    var g = new THREE.Group();
+
+    var body = new THREE.Mesh(bodyGeo, mat); body.position.y = 26; body.scale.set(1, 1.1, 0.9);
+    var head = new THREE.Mesh(headGeo, mat); head.position.y = 48;
+    body.castShadow = head.castShadow = true;
+    g.add(body); g.add(head);
+
+    var legs = [];
+    for (var l = 0; l < 4; l++) {
+      var leg = new THREE.Mesh(legGeo, mat);
+      leg.position.set(l % 2 ? 8 : -8, 8, l < 2 ? 9 : -9);
+      leg.castShadow = true;
+      g.add(leg); legs.push(leg);
+    }
+    var tail = new THREE.Mesh(tailGeo, new THREE.MeshLambertMaterial({ color: 0xffe9cf }));
+    tail.position.set(0, 30, -18); tail.rotation.x = -0.9;
+    tail.castShadow = true;
+    g.add(tail);
+
+    var a = (i / 90) * Math.PI * 2;
+    g.position.set(Math.cos(a) * (180 + (i % 7) * 90), 0, Math.sin(a) * (140 + (i % 5) * 110));
+    g.userData = { phase: i * 0.37, legs: legs, tail: tail, head: head, body: body, r: g.position.length() };
+    crowd.add(g);
+    actors.push(g);
+  }
+
+  /* 树（圆锥 + 圆柱），提供纵深 */
+  for (var t = 0; t < 40; t++) {
+    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(7, 9, 60, 6), new THREE.MeshLambertMaterial({ color: 0x9c7a52 }));
+    var crown = new THREE.Mesh(new THREE.SphereGeometry(46, 8, 6), new THREE.MeshLambertMaterial({ color: 0x4f9d6b }));
+    trunk.position.set(Math.cos(t) * (700 + t * 12), 30, Math.sin(t * 1.7) * (500 + t * 8));
+    crown.position.copy(trunk.position); crown.position.y = 92;
+    trunk.castShadow = crown.castShadow = true;
+    trunk.receiveShadow = crown.receiveShadow = true;
+    scene.add(trunk); scene.add(crown);
+  }
+
+  window.__SPIKE.meshes = actors.length;
+  window.__SPIKE.shadows = renderer.shadowMap.enabled;
+
+  var frames = 0, t0 = performance.now(), last = t0;
+  function tick(now) {
+    requestAnimationFrame(tick);
+    var dt = (now - last) / 1000; last = now;
+    var time = (now - t0) / 1000;
+
+    crowd.rotation.y = time * 0.12;
+    for (var i = 0; i < actors.length; i++) {
+      var g = actors[i], u = g.userData;
+      var p = time * 6 + u.phase;
+      for (var l = 0; l < 4; l++) g.userData.legs[l].rotation.x = Math.sin(p + l * Math.PI) * 0.7;
+      u.tail.rotation.z = Math.sin(p * 0.6) * 0.35;
+      u.body.position.y = 26 + Math.abs(Math.sin(p)) * 3;
+      u.head.position.y = 48 + Math.abs(Math.sin(p)) * 3;
+    }
+
+    camera.position.x = Math.sin(time * 0.2) * 420;
+    camera.position.z = 520 + Math.cos(time * 0.2) * 120;
+    camera.lookAt(0, 20, 0);
+
+    renderer.render(scene, camera);
+    frames++;
+    if (time - (window.__lastReport || 0) > 1) {
+      window.__lastReport = time;
+      window.__SPIKE.fps = Math.round(frames / time);
+      window.__SPIKE.ok = true;
+      box.innerHTML = '<b>3D 探针运行中</b><br>API: ' + window.__SPIKE.api +
+        '<br>角色数: ' + actors.length + '（每人 7 部件）<br>阴影: ' + (renderer.shadowMap.enabled ? '开' : '关') +
+        '<br>平均 FPS: <b>' + window.__SPIKE.fps + '</b><br>DPR: ' + DPR;
+    }
+  }
+  requestAnimationFrame(tick);
+
+  window.addEventListener('error', function (e) { fail('运行时异常: ' + (e.message || '')); });
+})();
+</script>
+</body>
+</html>

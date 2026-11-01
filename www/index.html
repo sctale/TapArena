@@ -22,7 +22,7 @@
 
     <div class="home-topbar">
       <div class="home-brand">
-        <span class="brand-dot"></span>萌兽峡谷<span class="brand-ver">v1.2</span>
+        <span class="brand-dot"></span>萌兽峡谷<span class="brand-ver">v1.3</span>
       </div>
       <div class="home-top-actions">
         <button class="icon-btn" id="btnSoundHome" aria-label="音效开关" title="音效开关">
@@ -118,6 +118,8 @@
 
   <!-- ================= 战斗 ================= -->
   <section id="screen-battle" class="screen battle">
+    <!-- 3D 战场（Three.js）；2D 画布只负责文字与 HUD 叠加 -->
+    <div id="world3dHost" aria-hidden="true"></div>
     <canvas id="game" aria-label="萌兽峡谷战斗画面"></canvas>
     <!-- Phaser 特效层：WebGL 粒子，Phaser 不可用时自动退回 Canvas 特效 -->
     <div id="fxStage" aria-hidden="true"></div>
@@ -304,6 +306,9 @@
 <script src="js/data.js" defer></script>
 <script src="js/anim.js" defer></script>
 <script src="js/render.js" defer></script>
+<script src="js/vendor/three.min.js" defer></script>
+<script src="js/hero-rigs.js" defer></script>
+<script src="js/world3d.js" defer></script>
 <script src="js/game.js" defer></script>
 <script src="js/vendor/phaser.min.js" defer></script>
 <script src="js/stage.js" defer></script>

@@ -21,6 +21,7 @@ const App = {
 
 let world = null;
 let player = null;
+let renderCtxRef = null;
 let bgCanvas = null;
 /* 供 Phaser 特效层做世界→屏幕换算：每帧由 renderWorld 刷新 */
 const FxView = { w: 0, h: 0, cx: 0, cy: 0, scale: 1, sx: 0, sy: 0 };
@@ -1679,6 +1680,7 @@ function resizeCanvas() {
   const h = battleCanvas.clientHeight || window.innerHeight;
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   PIXEL_RATIO = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+  if (typeof w3dResize === 'function') w3dResize(w, h);
   const nw = Math.round(w * PIXEL_RATIO), nh = Math.round(h * PIXEL_RATIO);
   if (battleCanvas.width !== nw || battleCanvas.height !== nh) {
     battleCanvas.width = nw;
@@ -1686,8 +1688,24 @@ function resizeCanvas() {
   }
 }
 
+/* 渲染模式：?render=2d 强制回退；默认有 WebGL 就上 3D */
+function pickRenderer() {
+  const q = new URLSearchParams(location.search);
+  const want = q.get('render');
+  if (want === '2d') return false;
+  if (want === '3d') return true;
+  return typeof w3dAvailable === 'function' ? w3dAvailable() : false;
+}
+
 function renderWorld(timeSec) {
   if (!world || !ctx) return;
+  const dt3 = Math.min(0.05, Math.max(0.001, timeSec - (W3D._lastT || timeSec)));
+  W3D._lastT = timeSec;
+  if (App.render3D && W3D.ok) {
+    w3dFrame(world, timeSec, dt3);
+    renderOverlay2D(timeSec);
+    return;
+  }
   const cw = battleCanvas.clientWidth, ch = battleCanvas.clientHeight;
   if (!cw || !ch) return;
   if (battleCanvas.width !== Math.round(cw * PIXEL_RATIO) || battleCanvas.height !== Math.round(ch * PIXEL_RATIO)) resizeCanvas();
@@ -1799,6 +1817,58 @@ function renderWorld(timeSec) {
 }
 
 /* ============================================================
+   3D 模式下的 2D 叠加层
+   ------------------------------------------------------------
+   文字与血条留在 2D 画：任何 DPR 下都清晰，不会被 3D 拉伸糊掉。
+   做法是把世界点投影到屏幕，再把绘制原点平移过去，
+   于是 render.js 里的 HUD/特效代码可以原样复用。
+   ============================================================ */
+const OVERLAY_SCALE = 1.35;
+
+function overlayAt(x, y, h, fn) {
+  const sp = w3dProject(x, y, h);
+  if (!sp || !sp.on) return;
+  const ctx = renderCtxRef;
+  ctx.save();
+  ctx.translate(sp.x, sp.y);
+  ctx.scale(OVERLAY_SCALE, OVERLAY_SCALE);
+  ctx.translate(-x, -y);
+  fn();
+  ctx.restore();
+}
+
+function renderOverlay2D(timeSec) {
+  const cw = battleCanvas.clientWidth, ch = battleCanvas.clientHeight;
+  ctx.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
+
+  /* 特效：地面环类已由 3D 画过，这里只画空中的 */
+  for (const e of world.effects) {
+    if (e.type === 'ring' || e.type === 'warn') continue;
+    const gy = e.gy == null ? e.y : e.gy;
+    const hh = e.h == null ? 34 : e.h;
+    overlayAt(e.x, gy, hh, () => drawEffect(ctx, e, world.time));
+  }
+
+  /* 血条与名字 */
+  const hudOf = (u, above) => {
+    if (!u.alive) return;
+    overlayAt(u.x, u.y, above, () => drawUnitHud(ctx, u, world.time));
+  };
+  for (const t of [...world.towers.blue, ...world.towers.red]) hudOf(t, 150);
+  for (const b of [world.bases.blue, world.bases.red]) hudOf(b, 210);
+  for (const p of world.pickups) if (p.alive) hudOf(p, 60);
+  for (const u of world.units) {
+    if (u.kind !== 'hero' || !u.alive) continue;
+    hudOf(u, 118);
+  }
+
+  drawScreenMood(ctx, cw, ch, world.time, timeSec);
+  if (player && player.alive && world.started && !world.over) drawJoystick(ctx, joy, cw, ch);
+  if (minimapCtx) drawMinimap(minimapCtx, 220, 120, world, world.time);
+}
+
+/* ============================================================
    HUD
    ============================================================ */
 function updateSkillHUD() {
@@ -1878,7 +1948,20 @@ function addKillFeed(killerName, killerTeam, victimName, victimTeam) {
    ============================================================ */
 function showScreen(name) {
   /* 特效层只在战斗界面开启；Phaser 启动失败则保持隐藏 */
-  if (typeof StageFX !== 'undefined') {
+  if (typeof W3D !== 'undefined') {
+      const host = document.getElementById('world3dHost');
+      if (host) host.style.display = name === 'battle' ? 'block' : 'none';
+      /* 3D 渲染器等真进战斗、容器有尺寸后再建：省显存，也避免在菜单里创建 GL 上下文 */
+      if (name === 'battle' && App.render3D && !W3D.ok && !W3D.error && host) {
+        if (!w3dInit(host)) {
+          console.warn('[3D] 初始化失败，自动退回 2D 画面');
+          App.render3D = false;
+        } else if (battleCanvas) {
+          w3dResize(battleCanvas.clientWidth, battleCanvas.clientHeight);
+        }
+      }
+    }
+  if (typeof StageFX !== 'undefined' && !App.render3D) {
     /* 必须先让容器有尺寸，否则 WebGL 帧缓冲为 0 会启动失败 */
     StageFX.setEnabled(name === 'battle');
     if (name === 'battle') requestAnimationFrame(() => StageFX.boot());
@@ -2317,6 +2400,8 @@ function boot() {
   cacheUI();
   battleCanvas = document.getElementById('game');
   ctx = battleCanvas.getContext('2d');
+  renderCtxRef = ctx;
+  App.render3D = pickRenderer();
   minimapCtx = ui.minimap ? ui.minimap.getContext('2d') : null;
   loadPrefs();
   applySoundState();

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>角色骨架检查 · hero-rigs</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #74c08c; overflow: hidden; font-family: sans-serif; }
+  canvas { display: block; }
+  #legend {
+    position: fixed; left: 10px; top: 10px; z-index: 9; color: #12301f; font-size: 15px; font-weight: 700;
+    background: rgba(255,255,255,.62); padding: 6px 10px; border-radius: 10px; letter-spacing: .5px;
+  }
+</style>
+</head>
+<body>
+<div id="legend">1 阿虎 · 2 灵灵 · 3 朵朵 · 4 阿岳 · 5 泡泡 · 6 尖尖（自左向右）</div>
+<script src="js/vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/hero-rigs.js"></script>
+<script>
+(function () {
+  const IDS = ['tiger', 'fox', 'rabbit', 'bear', 'otter', 'hedgehog'];
+  const X = { tiger: -152, fox: -94, rabbit: -40, bear: 30, otter: 104, hedgehog: 156 };
+  const YAW = -0.55;                 /* 让鼻子朝镜头偏一点，方便看脸和挂件 */
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fdcb4);
+
+  const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 4000);
+
+  /* 光照与主层一致：半球光 + 带阴影的平行光 */
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x6fae86, 0.9);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff2cc, 1.15);
+  sun.position.set(260, 520, 300);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -320; sun.shadow.camera.right = 320;
+  sun.shadow.camera.top = 320; sun.shadow.camera.bottom = -320;
+  sun.shadow.camera.near = 40; sun.shadow.camera.far = 1400;
+  sun.target.position.set(0, 0, 0);
+  scene.add(sun); scene.add(sun.target);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(1200, 700, 1, 1),
+    new THREE.MeshLambertMaterial({ color: 0x74c08c })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+  const path = new THREE.Mesh(
+    new THREE.PlaneGeometry(1200, 130, 1, 1),
+    new THREE.MeshLambertMaterial({ color: 0xe8d9ae })
+  );
+  path.rotation.x = -Math.PI / 2;
+  path.position.y = 0.4;
+  path.receiveShadow = true;
+  scene.add(path);
+
+  /* ---------- 装配 6 个骨架 ---------- */
+  const rigs = [];
+  for (const id of IDS) {
+    const rig = HERO_RIGS[id]();
+    rig.root.position.set(X[id], 0, 0);
+    rig.root.rotation.y = YAW;
+    scene.add(rig.root);
+    /* 记下每个部件的初始旋转/位移，换姿势时先复位 */
+    const base = {};
+    for (const k in rig.parts) {
+      const o = rig.parts[k];
+      if (o) base[k] = { x: o.rotation.x, y: o.rotation.y, z: o.rotation.z, py: o.position.y };
+    }
+    rig.userData = { id: id, base: base, bodyY: rig.parts.body.position.y };
+    rigs.push(rig);
+  }
+
+  function reset(rig) {
+    const b = rig.userData.base;
+    for (const k in b) {
+      const o = rig.parts[k];
+      o.rotation.set(b[k].x, b[k].y, b[k].z);
+      o.position.y = b[k].py;
+    }
+    rig.parts.body.position.y = rig.userData.bodyY;
+    rig.parts.eyes.scale.set(1, 1, 1);
+  }
+
+  /* ---------- 三种检查姿势（只动 rotation，专门用来验枢轴位置） ----------
+     面朝 +X：肢体 rotation.z > 0 = 向 +X（前方）甩；body 的 rotation.z < 0 才是前压。 */
+  const POSES = {
+    /* T-pose：四肢张开摆平，最容易被枢轴错误暴露 */
+    tpose: function (p) {
+      p.armL.rotation.x = 1.35; p.armR.rotation.x = -1.35;
+      p.legFL.rotation.x = 0.22; p.legFR.rotation.x = -0.22;
+      p.legBL.rotation.x = 0.22; p.legBR.rotation.x = -0.22;
+      p.earL && (p.earL.rotation.x = 0.5);
+      p.earR && (p.earR.rotation.x = -0.5);
+      p.tail && (p.tail.rotation.y = 0.5);
+    },
+    walk: function (p, t) {
+      const s = Math.sin(t * 6);
+      p.legFL.rotation.z = s * 0.55; p.legBL.rotation.z = -s * 0.55;
+      p.legFR.rotation.z = -s * 0.5; p.legBR.rotation.z = s * 0.5;
+      p.armL.rotation.z = s * 0.45; p.armR.rotation.z = -s * 0.45;
+      p.body.rotation.z = -0.05; p.body.position.y += 1.6;
+      p.head.rotation.z = -0.06;
+      p.tail && (p.tail.rotation.z = -0.25 + s * 0.25, p.tail.rotation.y = s * 0.3);
+      p.earL && (p.earL.rotation.z = 0.2 + s * 0.12);
+      p.earR && (p.earR.rotation.z = 0.2 - s * 0.12);
+    },
+    attack: function (p, t) {
+      p.armR.rotation.z = 1.45; p.armR.rotation.x = -0.35;
+      p.armL.rotation.z = 0.5; p.armL.rotation.x = 0.3;
+      p.legFL.rotation.z = 0.42; p.legFR.rotation.z = 0.3;
+      p.legBL.rotation.z = -0.5; p.legBR.rotation.z = -0.38;
+      p.body.rotation.z = -0.14;                /* 前压 */
+      p.body.position.y -= 1.2;
+      p.head.rotation.z = -0.2;
+      p.tail && (p.tail.rotation.z = -0.7);
+      p.eyes.scale.y = 0.45;                    /* 眨眼 */
+      p.weapon && (p.weapon.rotation.z = 0.35);
+    }
+  };
+
+  function applyPose(rig, name, t) {
+    reset(rig);
+    (POSES[name] || POSES.tpose)(rig.parts, t === undefined ? 0.6 : t);
+  }
+
+  /* ---------- 相机 ---------- */
+  const WIDE = { pos: [0, 190, 236], look: [0, 20, 0] };
+  function wide() {
+    camera.position.set.apply(camera.position, WIDE.pos);
+    camera.lookAt(new THREE.Vector3(WIDE.look[0], WIDE.look[1], WIDE.look[2]));
+    camera.updateProjectionMatrix();
+  }
+  function focus(id) {
+    const rig = rigs.filter(function (r) { return r.userData.id === id; })[0];
+    const h = rig.height, cx = rig.root.position.x;
+    camera.position.set(cx + h * 1.15, h * 1.05 + 12, h * 1.5);
+    camera.lookAt(new THREE.Vector3(cx + h * 0.1, h * 0.46, 0));
+    camera.updateProjectionMatrix();
+  }
+  function render() { renderer.render(scene, camera); }
+  wide(); render();
+
+  /* ---------- 统计 + 契约自检 ---------- */
+  const KEYS = ['body', 'head', 'earL', 'earR', 'armL', 'armR', 'legFL', 'legFR',
+                'legBL', 'legBR', 'tail', 'weapon', 'eyes'];
+  function stats() {
+    return rigs.map(function (r) {
+      let meshes = 0, tris = 0;
+      r.root.traverse(function (o) {
+        if (!o.isMesh) return;
+        meshes++;
+        const g = o.geometry;
+        tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+      });
+      const missing = KEYS.filter(k => !(k in r.parts));
+      const nul = KEYS.filter(k => r.parts[k] === null);
+      return {
+        id: r.userData.id, meshes: meshes, tris: Math.round(tris), height: r.height,
+        missingKeys: missing, nullParts: nul,
+        headUnderBody: !!(r.parts.head && r.parts.head.parent === r.parts.body),
+        allCastShadow: (function () { let ok = true; r.root.traverse(o => { if (o.isMesh && !o.userData.noShadow && !o.castShadow && o.material.opacity > 0.9) ok = false; }); return ok; })()
+      };
+    });
+  }
+
+  window.__RC = {
+    info: stats(), rigs: rigs,
+    setPose: function (name, t) { rigs.forEach(function (r) { applyPose(r, name, t); }); render(); },
+    focus: function (id) { focus(id); render(); },
+    wide: function () { wide(); render(); },
+    errors: []
+  };
+  window.addEventListener('error', function (e) { window.__RC.errors.push(e.message); });
+})();
+</script>
+</body>
+</html>

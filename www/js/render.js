@@ -101,7 +101,12 @@ function distToLane(x, y) {
 /* ============================================================
    地图背景（只画一次）
    ============================================================ */
-function buildBackground() {
+let GROUND_ONLY = false;
+const MAP_PROPS = { trees: [], bushes: [] };
+
+function buildBackground(groundOnly) {
+  GROUND_ONLY = !!groundOnly;
+  if (groundOnly) { MAP_PROPS.trees.length = 0; MAP_PROPS.bushes.length = 0; }
   const c = document.createElement('canvas');
   c.width = WORLD.w; c.height = WORLD.h;
   const g = c.getContext('2d');
@@ -188,7 +193,11 @@ function buildBackground() {
   HONEY_SPOTS.forEach((p, i) => drawHoneyNook(g, p.x, p.y, i));
 
   /* --- 装饰：灌木 --- */
-  BUSHES.forEach((b, i) => { if (!inRiver(b.x, b.y, 18)) drawBush(g, b.x, b.y, b.r / 60, i); });
+  BUSHES.forEach((b, i) => {
+    if (inRiver(b.x, b.y, 18)) return;
+    if (GROUND_ONLY) MAP_PROPS.bushes.push({ x: b.x, y: b.y, s: b.r / 60, v: i });
+    else drawBush(g, b.x, b.y, b.r / 60, i);
+  });
 
   /* --- 树木：避开主路与营地 --- */
   const trees = [];
@@ -209,12 +218,19 @@ function buildBackground() {
     if (trees.some(t => dist(t.x, t.y, x, y) < 130)) continue;
     trees.push({ x, y, s: R(0.8, 1.4), v: rnd() });
   }
-  trees.sort((a, b) => a.y - b.y).forEach(t => drawTree(g, t.x, t.y, t.s, t.v));
+  trees.sort((a, b) => a.y - b.y).forEach(t => {
+    if (GROUND_ONLY) MAP_PROPS.trees.push(t);
+    else drawTree(g, t.x, t.y, t.s, t.v);
+  });
 
   /* 特点灌木与花丛，让空草地更热闹 */
   [[1090, 560, 1.5, 1], [1265, 705, 1.15, 2], [1710, 1270, 1.35, 1], [1970, 700, 1.3, 2],
    [2280, 1325, 1.45, 1], [705, 540, 1.2, 2], [2470, 1265, 1.2, 1], [1555, 1335, 1.18, 2]]
-    .forEach(b => { if (distToLane(b[0], b[1]) > 190 && !inRiver(b[0], b[1], 24)) drawBush(g, b[0], b[1], b[2], b[3]); });
+    .forEach(b => {
+      if (distToLane(b[0], b[1]) <= 190 || inRiver(b[0], b[1], 24)) return;
+      if (GROUND_ONLY) MAP_PROPS.bushes.push({ x: b[0], y: b[1], s: b[2], v: b[3] });
+      else drawBush(g, b[0], b[1], b[2], b[3]);
+    });
   [[900, 610], [1490, 1370], [2075, 610], [640, 810], [2360, 690], [1320, 600]].forEach(([fx, fy]) => {
     if (distToLane(fx, fy) < 210 || inRiver(fx, fy, 30)) return;
     for (let k = 0; k < 7; k++) {
@@ -288,9 +304,32 @@ function buildBackground() {
     }
   }
 
+  GROUND_ONLY = false;
+
   return c;
 }
 
+/* 3D 地面贴图：把 3000×1600 的程序化地图缩到 maxWidth 宽，省显存 */
+function buildGroundTexture(maxWidth) {
+
+  const full = buildBackground(true);
+
+  const w = Math.min(maxWidth || 2048, full.width);
+
+  const h = Math.round(w * full.height / full.width);
+
+  const c = document.createElement('canvas');
+
+  c.width = w; c.height = h;
+
+  const g = c.getContext('2d');
+
+  g.imageSmoothingQuality = 'high';
+
+  g.drawImage(full, 0, 0, w, h);
+
+  return c;
+}
 function pickVal(arr, rnd) { return arr[Math.floor(rnd() * arr.length)]; }
 
 function drawRiver(g, rnd) {

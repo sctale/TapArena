@@ -290,6 +290,8 @@ class FxScene extends Phaser.Scene {
 
 /* 启动：等 game.js 暴露 __FX_VIEW 之后再 boot */
 function stageFxTryBoot() {
+  /* 3D 战场下特效全部走世界坐标，这一层不启动 */
+  if (typeof App !== 'undefined' && App.render3D) return;
   if (StageFX.ready || typeof Phaser === 'undefined' || !window.__FX_VIEW) return;
   StageFX.boot();
 }

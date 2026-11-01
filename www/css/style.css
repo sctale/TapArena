@@ -383,7 +383,9 @@ body.sound-off .icon-btn .ico-sound-off{ display:block; }
    战斗
    ============================================================ */
 .battle{ background:#173f38; }
-#game{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+#world3dHost{ position:absolute; inset:0; z-index:0; }
+#world3dHost canvas{ display:block; width:100%; height:100%; }
+#game{ position:absolute; inset:0; z-index:1; width:100%; height:100%; display:block; touch-action:none; background:transparent; }
 #fxStage{ position:absolute; inset:0; z-index:1; pointer-events:none; display:none; }
 
 .battle::after{

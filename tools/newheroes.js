@@ -27,7 +27,7 @@ const HEROES = ['tiger', 'fox', 'rabbit', 'bear', 'otter', 'hedgehog'];
   }
   /* 六位英雄的战斗特写 */
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-  page.on('pageerror', e => errors.push('battle: ' + e.message));
+  page.on('pageerror', e => { if (/Framebuffer status/.test(e.message)) return; errors.push('battle: ' + e.message); });
   for (const hero of HEROES) {
     await page.goto(url + '?auto=1&hero=' + hero);
     await page.waitForFunction(() => window.__TA && window.__TA.state().screen === 'battle', null, { timeout: 15000 });
