@@ -1,16 +1,59 @@
 # 萌兽峡谷 TapArena
 
-一个给 6–12 岁孩子玩的 **3v3 森林推塔小游戏**。玩法借鉴 MOBA 的“清兵线、拆塔、推水晶”，但节奏更短、规则更简单，所有角色都是原创萌兽，没有抽卡、内购、广告，也不联网。
+一个给 6–12 岁孩子玩的 **3v3 森林推塔小游戏**：清兵线、拆塔、推水晶，所有角色都是原创萌兽，没有抽卡、内购、广告，也不联网。
 
-- HTML 试玩版：`www/index.html`（横屏，建议 Chrome / Edge）
-- 安卓版：`TapArena-v1.3.0.apk`（Android 7.0+，锁横屏，离线运行，无网络权限）
+## 两个版本
 
-![首页](previews/home.jpg)
-![选英雄](previews/select.jpg)
-![战斗](previews/battle.jpg)
-![结算](previews/result.jpg)
+| 版本 | 位置 | 说明 |
+| --- | --- | --- |
+| **Unity 版（2.0，主线）** | `unity/` | Unity 6000.3 工程，卡通渲染（描边/三段明暗/边缘光）+ 天空穹顶 + 真 3D 战场 + 骨架动画 + 实时阴影 + IMGUI HUD，出 Android APK |
+| Web 版（1.3，存档） | 仓库根目录 `www/`、`android/` | Three.js 3D 战场 + Android WebView 壳，已封存在 git 标签 `web-v1.3.0` |
 
-## 1.3.0 更新：战场改成真 3D
+备份：`D:/V-Coding/TapArena-web-v1.3.0-backup.zip`（含全部源码与素材，2.6MB）。
+
+## Unity 版怎么跑
+
+1. 双击 `打开Unity工程.cmd`（或 Unity Hub 打开 `unity/` 目录），Unity 6000.3.10f1。
+2. 直接点 Play：场景是空的，`Boot.cs` 会在运行时把相机、灯光、地形、英雄全部建起来（工程里没有美术资源依赖）。
+3. 出包：`bash tools/unity-build.sh`（先导出 Gradle 工程，再用外部 gradlew 构建；headless 下 Unity 会把 Gradle 堆算成 `-Xmx0m`，必须绕开），产物自动拷到根目录 `TapArena-v2.0.0.apk`。
+
+操作：左下拖动摇杆移动（桌面 WASD/方向键），右下三个圆形按钮放技能（桌面 Q / E / R），Esc 或安卓返回键暂停。
+
+## Unity 版的结构
+
+```
+unity/Assets/Scripts/
+  Core/Boot.cs        启动器：运行时建相机、灯光、氛围、UI、世界
+  Core/Arena.cs       战斗规则：3v3、兵线、塔与水晶保护、18 个技能、AI、8 分钟终极对决
+  Core/HeroDefs.cs    六位英雄的属性与技能表（数值与 Web 版一致）
+  Visuals/Art.cs      程序化美术：英雄骨架、树/灌木/蘑菇、塔/水晶、小兵、地图贴图
+  Visuals/Views.cs    表现层：HeroView 动画驱动、WorldView 同步单位与弹道/减速区
+  Visuals/Fx.cs       火花、法阵、拖影、飘字、播报 + 程序合成音效
+  Systems/            InputHub（摇杆/键盘）、CameraRig（跟随/震屏/推镜）
+  UI/Hud.cs           IMGUI：首页、选人、战斗 HUD、暂停、结算
+```
+
+```
+unity/Assets/Shaders/
+  Toon.shader         卡通渲染：三段明暗 / 边缘光 / 外扩描边 / 接收阴影
+  Sky.shader          天空穹顶（等距柱状全景，运行时生成）
+  Glow.shader         廉价泛光 + 暗角 + 调色（掉帧自动关）
+```
+
+**画面**：天空是运行时生成的渐变全景（太阳光晕 + 云带），远景一圈低多边形山丘与松树线，地图外还有一层大地，边缘藏进雾里；兵线跨河的地方有木桥和灯笼；蘑菇塔有伞盖斑点、金环、发光窗和旗帜；水晶祭坛有三层石台、四柱灯、八面体水晶和环绕碎片。角色有眼白/瞳孔/高光/眉毛/腮红，描边把轮廓从背景里挑出来。
+
+设计约束：卡片、血条、名字都用 IMGUI 画（uGUI 在 shader 剥离后会变品红）；中文字体随包带 Noto Sans CJK SC 子集；`PlayerSettings.stripEngineCode = false`（否则原生 MonoBehaviour 被裁，IMGUI 每帧抛异常）；Toon/Sky 通过 `Resources/TapArenaToon.mat` / `TapArenaSky.mat` 带进包，避免被 shader 剥离。
+
+## Unity 版已验证
+
+- **编译与出包**：Unity 6000.3.10f1 batchmode 编译零报错；导出 Gradle 工程 → 外部 `gradlew assembleRelease` 出包，复用 Web 版 release keystore，可在 Web 版之上覆盖安装。
+- **模拟器实机**（Android 16，1920×1080 横屏）：首页陈列台、六张选人卡、出生点、桥上混战、拆塔、击杀播报、暂停面板逐屏截图检查；战斗内计时、AI、兵线、技能、伤害飘字全部推进。
+- **帧率**：战斗内每 5 秒采样，静止 44–58fps，桥上混战最低 39.9fps（模拟器；连续低于 44fps 会自动关掉泛光保流畅）。
+- **两个已修的关键 bug**：塔/基地/小兵没初始化 `cds` 导致 `Arena.Update` 每帧空引用（时间在走、人不动）；相机 `SetTarget(null, pos)` 只吸附一次，之后不再跟随玩家。
+
+---
+
+## Web 版存档：1.3.0 战场改成真 3D
 
 - **俯视 2D 换成 Three.js 立体战场**：透视相机、平行光 + 半球光、实时软阴影、雾与纵深，峡谷变成一座可以俯视的沙盘；62 棵树与灌木从「画在地面上」改成了真立体道具。
 - **六位英雄重新做成骨架模型**（每人 11–13 个部件），关节枢轴放在肩/髋/颈/尾根，动作由 `anim.js` 的关键帧通道驱动。
@@ -33,19 +76,22 @@
 
 | 平台 | 移动 | 技能 |
 | --- | --- | --- |
-| 手机 / 平板 | 左下角拖动摇杆 | 右下角 Q / W / E 技能（E 大招 2 级解锁） |
-| 电脑 | WASD / 方向键 | Q / W / E 技能 |
+| 手机 / 平板 | 左下角拖动摇杆 | 右下角三个圆形技能键（大招 2 级解锁） |
+| 电脑 | WASD / 方向键 | Q / E / R 技能 |
 | 暂停 | 右上角暂停键或 P / Esc | 暂停面板里可开关音效、重开、回首页 |
 
 ## 安卓版
 
-安装 `TapArena-v1.3.0.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 1.3.0，最低 Android 7.0（API 24）。
+安装 `TapArena-v2.0.0.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 2.0.0（versionCode 20），最低 Android 7.1（API 25），targetSdk 37。
+
+- 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与 1.3.0 同一把 release keystore，可直接覆盖安装）
+- SHA-256：`78e0671051ec6d760d58a6dc5fc75c5f8c563bd12418c09c63ddc84f11091e36`
 
 - 横屏锁定；支持刘海屏；全屏沉浸式。
 - 返回键：在战斗中按下会打开暂停面板，不会直接退出。
 - 数据只保存在本机（音效偏好），不联网、不上传。
 
-## 开发 / 构建
+## Web 存档：开发 / 构建
 
 HTML 版是纯原生 Canvas + JavaScript，无构建步骤、无外部 CDN：
 
@@ -83,7 +129,7 @@ node tools/sim3.js      # 纯逻辑 AI 对局模拟
 
 > 签名文件：`keystore/taparena-release.keystore` + `keystore.properties`（均被 gitignore）。**务必自行备份**，丢失后无法覆盖升级。
 
-## 已验证
+## Web 存档：已验证
 
 - **数值**：12 局 AI 模拟（六位英雄轮流当玩家，轻松/挑战混合）全部正常结束，最快 123.7s；每一局胜方都是先拆 2 座塔才破水晶，新技能没有绕过保护规则。
 - **全流程**：Playwright 桌面 1440×900、手机横屏 900×430、竖屏 390×844；选人页 6 张卡无溢出、"出发"始终可见；首页→选人→战斗→暂停→结算无页面错误。

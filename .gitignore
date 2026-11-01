@@ -9,3 +9,18 @@ android/local.properties
 keystore/
 keystore.properties
 *.apk
+
+# Unity 工程缓存与产物（工程本体在 unity/）
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/Obj/
+unity/Builds/
+unity/UserSettings/
+unity/*.log
+unity/artgen/
+unity/il2cpp-tmp/
+unity/shot-*.png
+unity/crop-*.png
+unity/sheet.png
+unity/*.mp4
