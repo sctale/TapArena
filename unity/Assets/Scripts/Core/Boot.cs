@@ -67,9 +67,9 @@ namespace TapArena
             _sun = sun;
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.52f, 0.62f, 0.74f);
-            RenderSettings.ambientEquatorColor = new Color(0.35f, 0.45f, 0.37f);
-            RenderSettings.ambientGroundColor = new Color(0.14f, 0.18f, 0.15f);
+            RenderSettings.ambientSkyColor = new Color(0.58f, 0.68f, 0.80f);
+            RenderSettings.ambientEquatorColor = new Color(0.48f, 0.56f, 0.46f);
+            RenderSettings.ambientGroundColor = new Color(0.28f, 0.32f, 0.26f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.80f, 0.86f, 0.78f);

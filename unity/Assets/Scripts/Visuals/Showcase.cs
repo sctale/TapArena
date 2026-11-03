@@ -100,7 +100,7 @@ namespace TapArena
             for (int i = 0; i < all.Length; i++)
             {
                 float a = Mathf.Lerp(-0.62f, 0.62f, i / (float)(all.Length - 1));
-                Vector3 p = new Vector3(Mathf.Sin(a) * 400f, 0f, Mathf.Cos(a) * 300f);
+                Vector3 p = new Vector3(Mathf.Sin(a) * 360f, 0f, Mathf.Cos(a) * 300f);
                 PrimPodium(p, all[i].accent);
                 var rig = Art.BuildHero(all[i], _root);
                 rig.root.position = p;
@@ -180,8 +180,8 @@ namespace TapArena
             if (!cam.enabled) return;
             _t += Time.unscaledDeltaTime;
             float sway = Mathf.Sin(_t * 0.22f) * 0.16f;
-            cam.transform.position = new Vector3(Mathf.Sin(sway) * 110f, 200f, -455f - Mathf.Cos(sway) * 20f);
-            cam.transform.LookAt(new Vector3(-130f, 55f, 200f));
+            cam.transform.position = new Vector3(Mathf.Sin(sway) * 90f, 196f, -405f - Mathf.Cos(sway) * 18f);
+            cam.transform.LookAt(new Vector3(-140f, 55f, 200f));
         }
     }
 }

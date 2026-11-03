@@ -24,3 +24,14 @@ unity/shot-*.png
 unity/crop-*.png
 unity/sheet.png
 unity/*.mp4
+unity/preview*.png
+unity/preview*.log
+unity/face_*.png
+unity/face_sheet*.png
+unity/artref/
+unity/pose_*.png
+unity/walk*.mp4
+unity/walk_sheet*.jpg
+unity/frames*/
+unity/emu.log
+unity/adbtmp/

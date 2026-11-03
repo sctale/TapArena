@@ -276,7 +276,7 @@ namespace TapArena
                 cxp += cw + h * 0.012f;
             }
 
-            Label(new Rect(w * 0.78f, h * 0.9f, w * 0.2f, h * 0.05f), "Unity 版 v2.0.1", _hudSmall,
+            Label(new Rect(w * 0.78f, h * 0.9f, w * 0.2f, h * 0.05f), "Unity 版 v2.1", _hudSmall,
                 new Color(1f, 1f, 1f, 0.55f));
         }
 

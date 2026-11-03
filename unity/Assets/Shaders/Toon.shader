@@ -13,6 +13,7 @@ Shader "TapArena/Toon"
         _RimPower ("Rim Power", Float) = 4.0
         _RimStrength ("Rim Strength", Float) = 0.28
         _ShadeTint ("Ambient Tint", Color) = (0.72,0.80,1,1)
+        _Flash ("Hit Flash", Range(0,1)) = 0
     }
 
     SubShader
@@ -81,6 +82,7 @@ Shader "TapArena/Toon"
             fixed4 _ShadeTint;
             float _RimPower;
             float _RimStrength;
+            float _Flash;
 
             struct appdata
             {
@@ -114,6 +116,7 @@ Shader "TapArena/Toon"
             fixed4 frag (v2f i) : SV_Target
             {
                 float3 albedo = tex2D(_MainTex, i.uv).rgb * _Color.rgb;
+                albedo = lerp(albedo, float3(1.0, 1.0, 1.0), saturate(_Flash));
                 float3 n = normalize(i.wn);
 
                 float3 lightDir = normalize(_WorldSpaceLightPos0.xyz);
