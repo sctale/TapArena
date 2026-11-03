@@ -2,6 +2,39 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [3.0.0] - 2026-11-03
+
+**Blender Low Poly 美术管线 + 2D 选人立绘 + 应用图标。**
+
+### Blender 资产
+
+- 新增 `tools/blender_lowpoly.py`：用 Blender 4.5 headless 生成六位原创英雄的低多边形分件几何，导出 `Resources/LowPoly/<id>.json`；每位英雄约 1.3–1.8k 三角面，全部平直着色。
+- 同一套 Blender 场景渲染 `Splash/<id>_splash.png`（768×1152 全身）、`Splash/<id>_bust.png`（512×512 头像）、`Portraits/<id>_head.png`（256×256 透明头部头像）；动态 3/4 姿态、卡通分档材质、低多边形描边、主题色光环与浮动碎片。
+- 新增 `Assets/Art/AppIcon.png`（1024×1024）：低多边形阿虎头像 + 金色圆环，已通过 `PlayerSettings.SetIconsForTargetGroup` 写入 Android 的 6 个图标槽。
+
+### 游戏内 3D
+
+- 新增 `LowPolyHero.cs`：读取 Blender 分件 JSON，按 `hips/chest/head/ear/eyes/shoulder/elbow/wrist/weapon/thigh/knee/ankle/tail` 骨骼合成一张**刚性权重 SkinnedMesh**；每个英雄一张网格、一支材质，保留现有待机/四相步态/攻击/施法/受击/阵亡动画。
+- 新增 `TapArena/LowPoly` shader：顶点色 + 三段卡通明暗 + 边缘光 + 外扩描边 + 受击闪白；顶点色按 sRGB→线性处理，避免低多边形角色发白。
+- 眼睛组保留独立骨骼，HeroView 的眨眼/受击缩眼仍然生效；法杖/星杖绑定 `weapon` 骨骼，施法起手光位置不变。
+
+### 2D 选人 / UI
+
+- 选人卡改用 Blender 渲染的 2D bust 全图（不再显示 3D 头像），选中卡改为暗色全图 + 金色外框/顶条；详情面板左侧加入大幅 2D splash 立绘，右侧保留技能信息与“出发”。
+- HUD 与结算头像改用 Low Poly 头部渲染；旧的高模全身立绘资源删除；应用显示名仍是“萌兽峡谷”。
+
+### 画面修复
+
+- 玩家靠近塔时，巨型蘑菇伞盖从“直接消失”改为平滑缩小成小盖并下沉，保留塔身/塔血条，不再出现断头塔。
+- 保留 v2.2.0 的木桥近侧栏杆、选人排版、冷却/大招状态与结算“击杀”文案修复。
+
+### 验证
+
+- Blender 批量生成：6 份 JSON、6 张 splash、6 张 bust、6 张头部头像、1 张图标；编辑器预览全部为 Low Poly。
+- Android 模拟器安装 v3.0.0（versionCode 24）：首页六位 Low Poly 英雄、2D 选人页、战斗内模型/动画/受击/技能/塔盖缩放正常；logcat 无异常。
+- 帧率约 39–56fps（多数 46–55fps，与战斗单位/特效数量有关）；低多边形英雄每位一次 SkinnedMesh 绘制。
+- APK 27.3MB；SHA-256 `1f15791298583770cddc10e0dc3062f6535c606c435b55a8cfe7cbfe512c4c3c`。
+
 ## [2.2.0] - 2026-11-03
 
 **UI、动作、人物与数值的一轮整体调整。**

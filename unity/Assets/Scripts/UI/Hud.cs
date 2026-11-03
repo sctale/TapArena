@@ -25,6 +25,8 @@ namespace TapArena
         float[] _cdRatio = { -1f, -1f, -1f };
         readonly Dictionary<HeroId, Texture2D> _portraits = new Dictionary<HeroId, Texture2D>();
         readonly Dictionary<HeroId, Texture2D> _headPortraits = new Dictionary<HeroId, Texture2D>();
+        readonly Dictionary<HeroId, Texture2D> _busts = new Dictionary<HeroId, Texture2D>();
+        readonly Dictionary<HeroId, Texture2D> _splashes = new Dictionary<HeroId, Texture2D>();
         readonly Dictionary<SkillKind, Texture2D> _icons = new Dictionary<SkillKind, Texture2D>();
         float _scale = 1f;
         Rect[] _skillRects = new Rect[3];
@@ -42,7 +44,7 @@ namespace TapArena
         Texture2D Portrait(HeroId id)
         {
             if (_portraits.TryGetValue(id, out var t) && t != null) return t;
-            t = Resources.Load<Texture2D>("Portraits/" + id.ToString().ToLowerInvariant());
+            t = Resources.Load<Texture2D>("Splash/" + id.ToString().ToLowerInvariant() + "_bust");
             _portraits[id] = t;
             return t;
         }
@@ -53,6 +55,24 @@ namespace TapArena
             t = Resources.Load<Texture2D>("Portraits/" + id.ToString().ToLowerInvariant() + "_head");
             if (t == null) t = Portrait(id);
             _headPortraits[id] = t;
+            return t;
+        }
+
+        Texture2D Bust(HeroId id)
+        {
+            if (_busts.TryGetValue(id, out var t) && t != null) return t;
+            t = Resources.Load<Texture2D>("Splash/" + id.ToString().ToLowerInvariant() + "_bust");
+            if (t == null) t = Portrait(id);
+            _busts[id] = t;
+            return t;
+        }
+
+        Texture2D Splash(HeroId id)
+        {
+            if (_splashes.TryGetValue(id, out var t) && t != null) return t;
+            t = Resources.Load<Texture2D>("Splash/" + id.ToString().ToLowerInvariant() + "_splash");
+            if (t == null) t = Bust(id);
+            _splashes[id] = t;
             return t;
         }
 
@@ -374,38 +394,36 @@ namespace TapArena
                 else
                     Rounded(new Rect(r.x + 3f, r.y + 5f, r.width, r.height), new Color(0.02f, 0.05f, 0.04f, 0.32f));
 
-                Rounded(r, on ? new Color(1f, 0.94f, 0.78f, 0.98f) : new Color(0.10f, 0.24f, 0.20f, 0.96f));
+                Rounded(r, on ? new Color(0.12f, 0.28f, 0.23f, 0.99f) : new Color(0.10f, 0.24f, 0.20f, 0.96f));
                 Fill(new Rect(r.x + r.width * 0.06f, r.y + 1f, r.width * 0.88f, 4f),
-                    on ? new Color(0.55f, 0.33f, 0.06f, 0.55f) : new Color(accent.r, accent.g, accent.b, 0.8f), _white);
+                    on ? CGold : new Color(accent.r, accent.g, accent.b, 0.8f), _white);
 
-                var art = new Rect(r.x + cw * 0.055f, r.y + ch * 0.035f, cw * 0.89f, ch * 0.585f);
-                Rounded(art, on ? new Color(1f, 0.91f, 0.68f, 0.55f) : new Color(0.05f, 0.15f, 0.12f, 0.75f));
-                Circle(new Rect(art.x + art.width * 0.16f, art.y + art.height * 0.10f,
-                    art.width * 0.68f, art.width * 0.68f), new Color(accent.r, accent.g, accent.b, 0.13f));
-
-                var tex = Portrait(d.id);
+                var art = new Rect(r.x + cw * 0.04f, r.y + ch * 0.03f, cw * 0.92f, ch * 0.60f);
+                Rounded(new Rect(art.x - 2f, art.y - 2f, art.width + 4f, art.height + 4f),
+                    on ? new Color(1f, 0.86f, 0.46f, 0.9f) : new Color(0.05f, 0.15f, 0.12f, 0.9f));
+                var tex = Bust(d.id);
                 if (tex != null)
-                    GUI.DrawTexture(art, tex, ScaleMode.ScaleToFit, true);
+                    GUI.DrawTexture(art, tex, ScaleMode.ScaleAndCrop, false);
                 else
                 {
                     Circle(new Rect(art.x + art.width * 0.22f, art.y + art.height * 0.05f,
                         art.width * 0.56f, art.width * 0.56f), d.fur);
-                    Label(art, d.name.Substring(0, 1), _big, CInk);
+                    Label(art, d.name.Substring(0, 1), _big, CCream);
                 }
 
-                Color nameC = on ? CInk : CCream;
-                Color roleC = on ? new Color(0.44f, 0.28f, 0.08f) : new Color(1f, 0.93f, 0.78f, 0.9f);
-                Label(new Rect(r.x, r.y + ch * 0.625f, r.width, ch * 0.105f), d.name, _cardName, nameC);
+                Color nameC = on ? CGoldSoft : CCream;
+                Color roleC = new Color(1f, 0.93f, 0.78f, 0.9f);
+                Label(new Rect(r.x, r.y + ch * 0.648f, r.width, ch * 0.105f), d.name, _cardName, nameC);
 
-                var roleBar = new Rect(r.x + r.width * 0.16f, r.y + ch * 0.735f, r.width * 0.68f, ch * 0.075f);
-                Rounded(roleBar, on ? new Color(0.55f, 0.36f, 0.07f, 0.24f) : new Color(0.04f, 0.12f, 0.10f, 0.55f));
+                var roleBar = new Rect(r.x + r.width * 0.16f, r.y + ch * 0.752f, r.width * 0.68f, ch * 0.075f);
+                Rounded(roleBar, new Color(0.04f, 0.12f, 0.10f, 0.55f));
                 Label(roleBar, d.role, _chip, roleC);
 
                 string stars = new string('●', d.difficulty) + new string('○', 3 - d.difficulty);
-                Label(new Rect(r.x, r.y + ch * 0.815f, r.width, ch * 0.075f), "难度 " + stars, _chip,
-                    on ? new Color(0.55f, 0.34f, 0.08f) : new Color(1f, 0.88f, 0.6f, 0.9f));
+                Label(new Rect(r.x, r.y + ch * 0.828f, r.width, ch * 0.075f), "难度 " + stars, _chip,
+                    new Color(1f, 0.88f, 0.6f, 0.9f));
                 Label(new Rect(r.x, r.y + ch * 0.905f, r.width, ch * 0.065f), on ? "已选择" : "点击选择", _micro,
-                    on ? new Color(0.45f, 0.29f, 0.06f, 0.85f) : new Color(1f, 1f, 1f, 0.38f));
+                    on ? CGoldSoft : new Color(1f, 1f, 1f, 0.38f));
 
                 if (GUI.Button(r, GUIContent.none, _btnSmall)) GameFlow.picked = d.id;
             }
@@ -418,29 +436,40 @@ namespace TapArena
             Panel(dp, CPanelDeep);
             var d = HeroDef.Get(GameFlow.picked);
             float h = Screen.height, w = Screen.width;
-            Label(new Rect(dp.x + w * 0.018f, dp.y + h * 0.010f, w * 0.52f, h * 0.040f),
+
+            /* 左侧 2D 立绘：选人页的“王者荣耀式”大图，游戏内仍然是 3D 低多边形。 */
+            float artW = w * 0.115f;
+            var art = new Rect(dp.x + w * 0.012f, dp.y + h * 0.012f, artW, dp.height - h * 0.024f);
+            Rounded(new Rect(art.x - 3f, art.y - 3f, art.width + 6f, art.height + 6f),
+                new Color(1f, 0.82f, 0.42f, 0.75f));
+            Rounded(art, new Color(0.04f, 0.10f, 0.09f, 0.95f));
+            var artTex = Splash(GameFlow.picked);
+            if (artTex != null) GUI.DrawTexture(art, artTex, ScaleMode.ScaleAndCrop, false);
+
+            float tx = art.xMax + w * 0.014f;
+            Label(new Rect(tx, dp.y + h * 0.010f, w * 0.44f, h * 0.040f),
                 d.name + "  ·  " + d.title, _cardName, CCream);
-            Label(new Rect(dp.x + w * 0.018f, dp.y + h * 0.050f, w * 0.62f, h * 0.028f),
+            Label(new Rect(tx, dp.y + h * 0.050f, w * 0.50f, h * 0.028f),
                 d.role + " · " + d.blurb, _hint, new Color(1f, 0.95f, 0.84f, 0.82f));
 
             float rowH = h * 0.060f, rowGap = h * 0.004f;
             float sy = dp.y + h * 0.080f;
-            float skillW = w * 0.66f;
+            float skillW = w * 0.50f;
             for (int i = 0; i < d.skills.Length; i++)
             {
                 var s = d.skills[i];
-                var sr = new Rect(dp.x + w * 0.018f, sy + i * (rowH + rowGap), skillW, rowH);
+                var sr = new Rect(tx, sy + i * (rowH + rowGap), skillW, rowH);
                 Rounded(sr, new Color(0.08f, 0.20f, 0.17f, i % 2 == 0 ? 0.55f : 0.32f));
                 var ir = new Rect(sr.x + h * 0.010f, sr.y + (rowH - h * 0.043f) * 0.5f, h * 0.043f, h * 0.043f);
                 Circle(new Rect(ir.x - 3f, ir.y - 3f, ir.width + 6f, ir.height + 6f),
                     new Color(s.color.r, s.color.g, s.color.b, 0.22f));
                 DrawIcon(ir, s.kind, s.color);
-                Label(new Rect(sr.x + h * 0.068f, sr.y + h * 0.003f, w * 0.18f, rowH * 0.46f),
+                Label(new Rect(sr.x + h * 0.068f, sr.y + h * 0.003f, w * 0.16f, rowH * 0.46f),
                     s.name, _name, CCream);
-                Label(new Rect(sr.x + h * 0.068f, sr.y + rowH * 0.48f, w * 0.41f, rowH * 0.46f),
+                Label(new Rect(sr.x + h * 0.068f, sr.y + rowH * 0.48f, w * 0.27f, rowH * 0.46f),
                     s.hint, _hudSmall, new Color(1f, 0.95f, 0.85f, 0.8f));
                 string tail = s.unlockAt2 ? "2 级解锁" : "冷却 " + s.cd.ToString("0.#") + " 秒";
-                Label(new Rect(sr.xMax - w * 0.115f, sr.y, w * 0.10f, rowH), tail, _micro,
+                Label(new Rect(sr.xMax - w * 0.105f, sr.y, w * 0.095f, rowH), tail, _micro,
                     s.unlockAt2 ? CGold : new Color(0.82f, 0.96f, 0.88f, 0.66f));
             }
 

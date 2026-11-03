@@ -24,6 +24,32 @@ namespace TapArena.EditorTools
                 ti.npotScale = TextureImporterNPOTScale.None;
                 return;
             }
+            if (path.Contains("Resources/Splash"))
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.sRGBTexture = true;
+                ti.mipmapEnabled = false;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.filterMode = FilterMode.Bilinear;
+                ti.textureCompression = TextureImporterCompression.CompressedHQ;
+                ti.maxTextureSize = 1024;
+                ti.alphaSource = TextureImporterAlphaSource.None;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                return;
+            }
+            if (path.EndsWith("Assets/Art/AppIcon.png"))
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.sRGBTexture = true;
+                ti.mipmapEnabled = false;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.filterMode = FilterMode.Bilinear;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.maxTextureSize = 1024;
+                ti.alphaSource = TextureImporterAlphaSource.None;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                return;
+            }
             if (!path.Contains("Resources/HeroFaces")) return;
             ti.textureType = TextureImporterType.Default;
             ti.sRGBTexture = true;

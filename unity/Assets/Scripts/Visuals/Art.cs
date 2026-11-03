@@ -410,7 +410,7 @@ namespace TapArena
 
         public static Rig BuildHero(HeroDef d, Transform parent)
         {
-            return HeroBuilder.Build(d, parent);
+            return LowPolyHero.Build(d, parent);
         }
 
         static void EarRound(Transform ear, float r, Material fur, Material inner)

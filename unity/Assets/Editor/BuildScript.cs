@@ -18,7 +18,7 @@ namespace TapArena.EditorTools
     public static class BuildScript
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
-        const string Version = "2.2.0";
+        const string Version = "3.0.0";
 
         /// <summary>
         /// headless 下 Unity 会把 Gradle 的 JVM 堆算成 0（-Xmx0m）直接崩，
@@ -135,6 +135,7 @@ namespace TapArena.EditorTools
             EnsureMat(resDir + "/TapArenaFx.mat", "Sprites/Default");
             EnsureMat(resDir + "/TapArenaGlow.mat", "TapArena/Glow");
             EnsureMat(resDir + "/TapArenaToon.mat", "TapArena/Toon");
+            EnsureMat(resDir + "/TapArenaLowPoly.mat", "TapArena/LowPoly");
             EnsureMat(resDir + "/TapArenaSky.mat", "TapArena/Sky");
             AssetDatabase.Refresh();
         }
@@ -157,7 +158,7 @@ namespace TapArena.EditorTools
             PlayerSettings.companyName = "sctale";
             PlayerSettings.productName = "萌兽峡谷";
             PlayerSettings.bundleVersion = Version;
-            PlayerSettings.Android.bundleVersionCode = 23;
+            PlayerSettings.Android.bundleVersionCode = 24;
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.sctale.taparena");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;
@@ -170,6 +171,23 @@ namespace TapArena.EditorTools
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
             PlayerSettings.colorSpace = ColorSpace.Linear;
             EditorUserBuildSettings.buildAppBundle = false;
+
+            var appIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/AppIcon.png");
+            if (appIcon != null)
+            {
+                try
+                {
+                    var sizes = PlayerSettings.GetIconSizesForTargetGroup(BuildTargetGroup.Android, IconKind.Application);
+                    var icons = new Texture2D[sizes.Length];
+                    for (int i = 0; i < icons.Length; i++) icons[i] = appIcon;
+                    PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Android, icons, IconKind.Application);
+                    Debug.Log($"[TapArena] app icon set ({icons.Length} slots)");
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning("[TapArena] app icon set failed: " + e.Message);
+                }
+            }
         }
 
         /// <summary>

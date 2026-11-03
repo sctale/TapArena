@@ -275,18 +275,12 @@ namespace TapArena
 
         void AddTowerOccluder(GameObject tower)
         {
-            var top = new List<Renderer>();
+            var top = new List<Transform>();
             for (int i = 0; i < tower.transform.childCount; i++)
             {
                 var c = tower.transform.GetChild(i);
                 if (c.localPosition.y < 72f) continue;
-                var r = c.GetComponent<Renderer>();
-                if (r != null) top.Add(r);
-                for (int j = 0; j < c.childCount; j++)
-                {
-                    var r2 = c.GetChild(j).GetComponent<Renderer>();
-                    if (r2 != null) top.Add(r2);
-                }
+                top.Add(c);
             }
             if (top.Count == 0) return;
             var oc = tower.AddComponent<TowerOccluder>();
@@ -294,28 +288,61 @@ namespace TapArena
         }
     }
 
-    /// <summary>玩家靠近塔时收起伞盖，避免巨型蘑菇挡住角色和动作。</summary>
+    /// <summary>玩家靠近塔时把蘑菇伞盖平滑缩成小盖，避免挡住角色，同时保留塔的轮廓。</summary>
     public class TowerOccluder : MonoBehaviour
     {
-        public Renderer[] top;
+        public Transform[] top;
         public float hideRadius = 215f;
         public float showRadius = 248f;
+        public float small = 0.30f;
+        public float sink = 26f;
         bool _hidden;
+        float _k = 1f;
+        Vector3[] _pos;
+        Vector3[] _scale;
+
+        void Start()
+        {
+            _pos = new Vector3[top.Length];
+            _scale = new Vector3[top.Length];
+            for (int i = 0; i < top.Length; i++)
+            {
+                if (top[i] == null) continue;
+                _pos[i] = top[i].localPosition;
+                _scale[i] = top[i].localScale;
+            }
+        }
 
         void LateUpdate()
         {
             var a = Arena.I;
-            if (a == null || a.player == null) { Set(false); return; }
-            float d = Vector3.Distance(a.player.pos, transform.position);
-            Set(_hidden ? d < showRadius : d < hideRadius);
-        }
-
-        void Set(bool hide)
-        {
-            if (hide == _hidden) return;
-            _hidden = hide;
+            bool hide = false;
+            if (a != null && a.player != null)
+            {
+                float d = Vector3.Distance(a.player.pos, transform.position);
+                hide = _hidden ? d < showRadius : d < hideRadius;
+            }
+            if (hide != _hidden)
+            {
+                _hidden = hide;
+                for (int i = 0; i < top.Length; i++)
+                {
+                    var c = top[i];
+                    if (c == null) continue;
+                    var col = c.GetComponent<Collider>();
+                    if (col != null) col.enabled = !hide;
+                }
+            }
+            float target = hide ? small : 1f;
+            _k = Mathf.Lerp(_k, target, 1f - Mathf.Exp(-8f * Time.deltaTime));
+            float t = Mathf.InverseLerp(1f, small, _k);
             for (int i = 0; i < top.Length; i++)
-                if (top[i] != null) top[i].enabled = !hide;
+            {
+                var c = top[i];
+                if (c == null) continue;
+                c.localScale = _scale[i] * _k;
+                c.localPosition = _pos[i] + Vector3.down * (t * sink);
+            }
         }
     }
 }
