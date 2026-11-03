@@ -18,7 +18,7 @@ namespace TapArena.EditorTools
     public static class BuildScript
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
-        const string Version = "2.1.0";
+        const string Version = "2.2.0";
 
         /// <summary>
         /// headless 下 Unity 会把 Gradle 的 JVM 堆算成 0（-Xmx0m）直接崩，
@@ -157,7 +157,7 @@ namespace TapArena.EditorTools
             PlayerSettings.companyName = "sctale";
             PlayerSettings.productName = "萌兽峡谷";
             PlayerSettings.bundleVersion = Version;
-            PlayerSettings.Android.bundleVersionCode = 22;
+            PlayerSettings.Android.bundleVersionCode = 23;
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.sctale.taparena");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;

@@ -130,6 +130,11 @@ namespace TapArena
             _structureGo[arena.baseBlue.uid] = Art.Crystal(_props, arena.baseBlue.pos, true);
             _structureGo[arena.baseRed.uid] = Art.Crystal(_props, arena.baseRed.pos, false);
 
+            /* 镜头会从塔后方穿过：玩家靠近时把伞盖/旗子收掉，塔身和血条留着。
+               没有透明版 Toon shader，直接关 Renderer，比让巨大伞盖糊住角色好。 */
+            foreach (var kv in _structureGo)
+                if (kv.Value.name == "tower") AddTowerOccluder(kv.Value);
+
             /* 英雄 */
             foreach (var h in arena.heroes)
             {
@@ -266,6 +271,51 @@ namespace TapArena
                 float k = 1f - z.t / z.life;
                 mr.material.color = new Color(z.color.r, z.color.g, z.color.b, 0.55f * k);
             }
+        }
+
+        void AddTowerOccluder(GameObject tower)
+        {
+            var top = new List<Renderer>();
+            for (int i = 0; i < tower.transform.childCount; i++)
+            {
+                var c = tower.transform.GetChild(i);
+                if (c.localPosition.y < 72f) continue;
+                var r = c.GetComponent<Renderer>();
+                if (r != null) top.Add(r);
+                for (int j = 0; j < c.childCount; j++)
+                {
+                    var r2 = c.GetChild(j).GetComponent<Renderer>();
+                    if (r2 != null) top.Add(r2);
+                }
+            }
+            if (top.Count == 0) return;
+            var oc = tower.AddComponent<TowerOccluder>();
+            oc.top = top.ToArray();
+        }
+    }
+
+    /// <summary>玩家靠近塔时收起伞盖，避免巨型蘑菇挡住角色和动作。</summary>
+    public class TowerOccluder : MonoBehaviour
+    {
+        public Renderer[] top;
+        public float hideRadius = 215f;
+        public float showRadius = 248f;
+        bool _hidden;
+
+        void LateUpdate()
+        {
+            var a = Arena.I;
+            if (a == null || a.player == null) { Set(false); return; }
+            float d = Vector3.Distance(a.player.pos, transform.position);
+            Set(_hidden ? d < showRadius : d < hideRadius);
+        }
+
+        void Set(bool hide)
+        {
+            if (hide == _hidden) return;
+            _hidden = hide;
+            for (int i = 0; i < top.Length; i++)
+                if (top[i] != null) top[i].enabled = !hide;
         }
     }
 }

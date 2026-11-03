@@ -9,8 +9,22 @@ namespace TapArena.EditorTools
         void OnPreprocessTexture()
         {
             string path = assetPath.Replace('\\', '/');
-            if (!path.Contains("Resources/HeroFaces")) return;
             var ti = (TextureImporter)assetImporter;
+            if (path.Contains("Resources/Portraits"))
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.sRGBTexture = true;
+                ti.mipmapEnabled = false;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.filterMode = FilterMode.Bilinear;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.maxTextureSize = 640;
+                ti.alphaSource = TextureImporterAlphaSource.FromInput;
+                ti.alphaIsTransparency = true;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                return;
+            }
+            if (!path.Contains("Resources/HeroFaces")) return;
             ti.textureType = TextureImporterType.Default;
             ti.sRGBTexture = true;
             ti.mipmapEnabled = true;

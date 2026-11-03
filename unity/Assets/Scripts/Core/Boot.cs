@@ -148,6 +148,15 @@ namespace TapArena
             CameraRig.I.Snap();
         }
 
+        public static void ToSelect()
+        {
+            I.ClearWorld();
+            GameFlow.screen = UiScreen.Select;
+            ShowMainWorld(false);
+            CameraRig.I.SetTarget(null, new Vector3(1500f, 0f, 800f));
+            CameraRig.I.Snap();
+        }
+
         void ClearWorld()
         {
             Arena.I = null;
@@ -192,7 +201,8 @@ namespace TapArena
 
             if (a.player != null)
             {
-                Vector3 want = a.player.pos;
+                /* 镜头往走位方向多探 55 单位，孩子能早点看到前面的敌人 */
+                Vector3 want = a.player.pos + a.player.moveDir * (a.player.moving ? 55f : 0f);
                 _follow.position = Vector3.Lerp(_follow.position, want, 1f - Mathf.Exp(-14f * Time.deltaTime));
             }
 

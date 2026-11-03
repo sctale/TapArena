@@ -26,6 +26,8 @@ namespace TapArena
         public float walkT;
         public bool moving;
         public bool isPlayer;
+        public float aiThink;
+        public Unit aiTarget;
         public int laneIndex;        // 小兵沿兵线走
         public int laneTarget;
 
@@ -68,9 +70,10 @@ namespace TapArena
         public static Arena I;
 
         public const float MapW = 3000f, MapH = 1600f;
-        public const float SuddenDeathTime = 360f;   // 6 分钟终极对决
-        public const float RespawnTime = 6f;
-        public const float WaveInterval = 22f;
+        public const float SuddenDeathTime = 240f;   // 4:00 终极对决
+        public const float RespawnTime = 5.5f;
+        public const float WaveInterval = 18f;
+        public const float XpToLevel2 = 260f;
 
         public readonly List<Unit> units = new List<Unit>();
         public readonly List<Unit> heroes = new List<Unit>();
@@ -132,8 +135,22 @@ namespace TapArena
             towersRed.Add(MakeTower(Team.Red, 0, new Vector3(1900f, 0f, 800f)));
             towersRed.Add(MakeTower(Team.Red, 1, new Vector3(2320f, 0f, 800f)));
 
-            var blueIds = new List<HeroId> { playerHero, others[0], others[1] };
-            var redIds = new List<HeroId> { others[2], others[3], others[4] };
+            /* 阵容别随机出三脆皮：两队都保证一名前排，玩家队再优先配一个辅助/远程 */
+            var allies = new List<HeroId>(2);
+            bool playerFront = playerHero == HeroId.Tiger || playerHero == HeroId.Bear;
+            if (!playerFront)
+            {
+                allies.Add(TakePreferred(others, HeroId.Bear, HeroId.Tiger));
+                allies.Add(TakePreferred(others, HeroId.Rabbit, HeroId.Otter, HeroId.Hedgehog, HeroId.Fox));
+            }
+            else
+            {
+                allies.Add(TakePreferred(others, HeroId.Hedgehog, HeroId.Fox, HeroId.Rabbit, HeroId.Otter));
+                allies.Add(TakePreferred(others, HeroId.Rabbit, HeroId.Otter, HeroId.Fox, HeroId.Hedgehog));
+            }
+
+            var blueIds = new List<HeroId> { playerHero, allies[0], allies[1] };
+            var redIds = new List<HeroId>(others);   // 剩下三人就是对面，仍有至少一个前排
             for (int i = 0; i < 3; i++)
             {
                 var h = MakeHero(blueIds[i], Team.Blue, i);
@@ -158,18 +175,18 @@ namespace TapArena
         Unit MakeBase(Team team, Vector3 pos)
         {
             var u = NewUnit(UnitKind.Base, team, team == Team.Blue ? "清清水晶" : "红红水晶", pos);
-            u.hp = u.maxHp = 3200f;
-            u.radius = 90f; u.height = 150f; u.range = 380f; u.dmg = 110f;
-            u.atkInterval = 1.2f; u.atkTimer = 1f;
+            u.hp = u.maxHp = 4200f;
+            u.radius = 90f; u.height = 150f; u.range = 400f; u.dmg = 120f;
+            u.atkInterval = 1.0f; u.atkTimer = 1f;
             return u;
         }
 
         Unit MakeTower(Team team, int tier, Vector3 pos)
         {
             var u = NewUnit(UnitKind.Tower, team, tier == 0 ? "外塔" : "内塔", pos);
-            u.hp = u.maxHp = 2200f;
+            u.hp = u.maxHp = 4200f;
             u.radius = 58f; u.height = 140f;
-            u.range = 340f; u.dmg = 92f; u.atkInterval = 1.1f; u.atkTimer = Rand(0f, 1f);
+            u.range = 350f; u.dmg = 100f; u.atkInterval = 1.0f; u.atkTimer = Rand(0f, 1f);
             u.level = tier;
             return u;
         }
@@ -194,6 +211,15 @@ namespace TapArena
 
         public Vector3 BasePos(Team t) => t == Team.Blue ? baseBlue.pos : baseRed.pos;
 
+        static HeroId TakePreferred(List<HeroId> pool, params HeroId[] prefs)
+        {
+            foreach (var p in prefs)
+                if (pool.Contains(p)) { pool.Remove(p); return p; }
+            var fallback = pool[0];
+            pool.RemoveAt(0);
+            return fallback;
+        }
+
         /* ================= 主循环 ================= */
         void Update()
         {
@@ -215,8 +241,8 @@ namespace TapArena
             for (int i = 0; i < heroes.Count; i++)
                 if (heroes[i].alive) AddXp(heroes[i], 2f * dt);
 
-            /* 兜底：8 分钟按水晶剩余血量判定，绝不让一局无限拖下去 */
-            if (!over && clock >= 480f)
+            /* 兜底：5 分钟按水晶剩余血量判定，绝不让一局无限拖下去 */
+            if (!over && clock >= 300f)
             {
                 float b = baseBlue.hp / baseBlue.maxHp, r = baseRed.hp / baseRed.maxHp;
                 if (Mathf.Abs(b - r) < 0.01f) EndMatch(scoreBlue >= scoreRed ? Team.Blue : Team.Red);
@@ -238,9 +264,9 @@ namespace TapArena
             for (int k = 0; k < 3; k++)
             {
                 var m = NewUnit(UnitKind.Minion, team, "小果冻", origin + new Vector3(0f, 0f, (k - 1) * 46f));
-                m.hp = m.maxHp = 260f;
-                m.radius = 20f; m.height = 46f; m.range = 118f; m.dmg = 20f;
-                m.atkInterval = 0.9f; m.atkTimer = Rand(0f, 0.6f); m.moveSpeed = 172f;
+                m.hp = m.maxHp = 280f;
+                m.radius = 20f; m.height = 46f; m.range = 118f; m.dmg = 22f;
+                m.atkInterval = 0.9f; m.atkTimer = Rand(0f, 0.6f); m.moveSpeed = 176f;
                 m.laneIndex = team == Team.Blue ? 1 : Lane.Length - 2;
                 m.laneTarget = m.laneIndex;
                 minions.Add(m);
@@ -316,7 +342,7 @@ namespace TapArena
             if (target != null && h.atkTimer <= 0f)
             {
                 h.atkTimer = h.atkInterval;
-                h.atkAnim = 0.26f;
+                h.atkAnim = 0.34f;
                 h.facing = target.pos.x >= h.pos.x ? 1f : -1f;
                 if (h.range > 250f) Shoot(h, target.pos - h.pos, h.dmg, h.def != null ? h.def.accent : Color.white, 700f, 0f, 0f, 0f, 0);
                 else HitWithFx(target, h.dmg, h, 0);
@@ -327,42 +353,154 @@ namespace TapArena
         {
             float hpP = h.hp / h.maxHp;
             bool retreat = hpP < 0.3f;
-            Vector3 goal;
 
-            if (retreat) goal = BasePos(h.team) + new Vector3(h.team == Team.Blue ? 90f : -90f, 0f, 0f);
+            /* 每 0.2~0.3 秒做一次决策；以前是每帧 5% 掷骰，技能会瞬间全丢 */
+            h.aiThink -= dt;
+            bool think = h.aiThink <= 0f;
+            if (think) h.aiThink = 0.22f + (h.uid % 5) * 0.025f;
+            if (h.aiTarget == null || !h.aiTarget.alive) h.aiTarget = AiTarget(h);
+            var t = h.aiTarget;
+
+            if (think) StepHeroSkills(h, hpP, retreat);
+
+            /* 走位：近战贴身、远程保持射程，血少回撤 */
+            if (retreat)
+            {
+                Vector3 home = BasePos(h.team) + new Vector3(h.team == Team.Blue ? 70f : -70f, 0f, 0f);
+                Vector3 away = home - h.pos;
+                if (away.magnitude > 55f) MoveAI(h, away, dt, 1f);
+                else h.moving = false;
+                h.facing = away.x >= 0f ? 1f : -1f;
+                return;
+            }
+
+            if (t == null)
+            {
+                Vector3 goal = Lane[h.team == Team.Blue ? Lane.Length - 1 : 0];
+                MoveAI(h, goal - h.pos, dt, 0.9f);
+                return;
+            }
+
+            Vector3 toT = t.pos - h.pos;
+            float dist = toT.magnitude;
+            h.facing = toT.x >= 0f ? 1f : -1f;
+
+            if (h.range > 250f)
+            {
+                /* 远程：太近就后撤，太远就靠近，射程内小幅横移 */
+                if (dist < h.range * 0.55f)
+                    MoveAI(h, -toT, dt, 1f);
+                else if (dist > h.range * 0.86f)
+                    MoveAI(h, toT, dt, 0.9f);
+                else
+                {
+                    Vector3 side = Vector3.Cross(Vector3.up, toT.normalized) * ((h.uid & 1) == 0 ? 1f : -1f);
+                    MoveAI(h, side, dt, 0.35f);
+                }
+            }
             else
             {
-                var t = AiTarget(h);
-                goal = t != null ? t.pos : Lane[h.team == Team.Blue ? Lane.Length - 1 : 0];
+                float keep = h.range * 0.84f;
+                if (dist > keep) MoveAI(h, toT, dt, 1f);
+                else h.moving = false;
             }
+        }
 
-            Vector3 to = goal - h.pos;
-            float d = to.magnitude;
-            bool shouldMove = retreat ? d > 140f : (AiTarget(h) == null ? true : d > h.range * 0.78f);
-            if (shouldMove && d > 4f)
-            {
-                to /= d;
-                h.moveDir = to;
-                h.facing = to.x >= 0f ? 1f : -1f;
-                h.moving = true;
-                MoveTo(h, h.pos + to * (h.moveSpeed * (h.slowT > 0f ? 0.55f : 1f) * dt));
-                h.walkT += dt;
-            }
-            else h.moving = false;
+        void MoveAI(Unit h, Vector3 dir, float dt, float speedK)
+        {
+            if (dir.sqrMagnitude < 0.0001f) { h.moving = false; return; }
+            dir.y = 0f;
+            dir.Normalize();
+            h.moveDir = dir;
+            h.moving = true;
+            MoveTo(h, h.pos + dir * (h.moveSpeed * speedK * (h.slowT > 0f ? 0.55f : 1f) * dt));
+            h.walkT += dt;
+        }
 
-            /* 技能：贴脸/远程各自有阈值 */
+        void StepHeroSkills(Unit h, float hpP, bool retreat)
+        {
             for (int i = 0; i < 3; i++)
             {
                 var s = h.skills[i];
                 if (s.unlockAt2 && h.level < 2) continue;
                 if (h.cds[i] > 0f) continue;
-                if (s.kind == SkillKind.Heal) { if (hpP < 0.7f && Random.value < 0.06f) TryCast(h, i); continue; }
-                if (s.kind == SkillKind.Shield) { if (hpP < 0.68f && Random.value < 0.06f) TryCast(h, i); continue; }
-                var t = AiTarget(h);
-                if (t == null) continue;
-                float dist = Vector3.Distance(h.pos, t.pos);
-                if (dist <= s.range && Random.value < 0.05f) TryCast(h, i);
+
+                bool support = s.kind == SkillKind.Heal || s.kind == SkillKind.Shield;
+                if (retreat && !support) continue;
+
+                bool use = false;
+                switch (s.kind)
+                {
+                    case SkillKind.Heal:
+                        use = LowAlly(h, s.radius, 0.68f) && Random.value < 0.55f;
+                        break;
+                    case SkillKind.Shield:
+                        use = hpP < 0.75f && EnemyHeroNear(h, 420f) && Random.value < 0.5f;
+                        break;
+                    case SkillKind.Dash:
+                    {
+                        var t = h.aiTarget;
+                        if (t != null)
+                        {
+                            float d = Vector3.Distance(h.pos, t.pos);
+                            use = d > s.range * 0.9f && d < s.range * 1.7f && Random.value < 0.4f;
+                        }
+                        break;
+                    }
+                    case SkillKind.Cone:
+                        use = CountEnemiesAround(h, s.range, 0.2f) > 0 && Random.value < 0.5f;
+                        break;
+                    case SkillKind.Pull:
+                    case SkillKind.Leap:
+                        use = NearestHero(h, s.range) != null && Random.value < 0.32f;
+                        break;
+                    case SkillKind.Multi:
+                        use = NearestEnemy(h, s.range) != null && Random.value < 0.34f;
+                        break;
+                    case SkillKind.Radial:
+                        use = NearestEnemy(h, s.range) != null && Random.value < 0.42f;
+                        break;
+                    case SkillKind.Aoe:
+                        use = CountEnemiesAround(h, s.radius, -1f) > 0 && Random.value < 0.42f;
+                        break;
+                    default:
+                        use = NearestEnemy(h, Mathf.Max(s.range, h.range)) != null && Random.value < 0.36f;
+                        break;
+                }
+                if (use) { TryCast(h, i); break; }   // 一次思考只放一个技能
             }
+        }
+
+        bool LowAlly(Unit h, float radius, float pct)
+        {
+            foreach (var a in heroes)
+            {
+                if (!a.alive || a.team != h.team) continue;
+                if (a.hp / a.maxHp < pct && Vector3.Distance(a.pos, h.pos) <= radius) return true;
+            }
+            return false;
+        }
+
+        bool EnemyHeroNear(Unit h, float radius)
+        {
+            foreach (var o in heroes)
+                if (o.alive && o.team != h.team && Vector3.Distance(o.pos, h.pos) <= radius) return true;
+            return false;
+        }
+
+        int CountEnemiesAround(Unit h, float radius, float dotMin)
+        {
+            int n = 0;
+            Vector3 aim = h.moveDir.sqrMagnitude > 0.01f ? h.moveDir.normalized : new Vector3(h.facing, 0f, 0f);
+            foreach (var u in units)
+            {
+                if (!u.alive || u.team == h.team) continue;
+                Vector3 to = u.pos - h.pos;
+                if (to.magnitude > radius + u.radius) continue;
+                if (dotMin < 0.99f && Vector3.Dot(to.normalized, aim) < dotMin) continue;
+                n++;
+            }
+            return n;
         }
 
         Unit AiTarget(Unit h)
@@ -394,7 +532,7 @@ namespace TapArena
                     m.atkTimer = m.atkInterval;
                     m.atkAnim = 0.22f;
                     /* 小兵对塔/水晶有攻城加成，保证兵线真的能推塔 */
-                    float dmg = (foe.kind == UnitKind.Tower || foe.kind == UnitKind.Base) ? m.dmg * 3.0f : m.dmg;
+                    float dmg = (foe.kind == UnitKind.Tower || foe.kind == UnitKind.Base) ? m.dmg * 2.0f : m.dmg;
                     HitWithFx(foe, dmg, m, 0);
                 }
                 return;
@@ -569,7 +707,9 @@ namespace TapArena
             if (target.kind == UnitKind.Hero)
             {
                 target.deaths++;
-                target.respawnT = RespawnTime;
+                /* 落后的一方复活快一点，别让一局在 90 秒就滚雪球滚死 */
+                int behind = target.team == Team.Blue ? scoreRed - scoreBlue : scoreBlue - scoreRed;
+                target.respawnT = Mathf.Max(3.8f, RespawnTime - Mathf.Clamp(behind, 0, 3) * 0.55f);
                 if (killer != null) killer.kills++;
                 if (killer != null && killer.kind == UnitKind.Hero) AddXp(killer, 140f);
                 if (killer != null)
@@ -604,7 +744,7 @@ namespace TapArena
         {
             if (h == null || add <= 0f || h.level >= 2) return;
             h.xp += add;
-            if (h.xp >= 300f)
+            if (h.xp >= XpToLevel2)
             {
                 h.level = 2;
                 Fx.Text(h.pos, "二级解锁大招！", new Color(1f, 0.95f, 0.6f));
@@ -750,8 +890,9 @@ namespace TapArena
                 /* 支援类不需要目标 */
             }
             h.cds[index] = s.cd;
-            h.castAnim = 0.42f;
+            h.castAnim = 0.5f;
             Sfx.Play("cast");
+            if (h.isPlayer && index == 2) { CameraRig.Punch(0.9f); CameraRig.Shake(4f); }
             Cast(h, s, index);
         }
 

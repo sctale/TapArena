@@ -197,6 +197,19 @@ namespace TapArena
             Spawn(pos, c, 34f, 0.12f, Vector3.zero, 0f, _glow, true);
         }
 
+        /* 脚步扬尘：贴地的小片，给走路一点重量 */
+        public static void Dust(Vector3 pos, Color c)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 v = new Vector3(Random.Range(-32f, 32f), Random.Range(10f, 46f), Random.Range(-32f, 32f));
+                var s = Spawn(pos + Vector3.up * 3f, c, Random.Range(13f, 22f),
+                    Random.Range(0.32f, 0.5f), v, -55f, _glow, true);
+                s.Flat();
+                s.Grow(1.7f);
+            }
+        }
+
         public static void Ring(Vector3 pos, float radius, Color c, float life)
         {
             var s = Spawn(pos + Vector3.up * 3f, c, radius * 2f, life, Vector3.zero, 0f, _ringTex, false);

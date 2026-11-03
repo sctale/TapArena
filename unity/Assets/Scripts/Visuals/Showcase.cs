@@ -107,7 +107,7 @@ namespace TapArena
                 rig.root.rotation = Quaternion.Euler(0f, 90f + Mathf.Sin(a) * 16f, 0f);
                 var u = new Unit
                 {
-                    heroId = all[i].id, def = all[i], kind = UnitKind.Hero, team = Team.Blue,
+                    uid = i + 1, heroId = all[i].id, def = all[i], kind = UnitKind.Hero, team = Team.Blue,
                     hp = all[i].hp, maxHp = all[i].hp, pos = p, facing = 1f,
                     radius = all[i].radius, height = all[i].height,
                     atkAnim = 0f, castAnim = 0f, hurtAnim = 0f, walkT = 0f, moving = false,

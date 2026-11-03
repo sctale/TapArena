@@ -166,8 +166,9 @@ def face_texture(hero_id, pal, closed=False, hurt=False):
             soft_ellipse(img, (512 * S + side * 150 * S - 55 * S, 300 * S,
                                512 * S + side * 150 * S + 55 * S, 420 * S), (255, 255, 255), blur=12, alpha=150)
     elif pal["pattern"] == "otter":
-        soft_ellipse(img, (512 * S - 210 * S, 220 * S, 512 * S + 210 * S, 490 * S),
-                     cream, blur=22, alpha=220)
+        # 只留一小块浅色下巴，别把下半张脸整个刷白
+        soft_ellipse(img, (512 * S - 150 * S, 360 * S, 512 * S + 150 * S, 485 * S),
+                     cream, blur=20, alpha=135)
     elif pal["pattern"] == "hedgehog":
         soft_ellipse(img, (512 * S - 180 * S, 260 * S, 512 * S + 180 * S, 470 * S),
                      cream, blur=18, alpha=230)

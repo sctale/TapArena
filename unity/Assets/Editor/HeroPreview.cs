@@ -23,6 +23,100 @@ namespace TapArena.EditorTools
             File.WriteAllBytes(Path.GetFullPath(file), tex.EncodeToPNG());
         }
 
+        /// <summary>把实际 3D 模型渲染成选人/头像用的透明 PNG，替掉旧 2D 立绘。</summary>
+        public static void RenderPortraits()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.62f, 0.70f, 0.82f);
+            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.58f, 0.50f);
+            RenderSettings.ambientGroundColor = new Color(0.30f, 0.34f, 0.28f);
+            RenderSettings.fog = false;
+
+            var lampGo = new GameObject("sun");
+            var lamp = lampGo.AddComponent<Light>();
+            lamp.type = LightType.Directional;
+            lamp.color = new Color(1f, 0.96f, 0.88f);
+            lamp.intensity = 1.15f;
+            lamp.shadows = LightShadows.Soft;
+            lamp.shadowStrength = 0.45f;
+            lampGo.transform.rotation = Quaternion.LookRotation(-Art.SunDir);
+
+            var rimGo = new GameObject("rim");
+            var rim = rimGo.AddComponent<Light>();
+            rim.type = LightType.Directional;
+            rim.color = new Color(0.72f, 0.86f, 1f);
+            rim.intensity = 0.35f;
+            rimGo.transform.rotation = Quaternion.Euler(18f, 208f, 0f);
+
+            var camGo = new GameObject("cam");
+            var cam = camGo.AddComponent<Camera>();
+            cam.fieldOfView = 30f;
+            cam.nearClipPlane = 1f;
+            cam.farClipPlane = 3000f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
+
+            string dir = Path.GetFullPath("Assets/Resources/Portraits");
+            Directory.CreateDirectory(dir);
+            var all = HeroDef.All;
+            for (int i = 0; i < all.Length; i++)
+            {
+                var root = new GameObject("portrait").transform;
+                var rig = Art.BuildHero(all[i], root);
+                rig.root.position = Vector3.zero;
+                rig.root.rotation = Quaternion.Euler(0f, 70f, 0f);
+                /* 头像是静止帧，给一点自然弯肘/屈膝，别像站军姿 */
+                rig.shL.localRotation = Quaternion.Euler(-7f, 0f, 0f);
+                rig.shR.localRotation = Quaternion.Euler(7f, 0f, 0f);
+                rig.elL.localRotation = Quaternion.Euler(0f, 0f, 12f);
+                rig.elR.localRotation = Quaternion.Euler(0f, 0f, 12f);
+                rig.knL.localRotation = Quaternion.Euler(0f, 0f, -7f);
+                rig.knR.localRotation = Quaternion.Euler(0f, 0f, -4f);
+                rig.anL.localRotation = Quaternion.Euler(0f, 0f, 4f);
+                rig.anR.localRotation = Quaternion.Euler(0f, 0f, 2f);
+                foreach (var l in Object.FindObjectsOfType<CpuLimb>()) l.ForceUpdate();
+                float h = all[i].height;
+                cam.transform.position = new Vector3(0f, h * 0.90f, -h * 3.55f);
+                cam.transform.LookAt(new Vector3(0f, h * 0.70f, 0f));
+
+                var rt = new RenderTexture(512, 640, 24, RenderTextureFormat.ARGB32);
+                cam.targetTexture = rt;
+                cam.Render();
+                RenderTexture.active = rt;
+                var tex = new Texture2D(512, 640, TextureFormat.RGBA32, false);
+                tex.ReadPixels(new Rect(0, 0, 512, 640), 0, 0);
+                tex.Apply();
+                RenderTexture.active = null;
+                cam.targetTexture = null;
+                string id = all[i].id.ToString().ToLowerInvariant();
+                File.WriteAllBytes(Path.Combine(dir, id + ".png"), tex.EncodeToPNG());
+                Object.DestroyImmediate(tex);
+                Object.DestroyImmediate(rt);
+
+                /* 头像特写：HUD 圆形头像与结算页用，脸要够大 */
+                cam.fieldOfView = 30f;
+                bool longEars = all[i].id == HeroId.Rabbit;
+                cam.transform.position = new Vector3(0f, h * 1.02f, -h * (longEars ? 2.50f : 1.95f));
+                cam.transform.LookAt(new Vector3(0f, h * (longEars ? 0.98f : 0.95f), 0f));
+                var hrt = new RenderTexture(256, 256, 24, RenderTextureFormat.ARGB32);
+                cam.targetTexture = hrt;
+                cam.Render();
+                RenderTexture.active = hrt;
+                var htex = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+                htex.ReadPixels(new Rect(0, 0, 256, 256), 0, 0);
+                htex.Apply();
+                RenderTexture.active = null;
+                cam.targetTexture = null;
+                File.WriteAllBytes(Path.Combine(dir, id + "_head.png"), htex.EncodeToPNG());
+                Object.DestroyImmediate(htex);
+                Object.DestroyImmediate(hrt);
+                Object.DestroyImmediate(root.gameObject);
+            }
+            AssetDatabase.Refresh();
+            Debug.Log("[HeroPreview] wrote 6 portraits to Assets/Resources/Portraits");
+        }
+
         public static void Render()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);

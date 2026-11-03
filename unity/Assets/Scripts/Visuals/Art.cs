@@ -584,20 +584,20 @@ namespace TapArena
             Prim(PrimitiveType.Cube, g.transform, new Vector3(0f, -3f, -118f), new Vector3(460f, 6f, 10f), woodC);
             Prim(PrimitiveType.Cube, g.transform, new Vector3(0f, -3f, 118f), new Vector3(460f, 6f, 10f), woodC);
 
-            /* 栏杆：立柱 + 扶手 */
-            for (int side = -1; side <= 1; side += 2)
+            /* 栏杆：镜头永远从 -Z 侧看过来，近侧高栏杆会横在角色身前，
+               所以只保留远侧栏杆；近侧换成一条低矮护边，不挡人和动作。 */
+            for (int i = 0; i < 5; i++)
             {
-                for (int i = 0; i < 5; i++)
-                {
-                    float x = Mathf.Lerp(-200f, 200f, i / 4f);
-                    Prim(PrimitiveType.Cylinder, g.transform, new Vector3(x, 20f, side * 118f),
-                        new Vector3(7f, 20f, 7f), woodC);
-                    Prim(PrimitiveType.Sphere, g.transform, new Vector3(x, 44f, side * 118f),
-                        Vector3.one * 9f, glow);
-                }
-                Prim(PrimitiveType.Cube, g.transform, new Vector3(0f, 38f, side * 118f),
-                    new Vector3(440f, 6f, 6f), woodA);
+                float x = Mathf.Lerp(-200f, 200f, i / 4f);
+                Prim(PrimitiveType.Cylinder, g.transform, new Vector3(x, 20f, 118f),
+                    new Vector3(7f, 20f, 7f), woodC);
+                Prim(PrimitiveType.Sphere, g.transform, new Vector3(x, 44f, 118f),
+                    Vector3.one * 9f, glow);
             }
+            Prim(PrimitiveType.Cube, g.transform, new Vector3(0f, 38f, 118f),
+                new Vector3(440f, 6f, 6f), woodA);
+            Prim(PrimitiveType.Cube, g.transform, new Vector3(0f, 7f, -118f),
+                new Vector3(440f, 5f, 10f), woodC);
             return g;
         }
 

@@ -30,28 +30,28 @@ namespace TapArena
             rig.hips = hips; rig.chest = chest; rig.neck = neck; rig.head = head;
 
             var shL = Node(chest, "shL", new Vector3(h * 0.02f, h * 0.005f, -h * 0.245f));
-            var elL = Node(shL, "elL", new Vector3(0f, -h * 0.14f, 0f));
-            var wrL = Node(elL, "wrL", new Vector3(0f, -h * 0.13f, 0f));
+            var elL = Node(shL, "elL", new Vector3(0f, -h * 0.14f, -h * 0.010f));
+            var wrL = Node(elL, "wrL", new Vector3(0f, -h * 0.13f, -h * 0.030f));
             var shR = Node(chest, "shR", new Vector3(h * 0.02f, h * 0.005f, h * 0.245f));
-            var elR = Node(shR, "elR", new Vector3(0f, -h * 0.14f, 0f));
-            var wrR = Node(elR, "wrR", new Vector3(0f, -h * 0.13f, 0f));
+            var elR = Node(shR, "elR", new Vector3(0f, -h * 0.14f, h * 0.010f));
+            var wrR = Node(elR, "wrR", new Vector3(0f, -h * 0.13f, h * 0.030f));
             rig.shL = shL; rig.elL = elL; rig.wrL = wrL;
             rig.shR = shR; rig.elR = elR; rig.wrR = wrR;
 
-            var thL = Node(hips, "thL", new Vector3(0f, 0f, -h * 0.115f));
-            var knL = Node(thL, "knL", new Vector3(0f, -h * 0.18f, 0f));
-            var anL = Node(knL, "anL", new Vector3(0f, -h * 0.155f, 0f));
-            var thR = Node(hips, "thR", new Vector3(0f, 0f, h * 0.115f));
-            var knR = Node(thR, "knR", new Vector3(0f, -h * 0.18f, 0f));
-            var anR = Node(knR, "anR", new Vector3(0f, -h * 0.155f, 0f));
+            var thL = Node(hips, "thL", new Vector3(0f, 0f, -h * 0.120f));
+            var knL = Node(thL, "knL", new Vector3(0f, -h * 0.18f, -h * 0.008f));
+            var anL = Node(knL, "anL", new Vector3(0f, -h * 0.155f, -h * 0.014f));
+            var thR = Node(hips, "thR", new Vector3(0f, 0f, h * 0.120f));
+            var knR = Node(thR, "knR", new Vector3(0f, -h * 0.18f, h * 0.008f));
+            var anR = Node(knR, "anR", new Vector3(0f, -h * 0.155f, h * 0.014f));
             rig.thL = thL; rig.knL = knL; rig.anL = anL;
             rig.thR = thR; rig.knR = knR; rig.anR = anR;
 
             var earL = Node(head, "earL", new Vector3(0f, h * 0.36f, -h * 0.14f));
             var earR = Node(head, "earR", new Vector3(0f, h * 0.36f, h * 0.14f));
             rig.earL = earL; rig.earR = earR;
-            earL.localRotation = Quaternion.Euler(-6f, 0f, 0f);
-            earR.localRotation = Quaternion.Euler(6f, 0f, 0f);
+            earL.localRotation = Quaternion.Euler(-10f, 0f, 0f);
+            earR.localRotation = Quaternion.Euler(10f, 0f, 0f);
 
             var tail1 = Node(hips, "tail1", new Vector3(-h * 0.17f, h * 0.03f, 0f));
             var tail2 = Node(tail1, "tail2", new Vector3(-h * 0.11f, h * 0.015f, 0f));
@@ -92,9 +92,9 @@ namespace TapArena
             // ---------- 身体 ----------
             var bodyProfile = new[]
             {
-                new Vector2(0f, -0.17f), new Vector2(0.10f, -0.165f), new Vector2(0.175f, -0.13f),
-                new Vector2(0.215f, -0.06f), new Vector2(0.222f, 0.02f), new Vector2(0.208f, 0.12f),
-                new Vector2(0.178f, 0.22f), new Vector2(0.138f, 0.30f), new Vector2(0.085f, 0.355f),
+                new Vector2(0f, -0.17f), new Vector2(0.105f, -0.165f), new Vector2(0.185f, -0.13f),
+                new Vector2(0.226f, -0.06f), new Vector2(0.235f, 0.02f), new Vector2(0.222f, 0.12f),
+                new Vector2(0.192f, 0.22f), new Vector2(0.152f, 0.30f), new Vector2(0.092f, 0.355f),
                 new Vector2(0f, 0.375f)
             };
             for (int i = 0; i < bodyProfile.Length; i++) bodyProfile[i] *= h;
@@ -132,10 +132,10 @@ namespace TapArena
             AddLeg(rig, root, thR, knR, anR, h, mFur, mCream, mAccent, mDark);
 
             // 肩/髋关节球，盖住身体与管子的接缝
-            Ball(shL, Vector3.zero, Vector3.one * h * 0.115f, mFur);
-            Ball(shR, Vector3.zero, Vector3.one * h * 0.115f, mFur);
-            Ball(thL, Vector3.zero, Vector3.one * h * 0.12f, mFur);
-            Ball(thR, Vector3.zero, Vector3.one * h * 0.12f, mFur);
+            Ball(shL, Vector3.zero, Vector3.one * h * 0.125f, mFur);
+            Ball(shR, Vector3.zero, Vector3.one * h * 0.125f, mFur);
+            Ball(thL, Vector3.zero, Vector3.one * h * 0.13f, mFur);
+            Ball(thR, Vector3.zero, Vector3.one * h * 0.13f, mFur);
 
             // ---------- 尾巴 ----------
             BuildTail(rig, root, d, h, mFur, mCream, mDark);
@@ -306,7 +306,7 @@ namespace TapArena
             {
                 float t = i / (rings - 1f);
                 pts[i] = Vector3.Lerp(a, b, t);
-                radii[i] = Mathf.Lerp(h * 0.072f, h * 0.050f, t) + Mathf.Sin(t * Mathf.PI) * h * 0.006f;
+                radii[i] = Mathf.Lerp(h * 0.085f, h * 0.062f, t) + Mathf.Sin(t * Mathf.PI) * h * 0.007f;
             }
             var bw = new BoneWeight[rings * 13];
             for (int i = 0; i < rings; i++)
@@ -325,10 +325,10 @@ namespace TapArena
             var hand = new GameObject(left ? "handL" : "handR");
             hand.transform.SetParent(wr, false);
             Ball(hand.transform, new Vector3(h * 0.005f, -h * 0.052f, 0f),
-                new Vector3(h * 0.125f, h * 0.105f, h * 0.105f), cream);
+                new Vector3(h * 0.145f, h * 0.118f, h * 0.118f), cream);
             float inner = left ? 1f : -1f;
-            Ball(hand.transform, new Vector3(h * 0.045f, -h * 0.028f, inner * h * 0.045f),
-                new Vector3(h * 0.05f, h * 0.055f, h * 0.04f), cream);
+            Ball(hand.transform, new Vector3(h * 0.052f, -h * 0.028f, inner * h * 0.048f),
+                new Vector3(h * 0.058f, h * 0.064f, h * 0.048f), cream);
             Cyl(hand.transform, new Vector3(0f, h * 0.005f, 0f),
                 new Vector3(h * 0.085f, h * 0.008f, h * 0.085f), accent);
             Art.Batch(hand.transform);
@@ -344,7 +344,7 @@ namespace TapArena
             {
                 float t = i / (rings - 1f);
                 pts[i] = Vector3.Lerp(a, b, t);
-                radii[i] = Mathf.Lerp(h * 0.078f, h * 0.062f, t) + Mathf.Sin(t * Mathf.PI) * h * 0.004f;
+                radii[i] = Mathf.Lerp(h * 0.092f, h * 0.075f, t) + Mathf.Sin(t * Mathf.PI) * h * 0.005f;
             }
             var bw = new BoneWeight[rings * 13];
             for (int i = 0; i < rings; i++)
@@ -362,13 +362,13 @@ namespace TapArena
             var boot = new GameObject(th.name == "thL" ? "bootL" : "bootR");
             boot.transform.SetParent(an, false);
             Ball(boot.transform, new Vector3(h * 0.03f, -h * 0.045f, 0f),
-                new Vector3(h * 0.155f, h * 0.085f, h * 0.12f), cream);
-            Ball(boot.transform, new Vector3(h * 0.085f, -h * 0.055f, 0f),
-                new Vector3(h * 0.08f, h * 0.06f, h * 0.10f), cream);
-            Box(boot.transform, new Vector3(h * 0.035f, -h * 0.088f, 0f),
-                new Vector3(h * 0.145f, h * 0.014f, h * 0.11f), dark);
+                new Vector3(h * 0.172f, h * 0.096f, h * 0.135f), cream);
+            Ball(boot.transform, new Vector3(h * 0.09f, -h * 0.055f, 0f),
+                new Vector3(h * 0.09f, h * 0.068f, h * 0.112f), cream);
+            Box(boot.transform, new Vector3(h * 0.038f, -h * 0.092f, 0f),
+                new Vector3(h * 0.162f, h * 0.015f, h * 0.122f), dark);
             Cyl(boot.transform, new Vector3(0f, h * 0.004f, 0f),
-                new Vector3(h * 0.098f, h * 0.010f, h * 0.092f), accent);
+                new Vector3(h * 0.108f, h * 0.010f, h * 0.102f), accent);
             Art.Batch(boot.transform);
         }
 
@@ -451,8 +451,8 @@ namespace TapArena
 
         static void LongEar(Transform p, float r, Material fur, Material pink)
         {
-            Tube(p, new Vector3(0f, r * 0.72f, 0f), new Vector3(r * 0.40f, r * 0.90f, r * 0.32f), fur);
-            Tube(p, new Vector3(r * 0.34f, r * 0.70f, 0f), new Vector3(r * 0.10f, r * 0.70f, r * 0.08f), pink);
+            Tube(p, new Vector3(0f, r * 0.74f, 0f), new Vector3(r * 0.50f, r * 0.92f, r * 0.38f), fur);
+            Tube(p, new Vector3(r * 0.36f, r * 0.72f, 0f), new Vector3(r * 0.16f, r * 0.70f, r * 0.11f), pink);
         }
 
         static void BuildHeadDecor(Art.Rig rig, HeroDef d, float h, float headR, Material fur, Material dark, Material pink, Material gold, Material leaf)
@@ -520,6 +520,12 @@ namespace TapArena
                 for (int i = -1; i <= 1; i++)
                     Cone(head, c + new Vector3(-headR * 0.12f, headR * 1.00f, i * headR * 0.20f),
                         new Vector3(headR * 0.16f, headR * 0.38f, headR * 0.16f), dark, Quaternion.Euler(0f, i * 12f, 25f));
+                /* 两侧的刺要露在剪影外，正面/选人头像才认得出是刺猬 */
+                for (int side = -1; side <= 1; side += 2)
+                    for (int i = 0; i < 2; i++)
+                        Cone(head, c + new Vector3(-headR * (0.22f + i * 0.16f), headR * (0.58f - i * 0.16f), side * headR * 0.78f),
+                            new Vector3(headR * 0.18f, headR * 0.42f, headR * 0.18f), dark,
+                            Quaternion.Euler(side * (58f + i * 8f), 0f, 24f));
             }
             head.localScale = d.id == HeroId.Bear ? new Vector3(1.06f, 0.99f, 1.05f)
                 : d.id == HeroId.Fox ? new Vector3(0.96f, 1.02f, 0.94f)
