@@ -2,6 +2,37 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [3.1.0] - 2026-11-04
+
+**英雄阵容换成 Polyfork 现成低模动物 + 四足动画 + 新 2D 立绘/图标。**
+
+### 阵容与模型
+
+- 从 Polyfork 资源库选用六只带骨架和 Idle/Walk/Run 的低多边形动物：狮（阿狮，战士）、赤狐（灵灵，法师）、林兔（朵朵，辅助）、黑熊（阿岳，坦克）、青蛙（泡泡，控制）、猫（尖尖，射手）。Polyfork 没有虎/水獭/刺猬，因此用生态位最接近的动物，保留五个原英雄名。
+- 新增 `tools/polyfork_to_fbx.py`：按需下载 6 个 GLB，清理 Blender 导入产生的辅助 Icosphere，以 24fps 导出带 Idle/Walk/Run 的 FBX；模型三角面约 1.9–4.0k/人。
+- 新增 `PolyforkHero.cs`：加载 FBX、按设计身高缩放、脚底落到 y=0、替换为 `TapArena/LowPoly` 顶点色材质、把施法点放到头部；FBX 缺失时回退旧 LowPoly JSON。
+- 新增 `PolyHeroView.cs`：采样作者自带的 Idle/Walk，叠加咬击（头/下颌/前爪）、施法抬前身、受击挤压闪白、阵亡侧倒、耳朵/尾巴小动作与脚步扬尘。
+- `Art.Rig` 增加 Polyfork 模型/朝向/动画字段；战斗和首页陈列都按 Polyfork 分支挂载 `PolyHeroView`，旧双足英雄仍走 `HeroView`。
+
+### 2D 选人 / 图标
+
+- 新增 `PolyforkArt.cs`：用游戏内模型渲染 768×1152 splash、512×512 bust、256×256 透明头部；背景为深色森林渐变 + 英雄主题色光环。
+- 选人页六张卡片、详情立绘、HUD 头像、结算头像全部换新；阿狮卡片/详情/结算显示狮子。
+- Android 应用图标从旧虎头改为狮子头像 + 金色圆环，继续写入 6 个密度槽。
+
+### 画面与兼容
+
+- 首页陈列相机右移，六只四足动物全部入镜，不再把尖尖切出画面。
+- 修复构建版里 `mesh.triangles` 不可读导致的每帧报错，改用 `GetIndexCount(0)` 记录三角面。
+- 保留塔盖平滑缩小、2D 选人排版、暂停/结算流程与 2.2.0 数值平衡。
+- Polyfork 原始 GLB/FBX 按授权要求不入库：`unity/ArtSource/` 与 `unity/Assets/Resources/Polyfork/` 已加入 `.gitignore`；构建前运行 Blender 脚本拉取。
+
+### 验证
+
+- Android 16、1920×1080 横屏覆盖安装 v3.1.0（versionCode 25）；首页、2D 选人、战斗、移动、技能冷却、受击、阵亡/复活、暂停菜单、结算逐项截图检查；结算 6:10、用时 3:51，HUD/结算头像正确。
+- 帧率约 38–40fps+；logcat 无异常（构建版网格读取报错已修）。
+- APK 29.4MB（29,382,000 字节）；SHA-256 `1f5285fbebb8b12209c3b7144614bb20729040ae464ca1a545295f6a6a905d3c`。
+
 ## [3.0.0] - 2026-11-03
 
 **Blender Low Poly 美术管线 + 2D 选人立绘 + 应用图标。**

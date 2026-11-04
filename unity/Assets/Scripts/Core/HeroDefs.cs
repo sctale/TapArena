@@ -73,14 +73,14 @@ namespace TapArena
         {
             new HeroDef
             {
-                id = HeroId.Tiger, name = "阿虎", title = "勇敢小虎", role = "战士",
+                id = HeroId.Tiger, name = "阿狮", title = "勇敢小狮", role = "战士",
                 blurb = "冲进人堆也不怕，适合第一次玩。",
                 hp = 1120f, dmg = 46f, range = 130f, atkInterval = 0.64f, moveSpeed = 270f,
-                radius = 34f, height = 76f, difficulty = 1,
-                fur = C("#F2A94F"), dark = C("#C9752F"), cream = C("#FFF3E2"), accent = C("#2E8B6F"),
+                radius = 34f, height = 80f, difficulty = 1,
+                fur = C("#E8B662"), dark = C("#8A5A32"), cream = C("#F8E9C9"), accent = C("#D9822B"),
                 skills = new[]
                 {
-                    S("猛虎冲撞", "往前冲一段，撞到的敌人受伤并被推开", SkillKind.Dash, 6.5f, 88f, 130f, C("#FFD98A"),
+                    S("雄狮冲撞", "往前冲一段，撞到的敌人受伤并被推开", SkillKind.Dash, 6.5f, 88f, 130f, C("#FFD98A"),
                         s => { s.range = 230f; s.knock = 26f; s.isDash = true; s.speed = 900f; }),
                     S("勇气咆哮", "身边一圈敌人受伤并减速", SkillKind.Aoe, 9.5f, 62f, 180f, C("#FFC46B"),
                         s => { s.slow = 1.4f; }),
@@ -93,8 +93,8 @@ namespace TapArena
                 id = HeroId.Fox, name = "灵灵", title = "星星小巫", role = "法师",
                 blurb = "远处丢星星，打不过就闪走。",
                 hp = 850f, dmg = 58f, range = 520f, atkInterval = 0.92f, moveSpeed = 246f,
-                radius = 32f, height = 74f, difficulty = 2,
-                fur = C("#E9A24C"), dark = C("#B5713A"), cream = C("#FFF6EC"), accent = C("#7B54C7"),
+                radius = 32f, height = 66f, difficulty = 2,
+                fur = C("#D96A2B"), dark = C("#5B3721"), cream = C("#F1E6D2"), accent = C("#7B54C7"),
                 skills = new[]
                 {
                     S("星光火球", "丢一颗会炸开的星星，命中减速", SkillKind.Splash, 5.5f, 80f, 100f, C("#C9A6FF"),
@@ -110,8 +110,8 @@ namespace TapArena
                 id = HeroId.Rabbit, name = "朵朵", title = "月亮小兔", role = "辅助",
                 blurb = "给队友回血，慢慢磨也能赢。",
                 hp = 960f, dmg = 48f, range = 460f, atkInterval = 0.76f, moveSpeed = 254f,
-                radius = 31f, height = 70f, difficulty = 1,
-                fur = C("#FFF7F3"), dark = C("#F3D3E0"), cream = C("#FFFFFF"), accent = C("#EE8FB8"),
+                radius = 31f, height = 56f, difficulty = 1,
+                fur = C("#A89684"), dark = C("#6D5747"), cream = C("#F3EEE4"), accent = C("#EE8FB8"),
                 skills = new[]
                 {
                     S("胡萝卜星镖", "星镖会穿透三人，并让敌人变慢", SkillKind.Projectile, 5f, 80f, 0f, C("#FFB7CF"),
@@ -127,8 +127,8 @@ namespace TapArena
                 id = HeroId.Bear, name = "阿岳", title = "森林大熊", role = "坦克",
                 blurb = "血厚能扛，抱人、跳砸都在行。",
                 hp = 1500f, dmg = 62f, range = 122f, atkInterval = 0.82f, moveSpeed = 230f,
-                radius = 42f, height = 88f, difficulty = 1,
-                fur = C("#B98155"), dark = C("#8A5A36"), cream = C("#FBE9D2"), accent = C("#4E9A63"),
+                radius = 42f, height = 90f, difficulty = 1,
+                fur = C("#4A3428"), dark = C("#191816"), cream = C("#C9A57D"), accent = C("#4E9A63"),
                 skills = new[]
                 {
                     S("荷叶拍击", "面前一片敌人被拍飞并减速", SkillKind.Cone, 7f, 96f, 132f, C("#BFE39B"),
@@ -141,11 +141,11 @@ namespace TapArena
             },
             new HeroDef
             {
-                id = HeroId.Otter, name = "泡泡", title = "溪水小獭", role = "控制",
+                id = HeroId.Otter, name = "泡泡", title = "溪水小蛙", role = "控制",
                 blurb = "水泡减速，把敌人留在原地。",
                 hp = 940f, dmg = 44f, range = 470f, atkInterval = 0.78f, moveSpeed = 252f,
-                radius = 32f, height = 72f, difficulty = 2,
-                fur = C("#7F9FC4"), dark = C("#5A7290"), cream = C("#F3F7FF"), accent = C("#4FA88F"),
+                radius = 32f, height = 56f, difficulty = 2,
+                fur = C("#6FA34B"), dark = C("#3F6B33"), cream = C("#E8E3CC"), accent = C("#4FA88F"),
                 skills = new[]
                 {
                     S("大水泡", "水泡炸开水花，减速一片", SkillKind.Splash, 5.5f, 64f, 100f, C("#BFE9FF"),
@@ -158,18 +158,18 @@ namespace TapArena
             },
             new HeroDef
             {
-                id = HeroId.Hedgehog, name = "尖尖", title = "星星刺猬", role = "射手",
+                id = HeroId.Hedgehog, name = "尖尖", title = "灵巧小猫", role = "射手",
                 blurb = "射得最远，但要站好位置。",
                 hp = 820f, dmg = 46f, range = 540f, atkInterval = 0.62f, moveSpeed = 252f,
-                radius = 30f, height = 68f, difficulty = 3,
-                fur = C("#D9B98F"), dark = C("#9C7B55"), cream = C("#FFF1DC"), accent = C("#E0604F"),
+                radius = 30f, height = 58f, difficulty = 3,
+                fur = C("#B08A63"), dark = C("#6B4A35"), cream = C("#F2E9DA"), accent = C("#4C8F9E"),
                 skills = new[]
                 {
-                    S("三连尖刺", "扇形射出三根会穿透的尖刺", SkillKind.Projectile, 4.5f, 44f, 0f, C("#FFE0A8"),
+                    S("三连爪影", "扇形射出三道会穿透的爪影", SkillKind.Projectile, 4.5f, 44f, 0f, C("#FFE0A8"),
                         s => { s.count = 3; s.speed = 680f; s.range = 560f; s.pierce = 1; }),
-                    S("缩成刺球", "护盾 + 反伤，谁打谁被扎", SkillKind.Shield, 14f, 0f, 0f, C("#FFD0A0"),
+                    S("炸毛护盾", "护盾 + 反伤，谁打谁被扎", SkillKind.Shield, 14f, 0f, 0f, C("#FFD0A0"),
                         s => { s.shieldPct = 0.26f; s.slow = 1f; s.buffT = 3.5f; }),
-                    S("万刺齐发", "向四周炸开尖刺", SkillKind.Radial, 30f, 52f, 152f, C("#FFD79B"),
+                    S("万爪齐发", "向四周炸开爪影", SkillKind.Radial, 30f, 52f, 152f, C("#FFD79B"),
                         s => { s.count = 10; s.speed = 560f; s.unlockAt2 = true; }),
                 }
             },

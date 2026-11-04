@@ -112,8 +112,16 @@ namespace TapArena
                     radius = all[i].radius, height = all[i].height,
                     atkAnim = 0f, castAnim = 0f, hurtAnim = 0f, walkT = 0f, moving = false,
                 };
-                var hv = HeroView.Attach(u, rig);
-                hv.yawOffset = 90f + Mathf.Sin(a) * 16f;
+                if (rig.polyModel != null)
+                {
+                    var pv = PolyHeroView.Attach(u, rig);
+                    pv.yawOffset = 90f + Mathf.Sin(a) * 16f;
+                }
+                else
+                {
+                    var hv = HeroView.Attach(u, rig);
+                    hv.yawOffset = 90f + Mathf.Sin(a) * 16f;
+                }
             }
 
             /* 两侧的树、蘑菇和花丛 */
@@ -181,7 +189,7 @@ namespace TapArena
             _t += Time.unscaledDeltaTime;
             float sway = Mathf.Sin(_t * 0.22f) * 0.16f;
             cam.transform.position = new Vector3(Mathf.Sin(sway) * 90f, 196f, -405f - Mathf.Cos(sway) * 18f);
-            cam.transform.LookAt(new Vector3(-140f, 55f, 200f));
+            cam.transform.LookAt(new Vector3(-20f, 55f, 200f));
         }
     }
 }

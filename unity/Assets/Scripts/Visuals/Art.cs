@@ -406,11 +406,16 @@ namespace TapArena
             public Color[] baseCols;
             public Material faceMat;
             public Texture2D faceOpen, faceBlink, faceHurt;
+            /* Polyfork 四足英雄：FBX 模型 + 独立动画片段，HeroView 不参与。 */
+            public GameObject polyModel;
+            public Transform polyFacing;
+            public string polyId;
+            public AnimationClip polyIdle, polyWalk, polyRun;
         }
 
         public static Rig BuildHero(HeroDef d, Transform parent)
         {
-            return LowPolyHero.Build(d, parent);
+            return PolyforkHero.Build(d, parent);
         }
 
         static void EarRound(Transform ear, float r, Material fur, Material inner)

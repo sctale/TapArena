@@ -139,7 +139,8 @@ namespace TapArena
             foreach (var h in arena.heroes)
             {
                 var rig = Art.BuildHero(h.def, _units);
-                HeroView.Attach(h, rig);
+                if (rig.polyModel != null) PolyHeroView.Attach(h, rig);
+                else HeroView.Attach(h, rig);
                 h.height = rig.height;
             }
 
