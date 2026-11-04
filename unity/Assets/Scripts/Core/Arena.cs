@@ -49,6 +49,9 @@ namespace TapArena
         public Color color;
         public bool bubble;
         public GameObject go;
+        public int viewId;
+        public bool homing;
+        public Unit target;
         public int hitMask;   // 已命中过谁用 uid 位判断不必要，简单起见只穿透不重复
         public HashSet<int> hit = new HashSet<int>();
     }
@@ -102,6 +105,10 @@ namespace TapArena
         };
 
         int _uid;
+        int _shotView;
+        float _aiThinkBase = 0.22f;
+        float _aiSkillMul = 1f;
+        float _enemyDmgMul = 1f;
         System.Random _rng = new System.Random(20261101);
         float Rand(float a, float b) => a + (float)_rng.NextDouble() * (b - a);
         static float Rng(float a, float b) => Random.Range(a, b);
@@ -118,6 +125,20 @@ namespace TapArena
 
         void Setup(HeroId playerHero)
         {
+            if (GameFlow.difficulty == Difficulty.Easy)
+            {
+                _aiThinkBase = 0.32f;
+                _aiSkillMul = 0.72f;
+                _enemyDmgMul = 0.85f;
+            }
+            else
+            {
+                _aiThinkBase = 0.17f;
+                _aiSkillMul = 1.15f;
+                _enemyDmgMul = 1.10f;
+            }
+            Debug.Log("[TapArena] difficulty=" + GameFlow.difficulty);
+
             /* 玩家 + 2 名随机队友 vs 其余 3 位（6 位英雄每局都登场） */
             var others = new List<HeroId>();
             foreach (var d in HeroDef.All) if (d.id != playerHero) others.Add(d.id);
@@ -238,6 +259,7 @@ namespace TapArena
             if (waveT <= 0f) { waveT = WaveInterval; SpawnWave(Team.Blue); SpawnWave(Team.Red); }
 
             for (int i = 0; i < units.Count; i++) StepUnit(units[i], dt);
+            SeparateUnits();
             for (int i = 0; i < heroes.Count; i++)
                 if (heroes[i].alive) AddXp(heroes[i], 2f * dt);
 
@@ -357,7 +379,7 @@ namespace TapArena
             /* 每 0.2~0.3 秒做一次决策；以前是每帧 5% 掷骰，技能会瞬间全丢 */
             h.aiThink -= dt;
             bool think = h.aiThink <= 0f;
-            if (think) h.aiThink = 0.22f + (h.uid % 5) * 0.025f;
+            if (think) h.aiThink = _aiThinkBase + (h.uid % 5) * 0.025f;
             if (h.aiTarget == null || !h.aiTarget.alive) h.aiTarget = AiTarget(h);
             var t = h.aiTarget;
 
@@ -467,6 +489,7 @@ namespace TapArena
                         use = NearestEnemy(h, Mathf.Max(s.range, h.range)) != null && Random.value < 0.36f;
                         break;
                 }
+                if (use && _aiSkillMul < 1f && Random.value > _aiSkillMul) use = false;
                 if (use) { TryCast(h, i); break; }   // 一次思考只放一个技能
             }
         }
@@ -572,7 +595,7 @@ namespace TapArena
             /* 塔用飞弹，水晶用光柱 */
             Shoot(s, target.pos - s.pos, s.dmg,
                 s.kind == UnitKind.Base ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.86f, 0.6f),
-                s.kind == UnitKind.Base ? 900f : 760f, 0f, 0f, 0f, 0);
+                s.kind == UnitKind.Base ? 900f : 760f, 0f, 0f, 0f, 0, true, target);
         }
 
         void MoveTo(Unit u, Vector3 p)
@@ -585,7 +608,8 @@ namespace TapArena
 
         /* ================= 投射物 ================= */
         public void Shoot(Unit src, Vector3 dir, float dmg, Color color, float speed,
-            float slow, float splash, float splashRadius, int pierce)
+            float slow, float splash, float splashRadius, int pierce,
+            bool homing = false, Unit target = null)
         {
             if (dir.sqrMagnitude < 0.001f) dir = Vector3.right;
             dir.y = 0f;
@@ -605,6 +629,9 @@ namespace TapArena
                 splashRadius = splashRadius,
                 pierce = pierce,
                 bubble = splash > 0f,
+                viewId = _shotView++,
+                homing = homing,
+                target = target,
             };
             shots.Add(p);
             Fx.Muzzle(p.pos, color);
@@ -616,6 +643,12 @@ namespace TapArena
             {
                 var p = shots[i];
                 if (!p.alive) continue;
+                if (p.homing && p.target != null && p.target.alive)
+                {
+                    Vector3 to = p.target.pos - p.pos;
+                    to.y = 0f;
+                    if (to.sqrMagnitude > 0.01f) p.dir = to.normalized;
+                }
                 p.pos += p.dir * (p.speed * dt);
                 p.life -= dt;
                 if (p.life <= 0f) { p.alive = false; continue; }
@@ -623,11 +656,10 @@ namespace TapArena
                 foreach (var u in units)
                 {
                     if (!u.alive || u.team == p.team) continue;
-                    if (u.kind == UnitKind.Tower || u.kind == UnitKind.Base)
-                    {
-                        if (Vector3.Distance(p.pos, u.pos) > u.radius * 0.7f) continue;
-                    }
-                    else if (Vector3.Distance(p.pos, u.pos) > u.radius + 10f) continue;
+                    float hitR = (u.kind == UnitKind.Tower || u.kind == UnitKind.Base)
+                        ? u.radius * 0.7f : u.radius + 10f;
+                    Vector2 dxz = new Vector2(p.pos.x - u.pos.x, p.pos.z - u.pos.z);
+                    if (dxz.sqrMagnitude > hitR * hitR) continue;
                     if (p.hit.Contains(u.uid)) continue;
 
                     if (p.splash > 0f)
@@ -676,6 +708,10 @@ namespace TapArena
             if (target.kind == UnitKind.Hero && target.invulnT > 0f) return;
             if (target.kind == UnitKind.Tower && IsTowerProtected(target)) { Fx.Text(target.pos, "先拆外塔", new Color(1f, 0.95f, 0.7f)); return; }
             if (target.kind == UnitKind.Base && IsBaseProtected(target)) { Fx.Text(target.pos, "水晶被保护着", new Color(1f, 0.95f, 0.7f)); return; }
+
+            /* 难度只调整敌方对蓝方的伤害，不改玩家英雄面板。 */
+            if (src != null && src.team == Team.Red && target.team == Team.Blue)
+                amount *= _enemyDmgMul;
 
             /* 刺球反伤：打它的人被扎回去 */
             if (reflect && target.thornT > 0f && src != null && src != target && src.alive && src.kind == UnitKind.Hero)
@@ -869,6 +905,34 @@ namespace TapArena
             }
         }
 
+        /// <summary>轻量分离：英雄/小兵不互相叠成一坨，血条和动作才看得清。</summary>
+        void SeparateUnits()
+        {
+            for (int iter = 0; iter < 2; iter++)
+            {
+                for (int i = 0; i < units.Count; i++)
+                {
+                    var a = units[i];
+                    if (!a.alive || a.kind == UnitKind.Tower || a.kind == UnitKind.Base) continue;
+                    for (int j = i + 1; j < units.Count; j++)
+                    {
+                        var b = units[j];
+                        if (!b.alive || b.kind == UnitKind.Tower || b.kind == UnitKind.Base) continue;
+                        float minD = (a.radius + b.radius) * 0.82f;
+                        Vector2 d = new Vector2(a.pos.x - b.pos.x, a.pos.z - b.pos.z);
+                        float sq = d.sqrMagnitude;
+                        if (sq >= minD * minD) continue;
+                        float dist = Mathf.Sqrt(sq);
+                        if (dist < 0.001f) { d = new Vector2(1f, 0f); dist = 1f; }
+                        float push = Mathf.Min(12f, (minD - dist) * 0.5f);
+                        Vector2 n = d / dist;
+                        MoveTo(a, a.pos + new Vector3(n.x, 0f, n.y) * push);
+                        MoveTo(b, b.pos - new Vector3(n.x, 0f, n.y) * push);
+                    }
+                }
+            }
+        }
+
         void EndMatch(Team winnerTeam)
         {
             over = true;
@@ -936,6 +1000,7 @@ namespace TapArena
                         team = h.team, src = h, speed = s.speed, dmg = s.dmg, life = 1.8f,
                         size = 10f, color = s.color, slow = s.slow,
                         splash = s.dmg, splashRadius = s.radius, bubble = true,
+                        viewId = _shotView++,
                     };
                     shots.Add(p);
                     Fx.Muzzle(p.pos, s.color);

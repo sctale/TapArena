@@ -83,25 +83,28 @@ namespace TapArena
             _root = new GameObject("ShowcaseWorld").transform;
             _root.SetParent(transform, false);
 
-            /* 草地圆盘：两层，边缘不会正好卡在镜头前 */
-            var outer = Art.Prim(PrimitiveType.Cylinder, _root, new Vector3(0f, -8f, 0f),
-                new Vector3(2800f, 4f, 2180f), Art.MatShared(new Color(0.30f, 0.47f, 0.31f), 0f));
-            outer.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            var disc = Art.Prim(PrimitiveType.Cylinder, _root, new Vector3(0f, -2f, 0f),
-                new Vector3(1900f, 3f, 1500f), Art.MatShared(new Color(0.40f, 0.61f, 0.38f), 0f));
-            var mr = disc.GetComponent<MeshRenderer>();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            /* 林间空地：优先用烘焙的苔藓地台，缺失时退回两层草地圆盘 */
+            var disc = ArtPropLibrary.Spawn("showcase_ground", _root, Vector3.zero, 1f, 0f);
+            if (disc == null)
+            {
+                var outer = Art.Prim(PrimitiveType.Cylinder, _root, new Vector3(0f, -8f, 0f),
+                    new Vector3(2800f, 4f, 2180f), Art.MatShared(new Color(0.30f, 0.47f, 0.31f), 0f));
+                outer.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                var inner = Art.Prim(PrimitiveType.Cylinder, _root, new Vector3(0f, -2f, 0f),
+                    new Vector3(1900f, 3f, 1500f), Art.MatShared(new Color(0.40f, 0.61f, 0.38f), 0f));
+                inner.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
 
             /* 远景山把地平线垫住 */
             Art.Hills(_root, new Vector3(0f, 0f, 0f), 1250f, 1750f, 16, 991, 0.75f);
 
-            /* 六位英雄排成弧形，每人脚下一个小石台，脸朝镜头 */
+            /* 六位英雄站在苔藓土丘上，脸朝镜头 */
             var all = HeroDef.All;
             for (int i = 0; i < all.Length; i++)
             {
                 float a = Mathf.Lerp(-0.62f, 0.62f, i / (float)(all.Length - 1));
-                Vector3 p = new Vector3(Mathf.Sin(a) * 360f, 0f, Mathf.Cos(a) * 300f);
-                PrimPodium(p, all[i].accent);
+                Vector3 p = new Vector3(Mathf.Sin(a) * 360f, 30f, Mathf.Cos(a) * 300f);
+                SpawnMound(new Vector3(p.x, 0f, p.z));
                 var rig = Art.BuildHero(all[i], _root);
                 rig.root.position = p;
                 rig.root.rotation = Quaternion.Euler(0f, 90f + Mathf.Sin(a) * 16f, 0f);
@@ -124,27 +127,28 @@ namespace TapArena
                 }
             }
 
-            /* 两侧的树、蘑菇和花丛 */
-            Art.Tree(_root, new Vector3(-760f, 0f, 40f), 1.35f, 0);
-            Art.Tree(_root, new Vector3(780f, 0f, 10f), 1.2f, 1);
-            Art.Tree(_root, new Vector3(-900f, 0f, 480f), 1.05f, 2);
-            Art.Tree(_root, new Vector3(920f, 0f, 430f), 1.0f, 0);
-            Art.Mushroom(_root, new Vector3(-420f, 0f, -120f), 1.0f, new Color(0.9f, 0.6f, 0.5f));
-            Art.Mushroom(_root, new Vector3(520f, 0f, -120f), 0.85f, new Color(0.95f, 0.8f, 0.55f));
-            for (int i = 0; i < 26; i++)
+            /* 背景树线 + 近景灌木/灯笼/井 */
+            HomeProp("tall_pine", new Vector3(-760f, 0f, 640f), 1.15f, 0f);
+            HomeProp("tall_pine", new Vector3(780f, 0f, 680f), 1.0f, 0f);
+            HomeProp("birch", new Vector3(-980f, 0f, 520f), 1.0f, 0f);
+            HomeProp("maple", new Vector3(960f, 0f, 500f), 1.0f, 0f);
+            HomeProp("log_cabin", new Vector3(-1080f, 0f, 820f), 0.85f, 20f);
+            HomeProp("stone_well", new Vector3(-520f, 0f, 90f), 1.0f, 0f);
+            HomeProp("lantern_post", new Vector3(-230f, 0f, 80f), 1.0f, 0f);
+            HomeProp("lantern_post", new Vector3(260f, 0f, 90f), 1.0f, 0f);
+            for (int i = 0; i < 18; i++)
             {
-                float a2 = i / 26f * Mathf.PI * 2f;
-                var q = new Vector3(Mathf.Cos(a2) * (600f + (i % 4) * 80f), 0f, Mathf.Sin(a2) * (360f + (i % 3) * 50f));
+                float a2 = i / 18f * Mathf.PI * 2f;
+                var q = new Vector3(Mathf.Cos(a2) * (620f + (i % 4) * 70f), 0f, Mathf.Sin(a2) * (380f + (i % 3) * 50f));
                 if (q.z < -300f && Mathf.Abs(q.x) < 700f) continue;
-                Art.Bush(_root, q, 0.7f + (i % 3) * 0.12f, i);
+                HomeProp(i % 3 == 0 ? "fern" : "round_bush", q, 0.9f + (i % 3) * 0.1f, a2 * Mathf.Rad2Deg);
             }
-            /* 台上撒一些小草丛，画面不空 */
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 16; i++)
             {
-                float a3 = i / 20f * Mathf.PI * 2f + 0.2f;
-                var q = new Vector3(Mathf.Cos(a3) * (430f + (i % 3) * 120f), 0f, Mathf.Sin(a3) * (250f + (i % 4) * 70f));
-                if (Mathf.Abs(q.x) < 420f && q.z > 100f) continue;
-                Art.GrassTuft(_root, q, 0.8f + (i % 3) * 0.25f, i);
+                float a3 = i / 16f * Mathf.PI * 2f + 0.2f;
+                var q = new Vector3(Mathf.Cos(a3) * (430f + (i % 3) * 110f), 0f, Mathf.Sin(a3) * (250f + (i % 4) * 60f));
+                if (Mathf.Abs(q.x) < 420f && q.z > 80f) continue;
+                HomeProp(i % 4 == 0 ? "wildflower" : "grass_tuft", q, 1.0f + (i % 3) * 0.2f, a3 * Mathf.Rad2Deg);
             }
 
             /* 灯光只照陈列台 */
@@ -162,15 +166,24 @@ namespace TapArena
             _lampGo = lamp;
         }
 
-        void PrimPodium(Vector3 p, Color accent)
+        void SpawnMound(Vector3 p)
         {
-            var stone = Art.MatShared(new Color(0.90f, 0.86f, 0.78f), 0.5f);
-            var top = Art.Prim(PrimitiveType.Cylinder, _root, p + new Vector3(0f, -3f, 0f),
-                new Vector3(150f, 6f, 150f), stone);
-            top.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            var ring = Art.Prim(PrimitiveType.Cylinder, _root, p + new Vector3(0f, 0.15f, 0f),
-                new Vector3(108f, 0.5f, 108f), Art.MatShared(accent, 0f));
-            ring.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (ArtPropLibrary.Spawn("moss_mound", _root, p, 1f, Random.Range(0f, 360f)) != null) return;
+            var stone = Art.MatShared(new Color(0.34f, 0.52f, 0.30f), 0f);
+            Art.Prim(PrimitiveType.Cylinder, _root, p + new Vector3(0f, -4f, 0f),
+                new Vector3(140f, 8f, 120f), stone)
+                .GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        void HomeProp(string name, Vector3 p, float s, float yaw)
+        {
+            if (ArtPropLibrary.Spawn(name, _root, p, s, yaw) != null) return;
+            if (name.Contains("pine") || name.Contains("birch") || name.Contains("maple"))
+                Art.Tree(_root, p, s, 0);
+            else if (name.Contains("bush") || name.Contains("fern"))
+                Art.Bush(_root, p, s, 0);
+            else if (name.Contains("grass") || name.Contains("flower"))
+                Art.GrassTuft(_root, p, s, 0);
         }
 
         Light _lamp;

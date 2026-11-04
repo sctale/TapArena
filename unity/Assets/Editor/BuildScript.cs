@@ -18,7 +18,7 @@ namespace TapArena.EditorTools
     public static class BuildScript
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
-        const string Version = "3.1.0";
+        const string Version = "3.2.0";
 
         /// <summary>
         /// headless 下 Unity 会把 Gradle 的 JVM 堆算成 0（-Xmx0m）直接崩，
@@ -136,6 +136,7 @@ namespace TapArena.EditorTools
             EnsureMat(resDir + "/TapArenaGlow.mat", "TapArena/Glow");
             EnsureMat(resDir + "/TapArenaToon.mat", "TapArena/Toon");
             EnsureMat(resDir + "/TapArenaLowPoly.mat", "TapArena/LowPoly");
+            EnsureMat(resDir + "/TapArenaLowPolyFlat.mat", "TapArena/LowPolyFlat");
             EnsureMat(resDir + "/TapArenaSky.mat", "TapArena/Sky");
             AssetDatabase.Refresh();
         }
@@ -158,7 +159,7 @@ namespace TapArena.EditorTools
             PlayerSettings.companyName = "sctale";
             PlayerSettings.productName = "萌兽峡谷";
             PlayerSettings.bundleVersion = Version;
-            PlayerSettings.Android.bundleVersionCode = 25;
+            PlayerSettings.Android.bundleVersionCode = 26;
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.sctale.taparena");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;

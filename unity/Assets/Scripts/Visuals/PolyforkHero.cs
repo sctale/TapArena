@@ -6,10 +6,43 @@ namespace TapArena
     /// <summary>
     /// Polyfork 的低多边形四足角色：FBX 自带 Idle/Walk/Run，没有可脚本驱动的
     /// 双足骨架，所以这里只负责把模型、材质和骨骼引用交给 PolyHeroView。
-    /// 资源缺失时回退到上一版 Blender LowPoly JSON，保证游戏仍能启动。
+    /// 新管线优先读取 Resources/Heroes（带 Blender 服装），缺失时回退旧 FBX /
+    /// LowPoly JSON，保证工程仍能启动。
     /// </summary>
     public static class PolyforkHero
     {
+        [Serializable]
+        class HeroMeta
+        {
+            public string id;
+            public float bodyHeight;
+            public int bones;
+            public int tris;
+        }
+
+        [Serializable]
+        class HeroMetaList { public HeroMeta[] heroes; }
+
+        static HeroMetaList _meta;
+
+        static float BodyHeight(string id)
+        {
+            if (_meta == null)
+            {
+                var ta = Resources.Load<TextAsset>("Heroes/hero_meta");
+                if (ta != null)
+                {
+                    try { _meta = JsonUtility.FromJson<HeroMetaList>(ta.text); }
+                    catch (Exception e) { Debug.LogWarning("[TapArena] hero_meta " + e.Message); }
+                }
+            }
+            if (_meta == null || _meta.heroes == null) return 0f;
+            for (int i = 0; i < _meta.heroes.Length; i++)
+                if (_meta.heroes[i] != null && _meta.heroes[i].id == id)
+                    return _meta.heroes[i].bodyHeight;
+            return 0f;
+        }
+
         public static string ModelId(HeroId id)
         {
             switch (id)
@@ -27,13 +60,27 @@ namespace TapArena
         public static Art.Rig Build(HeroDef d, Transform parent)
         {
             string id = ModelId(d.id);
-            var prefab = string.IsNullOrEmpty(id) ? null : Resources.Load<GameObject>("Polyfork/" + id);
-            if (prefab == null)
+            if (string.IsNullOrEmpty(id))
             {
-                Debug.LogWarning("[TapArena] Polyfork model missing for " + d.id + ", falling back");
+                Debug.LogWarning("[TapArena] no model for " + d.id);
                 return LowPolyHero.Build(d, parent);
             }
 
+            var prefab = Resources.Load<GameObject>("Heroes/" + id);
+            if (prefab != null)
+                return BuildFrom(prefab, "Heroes/Clips/", id, d, parent, BodyHeight(id));
+
+            prefab = Resources.Load<GameObject>("Polyfork/" + id);
+            if (prefab != null)
+                return BuildFrom(prefab, "Polyfork/Clips/", id, d, parent, 0f);
+
+            Debug.LogWarning("[TapArena] Polyfork model missing for " + d.id + ", falling back");
+            return LowPolyHero.Build(d, parent);
+        }
+
+        static Art.Rig BuildFrom(GameObject prefab, string clipPrefix, string id,
+            HeroDef d, Transform parent, float bodyHeight)
+        {
             var wrapper = new GameObject("hero").transform;
             wrapper.SetParent(parent, false);
             var facing = new GameObject("facing").transform;
@@ -62,10 +109,11 @@ namespace TapArena
                 return LowPolyHero.Build(d, parent);
             }
 
-            /* 按设计身高缩放，脚底落到 y=0。 */
+            /* 按设计身高缩放：优先用不含服装的 bodyHeight，避免帽子把整只动物缩小。 */
             Bounds b = smr.bounds;
-            if (b.size.y < 0.01f) b.size = Vector3.one;
-            float scale = d.height / b.size.y;
+            float baseHeight = bodyHeight > 0.01f ? bodyHeight : b.size.y;
+            if (baseHeight < 0.01f) baseHeight = 1f;
+            float scale = d.height / baseHeight;
             model.transform.localScale = Vector3.one * scale;
             Physics.SyncTransforms();
             b = smr.bounds;
@@ -73,7 +121,7 @@ namespace TapArena
             model.transform.localPosition = new Vector3(0f, -footY, 0f);
             Physics.SyncTransforms();
 
-            Material mat = MakeMaterial(d, scale);
+            Material mat = MakeMaterial(d);
             smr.sharedMaterial = mat;
             smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             smr.receiveShadows = true;
@@ -91,9 +139,9 @@ namespace TapArena
                 polyModel = model,
                 polyFacing = facing,
                 polyId = id,
-                polyIdle = Resources.Load<AnimationClip>("Polyfork/Clips/" + id + "_idle"),
-                polyWalk = Resources.Load<AnimationClip>("Polyfork/Clips/" + id + "_walk"),
-                polyRun = Resources.Load<AnimationClip>("Polyfork/Clips/" + id + "_run"),
+                polyIdle = Resources.Load<AnimationClip>(clipPrefix + id + "_idle"),
+                polyWalk = Resources.Load<AnimationClip>(clipPrefix + id + "_walk"),
+                polyRun = Resources.Load<AnimationClip>(clipPrefix + id + "_run"),
             };
 
             var hips = Bone(model.transform, "Hips") ?? wrapper;
@@ -141,22 +189,17 @@ namespace TapArena
             return null;
         }
 
-        static Material MakeMaterial(HeroDef d, float scale)
+        static Material MakeMaterial(HeroDef d)
         {
-            var baseMat = Resources.Load<Material>("TapArenaLowPoly");
-            Material m;
-            if (baseMat != null) m = new Material(baseMat) { hideFlags = HideFlags.DontSave };
-            else
-            {
-                var sh = Shader.Find("TapArena/LowPoly");
-                if (sh == null) sh = Art.ToonShader();
-                m = new Material(sh) { hideFlags = HideFlags.DontSave };
-            }
+            var baseMat = Art.LowPolyShared(true);
+            Material m = new Material(baseMat) { hideFlags = HideFlags.DontSave };
             m.color = Color.white;
-            if (m.HasProperty("_Outline")) m.SetFloat("_Outline", 0.36f / Mathf.Max(0.01f, scale));
+            /* _Outline 是世界单位；旧版按 local scale 反算，实际几乎看不见。 */
+            if (m.HasProperty("_Outline")) m.SetFloat("_Outline", 0.55f);
             if (m.HasProperty("_OutlineColor")) m.SetColor("_OutlineColor", new Color(0.10f, 0.07f, 0.06f));
             if (m.HasProperty("_RimStrength")) m.SetFloat("_RimStrength", 0.20f);
             if (m.HasProperty("_Flash")) m.SetFloat("_Flash", 0f);
+            m.enableInstancing = false;
             return m;
         }
     }

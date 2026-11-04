@@ -1,6 +1,5 @@
-// 低多边形角色：顶点色 + 三段卡通明暗 + 外扩描边 + 受击闪白。
-// 与 Toon.shader 同一套光照语言，但颜色来自 Blender 导出的逐顶点色，
-// 这样一个英雄可以合成一张 SkinnedMesh，只占一次绘制。
+// 低多边形角色/建筑：顶点色 + 顶点 AO + 三段卡通明暗 + 外扩描边 + 受击闪白。
+// 场景植被改用 LowPolyFlat（去掉描边 pass，省一半几何）。
 Shader "TapArena/LowPoly"
 {
     Properties
@@ -13,6 +12,7 @@ Shader "TapArena/LowPoly"
         _RimPower ("Rim Power", Float) = 4.0
         _RimStrength ("Rim Strength", Float) = 0.28
         _ShadeTint ("Ambient Tint", Color) = (0.72,0.80,1,1)
+        _AOStrength ("Vertex AO", Range(0,1)) = 1.0
         _Flash ("Hit Flash", Range(0,1)) = 0
     }
 
@@ -28,6 +28,7 @@ Shader "TapArena/LowPoly"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
             #include "UnityCG.cginc"
 
             float _Outline;
@@ -37,11 +38,13 @@ Shader "TapArena/LowPoly"
             {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
             struct v2f { float4 pos : SV_POSITION; };
 
             v2f vert (appdata v)
             {
+                UNITY_SETUP_INSTANCE_ID(v);
                 v2f o;
                 float3 wp = mul(unity_ObjectToWorld, v.vertex).xyz;
                 float3 wn = UnityObjectToWorldNormal(v.normal);
@@ -63,6 +66,7 @@ Shader "TapArena/LowPoly"
             #pragma fragment frag
             #pragma multi_compile_fwdbase
             #pragma multi_compile_fog
+            #pragma multi_compile_instancing
             #include "UnityCG.cginc"
             #include "Lighting.cginc"
             #include "AutoLight.cginc"
@@ -73,6 +77,7 @@ Shader "TapArena/LowPoly"
             fixed4 _ShadeTint;
             float _RimPower;
             float _RimStrength;
+            float _AOStrength;
             float _Flash;
 
             struct appdata
@@ -80,6 +85,7 @@ Shader "TapArena/LowPoly"
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
                 float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
@@ -94,6 +100,7 @@ Shader "TapArena/LowPoly"
 
             v2f vert (appdata v)
             {
+                UNITY_SETUP_INSTANCE_ID(v);
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.wn = UnityObjectToWorldNormal(v.normal);
@@ -106,9 +113,9 @@ Shader "TapArena/LowPoly"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                /* 顶点色是 Blender 导出的 sRGB 值，转到线性再做光照，
-                   否则整只角色会发白。 */
+                /* 顶点色是 Blender 导出的 sRGB 值，转到线性再做光照。 */
                 float3 albedo = pow(saturate(i.color.rgb), 2.2) * _Color.rgb;
+                albedo *= lerp(1.0, saturate(i.color.a), _AOStrength);
                 albedo = lerp(albedo, float3(1.0, 1.0, 1.0), saturate(_Flash));
                 float3 n = normalize(i.wn);
 
@@ -147,15 +154,18 @@ Shader "TapArena/LowPoly"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_shadowcaster
+            #pragma multi_compile_instancing
             #include "UnityCG.cginc"
             struct appdata
             {
                 float4 vertex : POSITION;
                 float3 normal : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
             struct v2f { V2F_SHADOW_CASTER; };
             v2f vert (appdata v)
             {
+                UNITY_SETUP_INSTANCE_ID(v);
                 v2f o;
                 TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
                 return o;

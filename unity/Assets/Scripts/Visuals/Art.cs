@@ -39,6 +39,43 @@ namespace TapArena
             return _toon;
         }
 
+        static Material _lpFull, _lpFlat;
+
+        /// <summary>新美术管线共用的顶点色材质；场景用无描边变体，角色/建筑用带描边。</summary>
+        public static Material LowPolyShared(bool outline)
+        {
+            if (outline)
+            {
+                if (_lpFull != null) return _lpFull;
+                _lpFull = Resources.Load<Material>("TapArenaLowPoly");
+                if (_lpFull == null)
+                {
+                    var sh = Shader.Find("TapArena/LowPoly");
+                    if (sh == null) sh = ToonShader();
+                    _lpFull = new Material(sh) { hideFlags = HideFlags.DontSave };
+                }
+                _lpFull.enableInstancing = true;
+                if (_lpFull.HasProperty("_Outline")) _lpFull.SetFloat("_Outline", 0.45f);
+                if (_lpFull.HasProperty("_OutlineColor"))
+                    _lpFull.SetColor("_OutlineColor", new Color(0.10f, 0.07f, 0.06f));
+                if (_lpFull.HasProperty("_AOStrength")) _lpFull.SetFloat("_AOStrength", 1f);
+                return _lpFull;
+            }
+            if (_lpFlat != null) return _lpFlat;
+            _lpFlat = Resources.Load<Material>("TapArenaLowPolyFlat");
+            if (_lpFlat == null)
+            {
+                var sh = Shader.Find("TapArena/LowPolyFlat");
+                if (sh == null) sh = Shader.Find("TapArena/LowPoly");
+                if (sh == null) sh = ToonShader();
+                _lpFlat = new Material(sh) { hideFlags = HideFlags.DontSave };
+            }
+            _lpFlat.enableInstancing = true;
+            if (_lpFlat.HasProperty("_Outline")) _lpFlat.SetFloat("_Outline", 0f);
+            if (_lpFlat.HasProperty("_AOStrength")) _lpFlat.SetFloat("_AOStrength", 1f);
+            return _lpFlat;
+        }
+
         /// <summary>独立材质（英雄受击要单独变色，不能共享）。</summary>
         public static Material Mat(Color c, float smooth = 0.18f, float metal = 0f, float outline = 0f)
         {
@@ -385,7 +422,7 @@ namespace TapArena
             var res = Resources.Load<Material>("TapArenaSky");
             if (res != null && res.shader != null) sh = res.shader;
             var mat = sh != null ? new Material(sh) : Mat(new Color(0.55f, 0.72f, 0.82f));
-            if (mat.HasProperty("_MainTex")) mat.mainTexture = SkyTexture(1024, 256);
+            if (mat.HasProperty("_MainTex")) mat.mainTexture = SkyTexture(512, 128);
             if (mat.HasProperty("_Tint")) mat.SetColor("_Tint", Color.white);
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = mat;

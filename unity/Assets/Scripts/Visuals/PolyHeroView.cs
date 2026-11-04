@@ -128,7 +128,7 @@ namespace TapArena
             transform.localScale = new Vector3(1f + _squash * 0.4f, 1f - _squash, 1f + _squash * 0.4f);
             float lungeWant = atk > 0f ? Mathf.Sin(Mathf.Clamp01((atk - 0.20f) / 0.58f) * Mathf.PI) * h * 0.045f : 0f;
             _lunge = Mathf.Lerp(_lunge, lungeWant, 1f - Mathf.Exp(-24f * dt));
-            transform.position = new Vector3(unit.pos.x, 0f, unit.pos.z) + transform.right * _lunge;
+            transform.position = new Vector3(unit.pos.x, unit.pos.y, unit.pos.z) + transform.right * _lunge;
 
             /* ---- 施法抬前身；平时回正 ---- */
             if (facing != null)

@@ -30,7 +30,7 @@ namespace TapArena
             Screen.autorotateToPortraitUpsideDown = false;
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
-            QualitySettings.shadowDistance = 700f;
+            QualitySettings.shadowDistance = 450f;
             QualitySettings.shadowResolution = ShadowResolution.Medium;
 
             /* 相机 */
@@ -162,6 +162,7 @@ namespace TapArena
             Arena.I = null;
             for (int i = _worldRoot.childCount - 1; i >= 0; i--)
                 Destroy(_worldRoot.GetChild(i).gameObject);
+            Fx.Clear();
             Fx.Texts.Clear();
             Fx.Banners.Clear();
             InputHub.Move = Vector3.zero;
@@ -180,6 +181,22 @@ namespace TapArena
                 InputHub.Move = Vector3.zero;
                 for (int i = 0; i < InputHub.SkillFlag.Length; i++) InputHub.SkillFlag[i] = false;
             }
+        }
+
+        void AutoPause()
+        {
+            if (GameFlow.screen == UiScreen.Battle && Arena.I != null && !Paused)
+                Pause(true);
+        }
+
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) AutoPause();
+        }
+
+        void OnApplicationFocus(bool focused)
+        {
+            if (!focused && Application.isMobilePlatform) AutoPause();
         }
 
         void Update()

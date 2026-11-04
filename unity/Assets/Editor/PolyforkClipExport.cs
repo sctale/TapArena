@@ -7,7 +7,8 @@ namespace TapArena.EditorTools
 {
     /// <summary>
     /// Polyfork FBX 里的动画不能直接按路径稳定加载，这里把 Idle/Walk/Run
-    /// 复制成独立的 .anim 资源，运行时用 Resources.Load 取。
+    /// 复制成独立的 .anim 资源，运行时用 Resources.Load 取。新版优先处理
+    /// Resources/Heroes（带服装），旧 Path 仍保留为回退。
     /// </summary>
     public static class PolyforkClipExport
     {
@@ -17,20 +18,34 @@ namespace TapArena.EditorTools
             "black-bear-adbdc7", "frog-base", "cat-base"
         };
 
-        public static void Run()
+        public static void Run(bool exit = true)
         {
-            string clipDir = "Assets/Resources/Polyfork/Clips";
-            if (!AssetDatabase.IsValidFolder(clipDir))
-                AssetDatabase.CreateFolder("Assets/Resources/Polyfork", "Clips");
+            string newDir = "Assets/Resources/Heroes";
+            string newClip = newDir + "/Clips";
+            if (!AssetDatabase.IsValidFolder(newDir))
+                AssetDatabase.CreateFolder("Assets/Resources", "Heroes");
+            if (!AssetDatabase.IsValidFolder(newClip))
+                AssetDatabase.CreateFolder(newDir, "Clips");
 
             foreach (string asset in Assets)
             {
-                string fbx = "Assets/Resources/Polyfork/" + asset + ".fbx";
+                string fbx = newDir + "/" + asset + ".fbx";
+                string clipDir = newClip;
+                if (!File.Exists(Path.GetFullPath(fbx)))
+                {
+                    fbx = "Assets/Resources/Polyfork/" + asset + ".fbx";
+                    clipDir = "Assets/Resources/Polyfork/Clips";
+                    if (!File.Exists(Path.GetFullPath(fbx))) { Debug.LogError("PFCLIP missing " + fbx); continue; }
+                }
                 var importer = AssetImporter.GetAtPath(fbx) as ModelImporter;
-                if (importer == null) { Debug.LogError("PFCLIP missing " + fbx); continue; }
+                if (importer == null) { Debug.LogError("PFCLIP importer missing " + fbx); continue; }
                 importer.importAnimation = true;
                 importer.animationType = ModelImporterAnimationType.Generic;
-                importer.animationCompression = ModelImporterAnimationCompression.Off;
+                importer.animationCompression = ModelImporterAnimationCompression.Optimal;
+                importer.animationRotationError = 0.5f;
+                importer.animationPositionError = 0.5f;
+                importer.animationScaleError = 0.5f;
+                importer.resampleCurves = true;
                 importer.importCameras = false;
                 importer.importLights = false;
                 importer.importBlendShapes = false;
@@ -55,7 +70,7 @@ namespace TapArena.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("PFCLIP RESULT=PASS");
-            EditorApplication.Exit(0);
+            if (exit) EditorApplication.Exit(0);
         }
     }
 }

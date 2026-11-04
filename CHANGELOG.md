@@ -2,6 +2,50 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [3.2.0] - 2026-11-04
+
+**混合低多边形美术重制 + 渲染/包体/玩法优化。**
+
+### 美术重制
+
+- 新增 `tools/polyfork_manifest.json`：只登记 6 只 Polyfork 动物与 27 个 Nature & Forest kit 道具，记录用途、缩放、阴影与实例上限。
+- 新增 `tools/polyfork_props.py`：按清单下载森林 kit 道具，清理 `Icosphere`，应用 46 units/m，顶点色 alpha 写入接触阴影，导出 FBX 到 `Resources/PolyforkProps/`。
+- 新增 `tools/polyfork_costumes.py` + 扩展 `tools/polyfork_to_fbx.py`：为六位英雄生成绑骨服装（狮盾/苔藓披肩、狐法师帽/浮空星、兔花环/挎包、熊苔藓背甲/木肩片、蛙水泡/芦苇披风、猫箭袋/护腕），与主体合并成一张 SkinnedMesh；生成 `hero_meta.json` 记录不含服装的 `bodyHeight`，避免帽子把动物缩小。
+- 新增 `tools/blender_game_art.py`：自制 3000×1600 顶点色地形、河道、蘑菇塔（外/内塔）、水晶祭坛、果冻小兵、首页苔藓地台。
+- 新增 `ArtPropLibrary`：运行时优先加载 `Resources/GameArt` 与 `Resources/PolyforkProps`，缺失时回退到旧程序化 `Art.*`。
+- 战场改为 2–3 层树线、近低远高的树影、河/桥/木屋/瞭望塔/石井地标、灯笼/路牌/栅栏引导；首页改为林间空地 + 苔藓土丘陈列。
+- 2D 立绘、bust、透明头像与应用图标全部用新服装模型重渲染。
+
+### 渲染与性能
+
+- 删除主路径的 `GroundTexture(1280,683)` 与 `SkyTexture(1024,256)` 运行时逐像素生成；天空降到 512×128，地面改烘焙网格。
+- 场景植被按象限 `StaticBatchingUtility.Combine`，植被不投射实时阴影；阴影距离 700 → 450。
+- `LowPoly.shader` 加入顶点色 alpha 作为 AO、GPU instancing；新增无描边 `LowPolyFlat.shader` 给地形/植被。
+- `Fx` 从“每粒子一个 GameObject/Material”改为按贴图合并的 3 个动态网格批次；减速区共用材质 + MaterialPropertyBlock。
+- 弹道视图按 `viewId` 绑定，修复列表压缩时串位；每帧 `HashSet`、`GetComponent`、`material` 实例化清理。
+- 动画导入改 `Optimal` 压缩；18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB。
+
+### 玩法与体验
+
+- 投射物命中改为 XZ 水平距离，修复“看着打中却没伤害”。
+- 塔/水晶弹道改为追踪目标，移动中的英雄/小兵不再被轻易打空。
+- 新增单位分离，英雄/小兵不再叠成一坨；血条与动作可读性提升。
+- 首页新增“轻松/挑战”难度：调整 AI 思考间隔、技能释放概率与敌方伤害系数，默认轻松。
+- 切后台/失去焦点自动暂停；返回键仍打开暂停面板。
+
+### 构建
+
+- 版本 3.2.0，versionCode 26；产物 `TapArena-v3.2.0.apk`。
+- 构建仍走本地 `tools/unity-build.sh` → 导出 Gradle 工程 → 外部 gradlew，不新增 GitHub Actions。
+
+### 验证
+
+- 实机：Android 16 模拟器（1080×1920 转横屏），v3.1.0/versionCode 25 → v3.2.0/versionCode 26 覆盖安装成功；首页、选人、战斗、移动、技能冷却、暂停、切后台自动暂停、结算逐项检查，logcat 无 Unity 异常。
+- 完整对局：默认轻松 + 挑战各 1 局；挑战局 5:00 兜底结算 17:20（“差一点点”），水晶/塔/兵线/复活链路正常。
+- 帧率：同机 v3.2.0 约 35–38fps（v3.1.0 同机约 20–29fps）；场景 Renderer 294 → 49（按材质合并静态批次）；冷启动到首页 `am start -W` TotalTime 2.03s。模拟器为软件渲染，真实设备帧率待补测。
+- 包体：`TapArena-v3.2.0.apk` 30,409,196 字节（29.0MiB），versionCode 26，minSdk 25/targetSdk 37，签名 `CN=TapArena`，SHA-256 `DE656CF14DA794FC061C3F58A5552E0B1A297866E9EC4C3B222226316238711A`。
+- 未采集：真实设备帧率、release 包 Profiler 的 draw call / GC 数值；代码侧已清理每帧 `HashSet`、`GetComponent`、材质实例与 UI 字符串分配。
+
 ## [3.1.0] - 2026-11-04
 
 **英雄阵容换成 Polyfork 现成低模动物 + 四足动画 + 新 2D 立绘/图标。**

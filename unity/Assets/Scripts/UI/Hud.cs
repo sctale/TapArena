@@ -4,11 +4,13 @@ using UnityEngine;
 namespace TapArena
 {
     public enum UiScreen { Home, Select, Battle, Result }
+    public enum Difficulty { Easy, Challenge }
 
     public static class GameFlow
     {
         public static UiScreen screen = UiScreen.Home;
         public static HeroId picked = HeroId.Tiger;
+        public static Difficulty difficulty = Difficulty.Easy;
         public static GameObject rootWorld;
     }
 
@@ -77,6 +79,13 @@ namespace TapArena
         }
 
         Rect _pauseRect;
+        readonly Dictionary<int, string> _tags = new Dictionary<int, string>();
+        readonly Dictionary<int, int> _tagLv = new Dictionary<int, int>();
+        readonly string[] _cdText = new string[3];
+        readonly int[] _cdKey = { -1, -1, -1 };
+        string _hpText, _scoreBText, _scoreRText, _clockText, _ultText, _titleText;
+        int _hpKey = -1, _scoreBlue = -1, _scoreRed = -1, _clockKey = -1, _ultKey = -1;
+        HeroId _titleId = (HeroId)(-1);
 
         void Awake()
         {
@@ -303,6 +312,14 @@ namespace TapArena
             return hit;
         }
 
+        void DifficultyChip(Rect r, string label, bool on, Difficulty value)
+        {
+            Rounded(r, on ? CGold : new Color(0.08f, 0.21f, 0.18f, 0.85f));
+            if (GUI.Button(r, GUIContent.none, _btnSmall))
+                GameFlow.difficulty = value;
+            Label(r, label, _chip, on ? CInk : new Color(0.93f, 0.97f, 0.90f, 0.9f));
+        }
+
         void OnGUI()
         {
             if (_font == null) return;
@@ -335,6 +352,15 @@ namespace TapArena
             Label(new Rect(x + h * 0.012f, h * 0.395f, w * 0.62f, h * 0.06f),
                 "六位小英雄，一起去点亮水晶", _sub, new Color(1f, 0.95f, 0.84f, 0.92f));
             HLine(new Rect(x + h * 0.014f, h * 0.482f, w * 0.10f, h * 0.005f), CGold);
+
+            /* 难度：默认轻松；挑战只改 AI 主动性与敌方伤害，不动玩家面板。 */
+            var diffRow = new Rect(x, h * 0.497f, w * 0.31f, h * 0.047f);
+            Label(new Rect(diffRow.x, diffRow.y, h * 0.055f, diffRow.height), "难度", _chip,
+                new Color(1f, 0.93f, 0.78f, 0.72f));
+            DifficultyChip(new Rect(diffRow.x + h * 0.060f, diffRow.y, h * 0.115f, diffRow.height),
+                "轻松", GameFlow.difficulty == Difficulty.Easy, Difficulty.Easy);
+            DifficultyChip(new Rect(diffRow.x + h * 0.060f + h * 0.122f, diffRow.y, h * 0.115f, diffRow.height),
+                "挑战", GameFlow.difficulty == Difficulty.Challenge, Difficulty.Challenge);
 
             var btn = new Rect(x, h * 0.555f, w * 0.30f, h * 0.115f);
             if (GoldButton(btn, "开始冒险", _btn)) GameFlow.screen = UiScreen.Select;
@@ -601,7 +627,7 @@ namespace TapArena
                         Rounded(new Rect(x + bw * hpK, y, bw * shK, bh), new Color(0.62f, 0.92f, 1f, 0.55f));
                 }
                 Label(new Rect(x - w * 0.02f, y - h * 0.024f, bw + w * 0.04f, h * 0.022f),
-                    u.name + "  Lv." + u.level, _micro, new Color(1f, 0.96f, 0.86f, 0.72f));
+                    HeroTag(u), _micro, new Color(1f, 0.96f, 0.86f, 0.72f));
             }
         }
 
@@ -621,7 +647,7 @@ namespace TapArena
             Label(lv, p.level.ToString(), _chip, CInk);
 
             Label(new Rect(av.xMax + h * 0.016f, plate.y + h * 0.010f, plate.width * 0.52f, h * 0.032f),
-                p.def.name + " · " + p.def.role, _name, CCream);
+                PlayerTitle(p), _name, CCream);
 
             float barX = av.xMax + h * 0.016f;
             var bar = new Rect(barX, plate.y + h * 0.047f, plate.width - h * 0.118f, h * 0.030f);
@@ -641,8 +667,7 @@ namespace TapArena
                         (bar.width - 4f) * shW, bar.height - 4f), new Color(0.62f, 0.92f, 1f, 0.45f));
             }
             LabelShadow(new Rect(bar.x + h * 0.008f, bar.y - 1f, bar.width - h * 0.008f, bar.height),
-                Mathf.CeilToInt(p.hp) + " / " + Mathf.RoundToInt(p.maxHp), _hudSmall,
-                new Color(0.98f, 1f, 0.96f, 0.98f), 2.2f);
+                HpText(p), _hudSmall, new Color(0.98f, 1f, 0.96f, 0.98f), 2.2f);
 
             var xb = new Rect(bar.x, bar.yMax + h * 0.012f, bar.width, h * 0.010f);
             Rounded(xb, new Color(0.03f, 0.08f, 0.07f, 0.8f));
@@ -655,13 +680,86 @@ namespace TapArena
             float chipW = w * 0.115f;
             var uchip = new Rect(plate.xMax - chipW - h * 0.012f, plate.y + h * 0.012f, chipW, h * 0.033f);
             if (p.level >= 2 && p.cds[2] > 0f)
-                Chip(uchip, "大招冷却 " + Mathf.CeilToInt(p.cds[2]) + "s", new Color(0.04f, 0.11f, 0.09f, 0.72f),
+                Chip(uchip, UltText(p, xpK), new Color(0.04f, 0.11f, 0.09f, 0.72f),
                     new Color(0.95f, 0.92f, 0.8f, 0.7f), _micro);
             else if (p.level >= 2)
                 Chip(uchip, "大招就绪", CGoldSoft, CInk, _micro);
             else
-                Chip(uchip, "大招 " + Mathf.RoundToInt(xpK * 100f) + "%", new Color(0.04f, 0.11f, 0.09f, 0.7f),
+                Chip(uchip, UltText(p, xpK), new Color(0.04f, 0.11f, 0.09f, 0.7f),
                     new Color(0.95f, 0.92f, 0.8f, 0.66f), _micro);
+        }
+
+        string PlayerTitle(Unit p)
+        {
+            if (_titleId != p.def.id)
+            {
+                _titleId = p.def.id;
+                _titleText = p.def.name + " · " + p.def.role;
+            }
+            return _titleText;
+        }
+
+        string HpText(Unit p)
+        {
+            int hp = Mathf.CeilToInt(p.hp);
+            int max = Mathf.RoundToInt(p.maxHp);
+            int key = hp * 100003 + max;
+            if (key != _hpKey) { _hpKey = key; _hpText = hp + " / " + max; }
+            return _hpText;
+        }
+
+        string HeroTag(Unit u)
+        {
+            if (!_tagLv.TryGetValue(u.uid, out int lv) || lv != u.level)
+            {
+                _tagLv[u.uid] = u.level;
+                _tags[u.uid] = u.name + "  Lv." + u.level;
+            }
+            return _tags[u.uid];
+        }
+
+        string ScoreText(bool blue, int v)
+        {
+            if (blue)
+            {
+                if (v != _scoreBlue) { _scoreBlue = v; _scoreBText = v.ToString(); }
+                return _scoreBText;
+            }
+            if (v != _scoreRed) { _scoreRed = v; _scoreRText = v.ToString(); }
+            return _scoreRText;
+        }
+
+        string ClockText(Arena a)
+        {
+            int sec = Mathf.FloorToInt(a.clock);
+            int key = sec * 2 + (a.suddenDeath ? 1 : 0);
+            if (key != _clockKey)
+            {
+                _clockKey = key;
+                int mm = sec / 60, ss = sec % 60;
+                _clockText = (a.suddenDeath ? "终局 " : "") + mm.ToString("00") + ":" + ss.ToString("00");
+            }
+            return _clockText;
+        }
+
+        string UltText(Unit p, float xpK)
+        {
+            int key = p.level * 1000 + (p.level >= 2 ? Mathf.CeilToInt(p.cds[2]) : Mathf.RoundToInt(xpK * 100f));
+            if (key != _ultKey)
+            {
+                _ultKey = key;
+                _ultText = p.level >= 2 && p.cds[2] > 0f
+                    ? "大招冷却 " + Mathf.CeilToInt(p.cds[2]) + "s"
+                    : "大招 " + Mathf.RoundToInt(xpK * 100f) + "%";
+            }
+            return _ultText;
+        }
+
+        string CdText(int i, float cd)
+        {
+            int k = Mathf.CeilToInt(cd);
+            if (_cdKey[i] != k) { _cdKey[i] = k; _cdText[i] = k.ToString(); }
+            return _cdText[i];
         }
 
         void DrawScore(Arena a, float w, float h)
@@ -670,13 +768,11 @@ namespace TapArena
             Panel(top, new Color(0.07f, 0.17f, 0.15f, 0.9f));
 
             Circle(new Rect(top.x + top.width * 0.055f, top.y + top.height * 0.30f, h * 0.014f, h * 0.014f), CBlue);
-            Label(new Rect(top.x + w * 0.012f, top.y, top.width * 0.20f, top.height * 0.72f), a.scoreBlue.ToString(), _center, CBlue);
+            Label(new Rect(top.x + w * 0.012f, top.y, top.width * 0.20f, top.height * 0.72f), ScoreText(true, a.scoreBlue), _center, CBlue);
             Circle(new Rect(top.xMax - w * 0.018f, top.y + top.height * 0.30f, h * 0.014f, h * 0.014f), CRed);
-            Label(new Rect(top.x + top.width * 0.68f, top.y, top.width * 0.20f, top.height * 0.72f), a.scoreRed.ToString(), _center, CRed);
+            Label(new Rect(top.x + top.width * 0.68f, top.y, top.width * 0.20f, top.height * 0.72f), ScoreText(false, a.scoreRed), _center, CRed);
 
-            int mm = Mathf.FloorToInt(a.clock / 60f), ss = Mathf.FloorToInt(a.clock % 60f);
-            string ts = (a.suddenDeath ? "终局 " : "") + $"{mm:00}:{ss:00}";
-            Label(new Rect(top.x + top.width * 0.25f, top.y, top.width * 0.5f, top.height * 0.72f), ts, _time,
+            Label(new Rect(top.x + top.width * 0.25f, top.y, top.width * 0.5f, top.height * 0.72f), ClockText(a), _time,
                 a.suddenDeath ? new Color(1f, 0.72f, 0.48f) : CCream);
 
             /* 双方塔数：两颗小塔，灰了就是被拆了 */
@@ -808,7 +904,7 @@ namespace TapArena
                 GUI.DrawTexture(r, _cdPie[i], ScaleMode.StretchToFill);
                 GUI.color = old;
                 LabelShadow(new Rect(r.x, r.y + r.height * 0.24f, r.width, r.height * 0.38f),
-                    Mathf.CeilToInt(p.cds[i]).ToString(), _center, Color.white, 2f);
+                    CdText(i, p.cds[i]), _center, Color.white, 2f);
             }
 
             var nameR = new Rect(r.x + r.width * 0.06f, r.y + r.height * 0.70f, r.width * 0.88f, r.height * 0.17f);

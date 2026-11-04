@@ -1,0 +1,53 @@
+{
+  "units_per_meter": 46,
+  "palette": {
+    "grass": "#4C8140",
+    "meadow": "#77B258",
+    "soil": "#A5855E",
+    "rock": "#87847C",
+    "bark": "#75563B",
+    "water": "#3F8FA8",
+    "cream": "#F3EEE4",
+    "ink": "#1F2E22",
+    "gold": "#FFD98A",
+    "blue": "#6FD8FF",
+    "red": "#FF8A7A"
+  },
+  "heroes": [
+    { "id": "lion-base", "hero": "Tiger", "costume": "lion_warrior" },
+    { "id": "red-fox-5c3bc0", "hero": "Fox", "costume": "fox_mage" },
+    { "id": "forest-rabbit-ea2da0", "hero": "Rabbit", "costume": "rabbit_healer" },
+    { "id": "black-bear-adbdc7", "hero": "Bear", "costume": "bear_tank" },
+    { "id": "frog-base", "hero": "Otter", "costume": "frog_control" },
+    { "id": "cat-base", "hero": "Hedgehog", "costume": "cat_archer" }
+  ],
+  "props": [
+    { "id": "tall-pine-tree-ab4108", "name": "tall_pine", "category": "tree", "scaleMin": 0.70, "scaleMax": 1.00, "shadow": false, "max": 26, "rotate": true },
+    { "id": "young-pine-0d7695", "name": "young_pine", "category": "tree_small", "scaleMin": 0.80, "scaleMax": 1.20, "shadow": false, "max": 20, "rotate": true },
+    { "id": "maple-tree-65fa12", "name": "maple", "category": "tree", "scaleMin": 0.72, "scaleMax": 1.00, "shadow": false, "max": 16, "rotate": true },
+    { "id": "broadleaf-oak-997c22", "name": "oak", "category": "tree", "scaleMin": 0.70, "scaleMax": 0.95, "shadow": false, "max": 14, "rotate": true },
+    { "id": "birch-tree-181b33", "name": "birch", "category": "tree", "scaleMin": 0.70, "scaleMax": 0.95, "shadow": false, "max": 16, "rotate": true },
+    { "id": "dead-tree-6795fa", "name": "dead_tree", "category": "tree", "scaleMin": 0.70, "scaleMax": 1.00, "shadow": false, "max": 6, "rotate": true },
+    { "id": "round-bush-cd2ac0", "name": "round_bush", "category": "bush", "scaleMin": 0.90, "scaleMax": 1.40, "shadow": false, "max": 30, "rotate": true },
+    { "id": "fern-plant-1559b8", "name": "fern", "category": "bush", "scaleMin": 0.90, "scaleMax": 1.50, "shadow": false, "max": 20, "rotate": true },
+    { "id": "grass-tuft-a40a08", "name": "grass_tuft", "category": "grass", "scaleMin": 1.00, "scaleMax": 1.70, "shadow": false, "max": 60, "rotate": true },
+    { "id": "wildflower-68d3a1", "name": "wildflower", "category": "flower", "scaleMin": 1.00, "scaleMax": 1.50, "shadow": false, "max": 40, "rotate": true },
+    { "id": "toadstool-257a4a", "name": "toadstool", "category": "mushroom", "scaleMin": 1.20, "scaleMax": 2.20, "shadow": false, "max": 18, "rotate": true },
+    { "id": "medium-rock-e08405", "name": "medium_rock", "category": "rock", "scaleMin": 0.80, "scaleMax": 1.30, "shadow": false, "max": 18, "rotate": true },
+    { "id": "small-rock-db33a7", "name": "small_rock", "category": "rock", "scaleMin": 0.90, "scaleMax": 1.60, "shadow": false, "max": 20, "rotate": true },
+    { "id": "large-boulder-a29b99", "name": "large_boulder", "category": "rock", "scaleMin": 0.70, "scaleMax": 1.10, "shadow": false, "max": 8, "rotate": true },
+    { "id": "rock-spire-13819c", "name": "rock_spire", "category": "rock", "scaleMin": 0.65, "scaleMax": 0.95, "shadow": false, "max": 5, "rotate": true },
+    { "id": "tree-stump-ec3f48", "name": "tree_stump", "category": "prop", "scaleMin": 1.00, "scaleMax": 1.60, "shadow": false, "max": 10, "rotate": true },
+    { "id": "fallen-log-1685fb", "name": "fallen_log", "category": "prop", "scaleMin": 0.90, "scaleMax": 1.30, "shadow": false, "max": 8, "rotate": true },
+    { "id": "lily-pad-86edbb", "name": "lily_pad", "category": "water", "scaleMin": 0.80, "scaleMax": 1.30, "shadow": false, "max": 12, "rotate": true },
+    { "id": "cattail-reed-6abbb3", "name": "cattail", "category": "water", "scaleMin": 1.00, "scaleMax": 1.50, "shadow": false, "max": 12, "rotate": true },
+    { "id": "water-blob-f266b8", "name": "water_blob", "category": "water", "scaleMin": 1.00, "scaleMax": 1.20, "shadow": false, "max": 8, "rotate": true },
+    { "id": "log-plank-bridge-a5f74f", "name": "log_bridge", "category": "structure", "scaleMin": 1.00, "scaleMax": 1.00, "shadow": false, "max": 1, "rotate": false },
+    { "id": "wooden-fence-section-5f04b7", "name": "fence", "category": "structure", "scaleMin": 0.90, "scaleMax": 1.10, "shadow": false, "max": 8, "rotate": true },
+    { "id": "lantern-post-f47665", "name": "lantern_post", "category": "structure", "scaleMin": 0.90, "scaleMax": 1.10, "shadow": false, "max": 6, "rotate": true },
+    { "id": "trail-signpost-bd29a7", "name": "trail_sign", "category": "structure", "scaleMin": 0.90, "scaleMax": 1.10, "shadow": false, "max": 4, "rotate": true },
+    { "id": "log-cabin-4fac3b", "name": "log_cabin", "category": "landmark", "scaleMin": 0.80, "scaleMax": 1.00, "shadow": false, "max": 1, "rotate": true },
+    { "id": "fire-lookout-tower-75a129", "name": "lookout_tower", "category": "landmark", "scaleMin": 0.70, "scaleMax": 0.90, "shadow": false, "max": 1, "rotate": true },
+    { "id": "stone-well-2b4717", "name": "stone_well", "category": "landmark", "scaleMin": 0.90, "scaleMax": 1.10, "shadow": false, "max": 2, "rotate": true }
+  ]
+}

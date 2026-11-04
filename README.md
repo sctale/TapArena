@@ -6,7 +6,7 @@
 
 | 版本 | 位置 | 说明 |
 | --- | --- | --- |
-| **Unity 版（3.1.0，主线）** | `unity/` | Unity 6000.3 工程：Polyfork 四足动物英雄（FBX 骨架 + Idle/Walk/Run）+ 2D 选人立绘 + 3D 战场 + 程序化战斗动作 + 应用图标，出 Android APK |
+| **Unity 版（3.2.0，主线）** | `unity/` | Unity 6000.3 工程：Polyfork 四足动物英雄 + Blender 服装配件 + Polyfork 森林场景道具 + 自制地形/塔/水晶/小兵 + 2D 选人立绘 + 应用图标，出 Android APK |
 | Web 版（1.3，存档） | 仓库根目录 `www/`、`android/` | Three.js 3D 战场 + Android WebView 壳，已封存在 git 标签 `web-v1.3.0` |
 
 备份：`D:/V-Coding/TapArena-web-v1.3.0-backup.zip`（含全部源码与素材，2.6MB）。
@@ -15,13 +15,22 @@
 
 1. 双击 `打开Unity工程.cmd`（或 Unity Hub 打开 `unity/` 目录），Unity 6000.3.10f1。
 2. 直接点 Play：场景是空的，`Boot.cs` 会在运行时把相机、灯光、地形、英雄全部建起来（工程里没有美术资源依赖）。
-3. 出包：`bash tools/unity-build.sh`（先导出 Gradle 工程，再用外部 gradlew 构建；headless 下 Unity 会把 Gradle 堆算成 `-Xmx0m`，必须绕开），产物自动拷到根目录 `TapArena-v3.1.0.apk`。
+3. 出包：`bash tools/unity-build.sh`（先导出 Gradle 工程，再用外部 gradlew 构建；headless 下 Unity 会把 Gradle 堆算成 `-Xmx0m`，必须绕开），产物自动拷到根目录 `TapArena-v3.2.0.apk`。
 
 操作：左下拖动摇杆移动（桌面 WASD/方向键），右下三个圆形按钮放技能（桌面 Q / E / R），Esc 或安卓返回键暂停。
 
-Polyfork 资产重建：`blender -b -P tools/polyfork_to_fbx.py`（Blender 4.5 LTS，headless）。脚本会下载缺失的 6 个 GLB，清理辅助物，按 24fps 导出带 Idle/Walk/Run 的 FBX 到 `unity/Assets/Resources/Polyfork/`；随后在 Unity 里跑 `TapArena.EditorTools.PolyforkClipExport.Run` 导出 `.anim`，再跑 `TapArena.EditorTools.PolyforkArt.Render` 重出 2D 立绘、bust 和头部头像。**原始 GLB/FBX 不提交仓库**（Polyfork 授权只允许随游戏发布，不允许再分发文件本体）。
+美术资产重建（Blender 4.5 LTS，headless）：
 
-旧的 Blender 程序化英雄管线仍保留：`blender -b -P tools/blender_lowpoly.py` 会重写 `Resources/LowPoly/*.json`；当 Polyfork FBX 缺失时 `PolyforkHero` 会回退到这套 JSON，保证工程仍能启动。
+```powershell
+blender -b -P tools/polyfork_props.py       # 森林 kit 道具 -> Resources/PolyforkProps
+blender -b -P tools/polyfork_to_fbx.py      # 六只动物 + Blender 服装 -> Resources/Heroes
+blender -b -P tools/blender_game_art.py     # 地形/塔/水晶/小兵/首页地台 -> Resources/GameArt
+Unity.exe -batchmode -quit -projectPath unity -executeMethod TapArena.EditorTools.ArtImport.Run
+```
+
+`ArtImport.Run` 会统一 FBX 导入设置、导出 `.anim`、重渲染 2D 立绘与图标，并打印 `[ART] RESULT=PASS`。**原始 GLB/FBX 不提交仓库**（Polyfork 授权只允许随游戏发布，不允许再分发文件本体）；`ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 均在 `.gitignore` 中。
+
+旧的 Blender 程序化英雄管线仍保留：`blender -b -P tools/blender_lowpoly.py` 会重写 `Resources/LowPoly/*.json`；当新英雄 FBX 缺失时 `PolyforkHero` 会依次回退到旧 Polyfork FBX、LowPoly JSON，保证工程仍能启动。
 
 ## Unity 版的结构
 
@@ -30,43 +39,49 @@ unity/Assets/Scripts/
   Core/Boot.cs        启动器：运行时建相机、灯光、氛围、UI、世界
   Core/Arena.cs       战斗规则：3v3、兵线、塔与水晶保护、18 个技能、AI、4:00 终极对决
   Core/HeroDefs.cs    六位英雄的属性与技能表（按 10–15 秒 TTK 重排，见 CHANGELOG 2.2.0）
-  Visuals/PolyforkHero.cs  Polyfork FBX → 材质/骨骼/缩放/施法点，保留作者动画
+  Visuals/PolyforkHero.cs  新英雄 FBX（含服装）→ 材质/骨骼/缩放/施法点，保留作者动画
   Visuals/PolyHeroView.cs  四足英雄视图：Idle/Walk 采样 + 咬击/施法/受击/阵亡叠加
-  Visuals/LowPolyHero.cs  旧 Blender JSON → 刚性权重 SkinnedMesh（FBX 缺失时回退）
-  Visuals/HeroBuilder.cs  旧高模程序化角色（更老的兜底）
-  Visuals/HeroView.cs     旧双足英雄的待机/四相步态/攻击/施法/受击/阵亡
-  Visuals/Art.cs      程序化场景：树/灌木/蘑菇、塔/水晶、小兵、地图贴图
-  Visuals/Views.cs    表现层：WorldView 同步单位与弹道/减速区
-  Visuals/Fx.cs       火花、法阵、拖影、飘字、播报、脚步扬尘 + 程序合成音效
+  Visuals/ArtPropLibrary.cs 运行时加载 GameArt / PolyforkProps，缺失时回退程序化道具
+  Visuals/Art.cs      程序化场景与回退：树/灌木/蘑菇、塔/水晶、小兵、地图贴图
+  Visuals/Views.cs    表现层：地图/道具/结构/弹道/减速区/英雄视图
+  Visuals/Fx.cs       火花、法阵、拖影、飘字、播报 + 3 个动态网格粒子批次 + 程序合成音效
   Systems/            InputHub（摇杆/键盘）、CameraRig（跟随/震屏/推镜）
-  UI/Hud.cs           IMGUI：首页、2D 选人、战斗 HUD、暂停、结算
-tools/polyfork_to_fbx.py  Polyfork 下载 + GLB→FBX（保留 Idle/Walk/Run）
-tools/blender_lowpoly.py  旧 Blender 程序化英雄管线（兜底）
-unity/Assets/Resources/Polyfork/*.fbx   本地构建用的 Polyfork 模型（不提交）
-unity/Assets/Resources/Splash/*.png     2D 选人卡与详情立绘
+  UI/Hud.cs           IMGUI：首页（含难度）、2D 选人、战斗 HUD、暂停、结算
+tools/polyfork_props.py    Polyfork 森林 kit 道具下载 + 顶点色/接触阴影 + FBX
+tools/polyfork_to_fbx.py   六只动物 + Blender 服装 + Idle/Walk/Run + hero_meta.json
+tools/polyfork_costumes.py 六套低模服装/配件的生成器
+tools/blender_game_art.py  自制地形/蘑菇塔/水晶/小兵/首页地台
+tools/polyfork_manifest.json 批准使用的 Polyfork 资产清单
+unity/Assets/Resources/GameArt/*      原创资产（入库）
+unity/Assets/Resources/PolyforkProps/* Polyfork 派生道具（gitignore）
+unity/Assets/Resources/Heroes/*        Polyfork 派生英雄 + 服装（gitignore）
+unity/Assets/Resources/Splash/*.png   2D 选人卡与详情立绘
 ```
 
 ```
 unity/Assets/Shaders/
-  LowPoly.shader      Low Poly：顶点色 / 三段明暗 / 边缘光 / 描边 / 受击闪白
-  Toon.shader         场景卡通渲染：三段明暗 / 边缘光 / 外扩描边 / 接收阴影
-  Sky.shader          天空穹顶（等距柱状全景，运行时生成）
+  LowPoly.shader      Low Poly：顶点色 / 顶点 AO / 三段明暗 / 边缘光 / 描边 / 受击闪白 / GPU instancing
+  LowPolyFlat.shader  场景无描边版：地形与植被，省掉描边 pass
+  Toon.shader         旧场景卡通渲染（程序化回退用）
+  Sky.shader          天空穹顶（512×128 运行时渐变全景）
   Glow.shader         廉价泛光 + 暗角 + 调色（掉帧自动关）
 ```
 
-**画面**：英雄是 Polyfork 的平直着色 Low Poly 四足动物（顶点色/描边/受击闪白），自带 Idle/Walk/Run，战斗中的咬击、施法抬身、受击挤压和阵亡侧倒由 `PolyHeroView` 叠加；2D 选人页用游戏内模型离屏渲染的 splash/bust，游戏内仍是 3D 模型。天空是运行时渐变全景，远景低多边形山丘与松树线，木桥、蘑菇塔、水晶祭坛保留原有的低多边形场景语言。
+**画面**：英雄是 Polyfork 的平直着色 Low Poly 四足动物 + Blender 服装配件（帽子/披风/盾/背甲/箭袋/浮空物），自带 Idle/Walk/Run，战斗中的咬击、施法抬身、受击挤压和阵亡侧倒由 `PolyHeroView` 叠加；场景由 Polyfork Nature & Forest kit 的树/灌木/蘑菇/石头/木桥/灯笼，加上自制地形、蘑菇塔、水晶祭坛和小兵组成；2D 选人页用游戏内模型离屏渲染的 splash/bust，游戏内仍是 3D 模型。首页改成林间空地的苔藓土丘陈列，战场有兵线、河桥、树线、木屋/瞭望塔/石井地标。
 
 设计约束：卡片、血条、名字都用 IMGUI 画（uGUI 在 shader 剥离后会变品红）；中文字体随包带 Noto Sans CJK SC 子集；`PlayerSettings.stripEngineCode = false`（否则原生 MonoBehaviour 被裁，IMGUI 每帧抛异常）；Toon/Sky/LowPoly 通过 `Resources/TapArenaToon.mat` / `TapArenaSky.mat` / `TapArenaLowPoly.mat` 带进包，避免被 shader 剥离；Android 图标由 `PlayerSettings.SetIconsForTargetGroup` 写入 6 个槽。
 
-## Unity 版已验证（3.1.0）
+## Unity 版已验证（3.2.0）
 
-- **Polyfork 阵容**：阿狮（狮，战士）、灵灵（赤狐，法师）、朵朵（林兔，辅助）、阿岳（黑熊，坦克）、泡泡（青蛙，控制）、尖尖（猫，射手）。Polyfork 没有虎/水獭/刺猬，因此用生态位最接近的动物替换，并保留五个原英雄名。
-- **模型**：6 个 FBX 各带 22–26 根骨骼和 Idle/Walk/Run 动画；`PolyforkHero` 缩放到设计身高、脚底落到 y=0、替换为 `TapArena/LowPoly` 顶点色材质，并把施法点放到头部；`PolyHeroView` 按移动状态采样步态，再叠加咬击、施法抬身、受击挤压、阵亡侧倒、耳朵/尾巴小动作。
-- **2D 选人**：卡片使用游戏内模型渲染的 512×512 bust，详情面板左侧是 768×1152 全身 splash；HUD/结算头像使用 256×256 透明头部。选人页仍是单排卡片 + 技能详情。
-- **画面修复**：首页陈列相机右移，六只动物全部入镜；塔盖遮挡继续平滑缩小；旧 LowPoly 资产保留为 FBX 缺失时的兜底。
-- **实机**：Android 16、1920×1080 横屏，v3.1.0/versionCode 25 覆盖安装；首页、2D 选人、战斗、移动、技能冷却、受击、阵亡/复活、暂停菜单逐项检查；logcat 无异常（修复了构建版里读取不可读网格统计三角面导致的报错）。
-- **帧率**：约 38–58fps（开局加载约 38，稳定段 56–58fps；Polyfork 每位英雄约 1.9–4.0k 三角面）。
-- **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；因此 `unity/ArtSource/` 与 `unity/Assets/Resources/Polyfork/` 在 `.gitignore` 中，构建前用 `tools/polyfork_to_fbx.py` 拉取。
+- **阵容与服装**：阿狮（狮，战士，木盾/苔藓披肩）、灵灵（赤狐，法师，尖帽/浮空星）、朵朵（林兔，辅助，花环/挎包）、阿岳（黑熊，坦克，苔藓背甲/木肩片）、泡泡（青蛙，控制，水泡/芦苇披风）、尖尖（猫，射手，箭袋/护腕）。服装按骨骼权重 1 合并进同一张 SkinnedMesh，仍是一次绘制。
+- **模型**：6 个 FBX 各带 22–26 根骨骼、Idle/Walk/Run 动画，合计约 2.0–4.1k 三角面/人；`hero_meta.json` 记录不含服装的 `bodyHeight`，缩放不再被帽子影响；`PolyHeroView` 按步态采样再叠加咬击/施法/受击/阵亡。
+- **场景**：27 个 Polyfork 森林 kit 道具（树/灌木/蘑菇/石头/木桥/栅栏/灯笼/木屋/瞭望塔/石井）+ 自制 3000×1600 顶点色地形/河道、蘑菇塔、水晶祭坛、果冻小兵；植被按象限静态合批，植被不投射实时阴影。
+- **2D 选人**：卡片 512×512 bust、详情 768×1152 splash、HUD/结算 256×256 透明头像，全部用新服装模型重渲染；首页/战斗都从同一套 3D 资产出发。
+- **实机**：Android 16 模拟器（1080×1920 转横屏），v3.1.0/versionCode 25 → v3.2.0/versionCode 26 覆盖安装成功；首页、选人、战斗、移动、技能冷却、暂停、切后台自动暂停、结算“差一点点/再来一局”逐项检查；默认轻松 + 挑战各完整跑完一局（挑战 5:00 结算 17:20），logcat 无 Unity 异常。
+- **帧率**：同一台软件渲染模拟器上 v3.2.0 约 35–38fps（v3.1.0 同机约 20–29fps）；场景 Renderer 从 294 降到 49（按材质合并静态批次）。冷启动到首页 `am start -W` TotalTime 2.03s。真实设备帧率待补测，模拟器数值只用于同机对比。
+- **包体**：`TapArena-v3.2.0.apk` 30,409,196 字节（29.0MiB），versionCode 26，minSdk 25/targetSdk 37；签名 `CN=TapArena, OU=Games, O=sctale, C=CN`；SHA-256 `DE656CF14DA794FC061C3F58A5552E0B1A297866E9EC4C3B222226316238711A`（最终构建后如有变动以根目录 APK 为准）。
+- **动画/内存**：18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB（Idle 保留完整循环，导入 `Optimal` 压缩）；主路径不再生成 1280×683 地面贴图。
+- **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；`unity/ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 在 `.gitignore` 中，构建前用 Blender 脚本拉取。
 
 ## 素材授权
 
@@ -99,17 +114,19 @@ unity/Assets/Shaders/
 | --- | --- | --- |
 | 手机 / 平板 | 左下角拖动摇杆 | 右下角三个圆形技能键（大招 2 级解锁） |
 | 电脑 | WASD / 方向键 | Q / E / R 技能 |
+| 难度 | 首页“轻松/挑战” | 默认轻松；挑战提高 AI 主动性与敌方伤害 |
 | 暂停 | 右上角暂停键或 P / Esc | 暂停面板里可开关音效、重开、回首页 |
 
 ## 安卓版
 
-安装 `TapArena-v3.0.0.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 3.0.0（versionCode 24），最低 Android 7.1（API 25），targetSdk 37。
+安装 `TapArena-v3.2.0.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 3.2.0（versionCode 26），最低 Android 7.1（API 25），targetSdk 37。
 
 - 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与 1.3.0 同一把 release keystore，可直接覆盖安装）
-- SHA-256：`1f15791298583770cddc10e0dc3062f6535c606c435b55a8cfe7cbfe512c4c3c`
+- SHA-256：`DE656CF14DA794FC061C3F58A5552E0B1A297866E9EC4C3B222226316238711A`
+- 体积：30,409,196 字节（29.0MiB）
 
 - 横屏锁定；支持刘海屏；全屏沉浸式。
-- 返回键：在战斗中按下会打开暂停面板，不会直接退出。
+- 返回键：在战斗中按下会打开暂停面板，不会直接退出；切后台/失去焦点自动暂停。
 - 数据只保存在本机（音效偏好），不联网、不上传。
 
 ## Web 存档：开发 / 构建

@@ -1,4 +1,7 @@
 node_modules/
+tools/__pycache__/
+__pycache__/
+*.pyc
 shots/
 *.log
 android/.gradle/
@@ -41,3 +44,7 @@ unity/adbtmp/
 unity/ArtSource/
 unity/Assets/Resources/Polyfork/
 unity/Assets/Resources/Polyfork.meta
+unity/Assets/Resources/PolyforkProps/
+unity/Assets/Resources/PolyforkProps.meta
+unity/Assets/Resources/Heroes/
+unity/Assets/Resources/Heroes.meta

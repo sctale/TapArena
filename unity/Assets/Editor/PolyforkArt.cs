@@ -17,7 +17,7 @@ namespace TapArena.EditorTools
         static Texture2D glow;
         static Color glowColor;
 
-        public static void Render()
+        public static void Render(bool exit = true)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
@@ -54,7 +54,7 @@ namespace TapArena.EditorTools
             cam.nearClipPlane = 0.5f;
             cam.farClipPlane = 4000f;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.03f, 0.06f, 0.08f, 1f);
+            cam.backgroundColor = new Color(0.06f, 0.13f, 0.11f, 1f);
             cam.allowHDR = false;
             cam.allowMSAA = true;
 
@@ -97,7 +97,7 @@ namespace TapArena.EditorTools
                 cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
                 if (backdrop != null) backdrop.SetActive(false);
                 Render(256, 256, "Assets/Resources/Portraits/" + id + "_head.png", true);
-                cam.backgroundColor = new Color(0.03f, 0.06f, 0.08f, 1f);
+                cam.backgroundColor = new Color(0.06f, 0.13f, 0.11f, 1f);
                 if (backdrop != null) backdrop.SetActive(true);
 
                 Object.DestroyImmediate(artRoot.gameObject);
@@ -105,7 +105,7 @@ namespace TapArena.EditorTools
 
             AssetDatabase.Refresh();
             Debug.Log("PFPORTRAIT RESULT=PASS");
-            EditorApplication.Exit(0);
+            if (exit) EditorApplication.Exit(0);
         }
 
         static void PoseIdle(Art.Rig rig, HeroDef d, float t)
@@ -136,9 +136,9 @@ namespace TapArena.EditorTools
             if (glow != null) Object.DestroyImmediate(glow);
             const int S = 256;
             glow = new Texture2D(S, S, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-            Color edge = new Color(0.035f, 0.085f, 0.085f);
-            Color mid = Color.Lerp(edge, d.accent, 0.46f);
-            Color core = Color.Lerp(d.accent, new Color(1f, 0.96f, 0.86f), 0.50f);
+            Color edge = new Color(0.07f, 0.15f, 0.12f);
+            Color mid = Color.Lerp(edge, d.accent, 0.52f);
+            Color core = Color.Lerp(d.accent, new Color(1f, 0.96f, 0.86f), 0.58f);
             var px = new Color[S * S];
             for (int y = 0; y < S; y++)
                 for (int x = 0; x < S; x++)
