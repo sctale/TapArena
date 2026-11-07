@@ -2,6 +2,39 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
+## [4.0.0-dev.1] - 2026-11-07
+
+**Godot 4.7.2 战斗垂直切片（开发预览，不替代 Unity 3.2.0 主线）。**
+
+### 新增
+
+- 新建 `godot/` 并行工程：Godot 4.7.2 + GL Compatibility，横屏，复用 `com.sctale.taparena` 包名与 `TapArena` release keystore。
+- 新增纯逻辑 `BattleSim`：3v3、兵线、小兵、两座塔、水晶保护、18 个技能、AI、难度、复活、经验/2 级大招、4:00 终极对决、5:00 兜底。规则层不引用节点、相机、音频或 UI，可无头运行。
+- 数据外置为 `data/heroes.json` 与 `data/rules.json`，英雄数值与技能表从 Unity `HeroDefs.cs` 迁入。
+- 新增基础几何体表现层、相机跟随/推镜/震屏、最小战斗 HUD（头像血条、比分计时、塔位、小地图、技能冷却、摇杆、播报、暂停、结算）。
+- 新增触屏输入：左下摇杆 + 右下三技能，支持摇杆与技能同时按；桌面 WASD + Q/E/R。
+- 新增 `tests/sim_headless.gd`：10 局固定种子无头对局 + 水晶保护规则单测。
+- 新增 `tools/godot-build.ps1`：生成导出预设、导入资产、无头回归、导出 Android release、aapt2/apksigner 校验并复制根目录 APK。
+
+### 修复 / 规避
+
+- **顿帧重入**：Godot 侧用“单次生效 + 真实时间计时器”恢复 `Engine.time_scale`，避免 Unity 版两段顿帧协程重叠后卡在 0.18 的问题。
+- **安卓返回键**：设置 `application/config/quit_on_go_back=false` 并监听 `Window.go_back_requested`，返回键不再退出应用，而是打开游戏内暂停面板。
+- **相机方向**：横屏相机改到 +Z 侧俯视，摇杆向右 = 画面向右，和 Unity/Web 版一致。
+- **性能**：HUD 改为 MultiMesh 合批 + Label 节点缓存文字，绘制从约 100ms/帧降到约 3ms/帧；模拟固定 30Hz；3D 以 0.65 分辨率渲染；关闭植被实时阴影与雾。本次 Android 模拟器最终约 15–21fps（受 ANGLE/GL 翻译限制），真实设备待补测。
+
+### 验证
+
+- 10 局无头对局全部在 5:00 内结束；水晶保护单测 5 条断言全部通过（外塔/内塔存活时水晶不掉血，双塔拆除后可破，终极对决绕过保护）。
+- Android 16 模拟器（1080×1920 横屏）：安装覆盖成功，摇杆移动、技能点击/冷却、暂停/继续、返回键暂停逐项通过；Godot 日志无脚本异常。
+- APK：`TapArena-v4.0.0-dev.1.apk`，27,710,946 字节，versionCode 27，minSdk 24/targetSdk 36，arm64-v8a，证书 SHA-256 与 Unity v3.2.0 完全一致（可覆盖升级）。
+
+### 未完成
+
+- 首页、选人、换英雄、回首页未迁移；结算页仅支持“再来一局”。
+- Polyfork 英雄/森林道具与自制 GameArt 未接入；当前为几何体占位。
+- 音频、LowPoly 描边 Shader、泛光/暗角、2D 立绘待后续阶段。
+
 ## [3.2.0] - 2026-11-04
 
 **混合低多边形美术重制 + 渲染/包体/玩法优化。**

@@ -39,6 +39,14 @@ unity/frames*/
 unity/emu.log
 unity/adbtmp/
 
+# Godot 工程：缓存、产物、含签名密码的导出预设、keystore
+godot/.godot/
+godot/build/
+godot/export_presets.cfg
+godot/keystore/
+godot/*.log
+
+
 # Polyfork 的原始 GLB / 转出的 FBX / 动画片段：
 # 授权允许模型随游戏 APK 一起发布，但不允许把文件本体再分发到仓库或素材站。
 unity/ArtSource/

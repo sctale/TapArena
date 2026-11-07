@@ -2,11 +2,12 @@
 
 一个给 6–12 岁孩子玩的 **3v3 森林推塔小游戏**：清兵线、拆塔、推水晶。英雄使用 [Polyfork](https://polyfork.dev) 的免费低多边形动物（可商用、无需署名），没有抽卡、内购、广告，也不联网。
 
-## 两个版本
+## 三个版本
 
 | 版本 | 位置 | 说明 |
 | --- | --- | --- |
 | **Unity 版（3.2.0，主线）** | `unity/` | Unity 6000.3 工程：Polyfork 四足动物英雄 + Blender 服装配件 + Polyfork 森林场景道具 + 自制地形/塔/水晶/小兵 + 2D 选人立绘 + 应用图标，出 Android APK |
+| Godot 垂直切片（4.0.0-dev.1，开发中） | `godot/` | Godot 4.7.2 并行工程：纯逻辑 BattleSim + 基础几何体战场 + 触屏摇杆/技能 + 最小 HUD，验证引擎与出包链路 |
 | Web 版（1.3，存档） | 仓库根目录 `www/`、`android/` | Three.js 3D 战场 + Android WebView 壳，已封存在 git 标签 `web-v1.3.0` |
 
 备份：`D:/V-Coding/TapArena-web-v1.3.0-backup.zip`（含全部源码与素材，2.6MB）。
@@ -82,6 +83,46 @@ unity/Assets/Shaders/
 - **包体**：`TapArena-v3.2.0.apk` 30,409,196 字节（29.0MiB），versionCode 26，minSdk 25/targetSdk 37；签名 `CN=TapArena, OU=Games, O=sctale, C=CN`；SHA-256 `DE656CF14DA794FC061C3F58A5552E0B1A297866E9EC4C3B222226316238711A`（最终构建后如有变动以根目录 APK 为准）。
 - **动画/内存**：18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB（Idle 保留完整循环，导入 `Optimal` 压缩）；主路径不再生成 1280×683 地面贴图。
 - **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；`unity/ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 在 `.gitignore` 中，构建前用 Blender 脚本拉取。
+
+## Godot 版（4.0.0-dev.1 垂直切片）
+
+Godot 4.7.2 的并行工程在 `godot/`。目前只迁移了**战斗垂直切片**，用来验证引擎可行性、触控手感和 Android 出包链路；Unity 3.2.0 仍是可发布主线，首页/选人、Polyfork 模型、音频与后处理尚未迁入。
+
+已实现：
+
+- **纯逻辑 `BattleSim`**（`godot/scripts/core/battle_sim.gd`）：3v3、兵线、小兵、两座塔、水晶保护、18 个技能、AI、难度、复活、经验/2 级大招、4:00 终极对决、5:00 兜底。规则不引用任何节点，可无头跑。
+- **数据外置**：`godot/data/heroes.json`、`godot/data/rules.json`。
+- **表现层**：基础几何体战场 + 相机跟随/震屏 + 最小 HUD（头像血条、比分计时、塔位、小地图、技能冷却、摇杆、播报、暂停、结算）。
+- **输入**：左下摇杆 + 右下三技能，支持多点触控；桌面 WASD + Q/E/R；安卓返回键与右上暂停键都能暂停。
+- **构建**：`tools/godot-build.ps1` 本地一键导入、无头回归、导出 release APK、aapt2/apksigner 校验并复制到根目录。
+
+运行与验证：
+
+```powershell
+# 无头 10 局 + 水晶保护规则
+godot --headless --path godot --script res://tests/sim_headless.gd
+
+# 桌面运行
+godot --path godot
+
+# Android release（会读取 keystore.properties，不打印密码）
+powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
+```
+
+产物：`TapArena-v4.0.0-dev.1.apk`（27,710,946 字节，versionCode 27，arm64-v8a，签名 `CN=TapArena`，与 3.2.0 同一把 keystore，可直接覆盖升级）。
+
+已验证：
+
+- 10 局固定种子无头对局全部在 5:00 内结束；水晶保护规则单测通过（外塔/内塔存活时水晶不掉血，双塔拆除后可破，终极对决绕过保护）。
+- Android 16 模拟器（1080×1920 横屏）：摇杆移动、技能点击/冷却、暂停/继续、返回键暂停逐项通过；Godot 侧无脚本异常。
+- 帧率：本次 Android 16 模拟器约 15–21fps（3D 以 0.65 分辨率渲染 + HUD 用 MultiMesh 合批到约 3ms + 30Hz 固定步长模拟 + 关闭植被阴影/雾）；同机数值受模拟器 ANGLE/GL 翻译影响较大，真实设备待补测。
+- 相机方向：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右，和 Unity/Web 版一致。
+
+已知边界：
+
+- 角色/场景是几何体占位，尚未接 Polyfork 模型与自制 GameArt；首页/选人/换英雄未迁移，结算页的“再来一局”已可用。
+- 音频未迁入；LowPoly 描边 Shader、后处理、2D 立绘待后续阶段。
+- `godot/export_presets.cfg` 含签名密码，已 gitignore；首次构建由脚本生成。
 
 ## 素材授权
 

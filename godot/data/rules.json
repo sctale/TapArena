@@ -1,0 +1,73 @@
+{
+  "map_w": 3000,
+  "map_h": 1600,
+  "sudden_death_time": 240,
+  "match_cap": 300,
+  "respawn_time": 5.5,
+  "wave_interval": 18,
+  "xp_to_level2": 260,
+  "xp_passive_per_sec": 2,
+  "xp_hero_kill": 140,
+  "xp_hero_assist": 60,
+  "xp_tower": 80,
+  "xp_minion": 14,
+  "xp_minion_assist": 7,
+  "base": {
+    "hp": 4200,
+    "radius": 90,
+    "height": 150,
+    "range": 400,
+    "dmg": 120,
+    "atk_interval": 1.0
+  },
+  "tower": {
+    "hp": 4200,
+    "radius": 58,
+    "height": 140,
+    "range": 350,
+    "dmg": 100,
+    "atk_interval": 1.0
+  },
+  "minion": {
+    "hp": 280,
+    "radius": 20,
+    "height": 46,
+    "range": 118,
+    "dmg": 22,
+    "atk_interval": 0.9,
+    "move_speed": 176,
+    "count": 3,
+    "structure_damage_mul": 2.0
+  },
+  "lane": [
+    [300, 800],
+    [760, 800],
+    [1180, 800],
+    [1500, 800],
+    [1900, 800],
+    [2320, 800],
+    [2700, 800]
+  ],
+  "difficulty": {
+    "easy": {
+      "ai_think": 0.32,
+      "ai_skill_mul": 0.72,
+      "enemy_dmg_mul": 0.85
+    },
+    "challenge": {
+      "ai_think": 0.17,
+      "ai_skill_mul": 1.15,
+      "enemy_dmg_mul": 1.10
+    }
+  },
+  "hitstop": {
+    "threshold": 45,
+    "scale": 0.18,
+    "duration": 0.045
+  },
+  "comeback": {
+    "max_tiers": 3,
+    "respawn_cut": 0.55,
+    "min_respawn": 3.8
+  }
+}
