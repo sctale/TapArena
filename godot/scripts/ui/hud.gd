@@ -482,7 +482,7 @@ func _update_panel_labels() -> void:
 		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.66, p.size.x, h * 0.045))
 		_set_label(lbl_pause_goal, "往右走 → 拆外塔、拆内塔，再点亮水晶")
 		_place(lbl_pause_foot, Rect2(p.position.x, p.end.y - h * 0.08, p.size.x, h * 0.04))
-		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.2.0")
+		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.2.1")
 	elif show_result:
 		var p := _result_panel()
 		var win: bool = sim.winner == sim.BLUE

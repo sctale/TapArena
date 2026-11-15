@@ -12,6 +12,7 @@ const ORDER := [
 	"grass_top", "grass_side", "dirt", "stone", "stone_brick", "sand",
 	"log_side", "log_top", "leaves", "planks", "path", "crystal",
 	"fur", "flat", "face_slime", "flag", "glow", "cloud", "mushroom", "gold",
+	"ice", "lava", "face_angry",
 ]
 
 var texture: ImageTexture
@@ -194,5 +195,41 @@ func _paint(tile: String, i: int) -> void:
 						_px(ox, oy, cx + x, cy + y, Color("f4efe0"))
 		"gold":
 			_noise(ox, oy, Color("f0b93c"), [Color("d99f28"), Color("ffd96a")], 32, 0.45)
+		"ice":
+			_fill(ox, oy, Color("dff6ff"))
+			for y in range(TILE):
+				for x in range(TILE):
+					if (x + y * 2) % 9 == 0:
+						_px(ox, oy, x, y, Color("b8e8ff"))
+					elif (x * 2 + y) % 13 == 0:
+						_px(ox, oy, x, y, Color("ffffff"))
+		"lava":
+			_fill(ox, oy, Color("3a1c16"))
+			for y in range(TILE):
+				for x in range(TILE):
+					var r := _h(x, y, 33)
+					if r < 0.16:
+						_px(ox, oy, x, y, Color("f0702a"))
+					elif r < 0.24:
+						_px(ox, oy, x, y, Color("ffb347"))
+					elif r < 0.34:
+						_px(ox, oy, x, y, Color("5a2a1e"))
+		"face_angry":
+			_fill(ox, oy, Color("ffffff"))
+			# 斜挑的怒眉
+			for k in range(3):
+				_px(ox, oy, 3 + k, 5 + k, Color("232323"))
+				_px(ox, oy, 12 - k, 5 + k, Color("232323"))
+			for y in range(7, 9):
+				for x in range(4, 7):
+					_px(ox, oy, x, y, Color("232323"))
+				for x in range(9, 12):
+					_px(ox, oy, x, y, Color("232323"))
+			# 锯齿嘴
+			for x in range(4, 12):
+				if x % 2 == 0:
+					_px(ox, oy, x, 11, Color("232323"))
+				else:
+					_px(ox, oy, x, 12, Color("232323"))
 		_:
 			_fill(ox, oy, Color("ff00ff"))

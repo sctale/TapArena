@@ -199,7 +199,7 @@ func _refresh_labels() -> void:
 	lbl_hint.text = "轻松：电脑更慢，适合第一次玩" if difficulty == 0 else "挑战：电脑更凶，会抢技能"
 	_place(lbl_foot, Rect2(safe.end.x - safe.size.x * 0.30, safe.end.y - h * 0.045,
 		safe.size.x * 0.26, h * 0.032))
-	lbl_foot.text = "v4.2.0-dev.1 · Godot"
+	lbl_foot.text = "v4.2.1-dev.1 · Godot"
 
 
 # ---- 绘制 ----

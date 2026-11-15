@@ -266,11 +266,6 @@ func _add_hero(u) -> void:
 		root.add_child(pivot)
 		limbs[key] = pivot
 
-	var ring = _model("ring_%d_%d" % [int(u.radius), u.team], func(): return BlockModels.ground_ring(
-		atlas, u.radius * 1.18, _team_color(u.team)))
-	var ring_node := _make_instance(ring)
-	root.add_child(ring_node)
-
 	var s := _hero_scale(u)
 	root.scale = Vector3(s, s, s)
 	hero_nodes[u.uid] = {"root": root, "body": body, "limbs": limbs, "scale": s}
@@ -281,7 +276,7 @@ func _add_minion(u) -> void:
 	root.name = "Minion_%d" % u.uid
 	add_child(root)
 	var mesh = _model("minion_%d" % u.team, func(): return BlockModels.minion(
-		atlas, _team_color(u.team), u.radius))
+		atlas, _team_color(u.team), u.radius, u.team))
 	var body := _make_instance(mesh)
 	root.add_child(body)
 	minion_nodes[u.uid] = {"root": root, "body": body}
@@ -299,17 +294,28 @@ func _add_structure(u) -> void:
 			atlas, team_c, u.radius, u.height))
 		var body := _make_instance(mesh)
 		root.add_child(body)
-		structure_nodes[u.uid] = {"root": root, "crystal": null}
+		var ruin_mesh = _model("tower_ruins_%d" % u.team, func(): return BlockModels.tower_ruins(
+			atlas, team_c, u.radius))
+		var ruins := _make_instance(ruin_mesh)
+		ruins.visible = false
+		root.add_child(ruins)
+		structure_nodes[u.uid] = {"root": root, "body": body, "crystal": null, "ruins": ruins}
 	else:
-		var ped = _model("base_ped", func(): return BlockModels.base_pedestal(atlas, u.radius))
+		var ped = _model("base_ped_%d" % u.team, func(): return BlockModels.base_pedestal(
+			atlas, u.radius, u.team))
 		var ped_node := _make_instance(ped)
 		root.add_child(ped_node)
 		var cry = _model("base_cry_%d" % u.team, func(): return BlockModels.base_crystal(
-			atlas, team_c, u.radius, u.height))
+			atlas, team_c, u.radius, u.height, u.team))
 		var crystal := _make_instance(cry)
 		crystal.position = Vector3(0, 40, 0)
 		root.add_child(crystal)
-		structure_nodes[u.uid] = {"root": root, "crystal": crystal}
+		var ruin_mesh = _model("base_ruins_%d" % u.team, func(): return BlockModels.base_ruins(
+			atlas, team_c, u.radius, u.height))
+		var ruins := _make_instance(ruin_mesh)
+		ruins.visible = false
+		root.add_child(ruins)
+		structure_nodes[u.uid] = {"root": root, "body": ped_node, "crystal": crystal, "ruins": ruins}
 
 
 func _process(delta: float) -> void:
@@ -340,11 +346,18 @@ func _sync_units(delta: float) -> void:
 		elif u.kind == sim.TOWER or u.kind == sim.BASE:
 			var item = structure_nodes.get(u.uid)
 			if item != null:
-				item["root"].visible = u.is_alive()
-				if item["crystal"] != null and u.is_alive():
+				var alive: bool = u.is_alive()
+				item["root"].visible = true
+				if item["body"] != null:
+					item["body"].visible = alive
+				if item["crystal"] != null:
 					var c: Node3D = item["crystal"]
-					c.rotation.y += delta * 0.8
-					c.position.y = 40.0 + sin(Time.get_ticks_msec() * 0.002) * 5.0
+					c.visible = alive
+					if alive:
+						c.rotation.y += delta * 0.8
+						c.position.y = 40.0 + sin(Time.get_ticks_msec() * 0.002) * 5.0
+				if item["ruins"] != null:
+					item["ruins"].visible = not alive
 
 	for uid in hero_nodes:
 		var item: Dictionary = hero_nodes[uid]

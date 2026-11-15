@@ -39,8 +39,8 @@ func _ready() -> void:
 	Engine.max_fps = 60
 	DisplayServer.window_set_title("萌兽峡谷 TapArena · Godot")
 	if OS.get_name() == "Android":
-		# 3D 用 65% 分辨率渲染，HUD 仍按原生分辨率绘制；低端机优先保帧率。
-		get_viewport().scaling_3d_scale = 0.65
+		# 像素风要看清方块边缘：3D 按原生分辨率渲染，不用低分辨率放大。
+		get_viewport().scaling_3d_scale = 1.0
 	var win := get_window()
 	if win.has_signal("go_back_requested"):
 		win.go_back_requested.connect(_on_go_back_requested)
@@ -126,12 +126,28 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		camera_follow = false
 		cam.set_target(Vector3(230, 0, 800))
 		cam.snap()
+	if "--look-red" in OS.get_cmdline_user_args():
+		camera_follow = false
+		cam.set_target(Vector3(2770, 0, 800))
+		cam.snap()
+	if "--look-lane" in OS.get_cmdline_user_args():
+		camera_follow = false
+		cam.set_target(Vector3(700, 0, 800))
+		cam.snap()
 	if "--top" in OS.get_cmdline_user_args():
 		camera_follow = false
 		cam.frozen = true
 		cam.fov = 58.0
 		cam.position = Vector3(1500, 1450, 2500)
 		cam.look_at(Vector3(1500, 0, 820), Vector3.UP)
+	# 调试：拆掉双方外塔，检查废墟模型。
+	if "--ruins" in OS.get_cmdline_user_args():
+		sim.deal_damage(sim.towers_blue[0], 99999.0, sim.player)
+		sim.deal_damage(sim.towers_red[0], 99999.0, sim.player)
+		if "--top" not in OS.get_cmdline_user_args():
+			camera_follow = false
+			cam.set_target(Vector3(1180, 0, 800))
+			cam.snap()
 
 	hud = HudScript.new()
 	hud.process_priority = 10

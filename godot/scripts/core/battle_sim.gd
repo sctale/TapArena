@@ -1091,7 +1091,8 @@ func cleanup_dead() -> void:
 		var u = units[i]
 		if u.is_alive():
 			continue
-		if u.kind == HERO:
+		# 塔与水晶留在 units 里，表现层才能把原模型换成废墟。
+		if u.kind == HERO or u.kind == TOWER or u.kind == BASE:
 			continue
 		units.remove_at(i)
 	minions = minions.filter(func(m): return m.is_alive())
