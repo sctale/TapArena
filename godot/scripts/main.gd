@@ -207,10 +207,12 @@ func _process(delta: float) -> void:
 			sim.step(SIM_DT)
 			sim_acc -= SIM_DT
 			steps += 1
+		sim.interp_alpha = clampf(sim_acc / SIM_DT, 0.0, 1.0)
 		sim_us_total += Time.get_ticks_usec() - t0
 		sim_frames += steps
 		if sim.player != null and camera_follow:
-			cam.set_target(Vector3(sim.player.pos.x, 0, sim.player.pos.y))
+			var rp: Vector2 = sim.render_pos(sim.player)
+			cam.set_target(Vector3(rp.x, 0, rp.y))
 
 	if hitstop_until_ms > 0 and Time.get_ticks_msec() >= hitstop_until_ms:
 		hitstop_until_ms = 0

@@ -371,7 +371,7 @@ func _process(delta: float) -> void:
 		if floats[i]["t"] >= floats[i]["life"]:
 			floats.remove_at(i)
 	redraw_acc += delta
-	if redraw_acc >= 1.0 / 30.0:
+	if redraw_acc >= 1.0 / 60.0:
 		redraw_acc = 0.0
 		_update_labels()
 		queue_redraw()
@@ -423,7 +423,8 @@ func _update_labels() -> void:
 		if not u.is_alive() or not show_battle or cam == null:
 			l.visible = false
 			continue
-		var wp := Vector3(u.pos.x, u.height * 1.20 + 40.0, u.pos.y)
+		var rp: Vector2 = sim.render_pos(u)
+		var wp := Vector3(rp.x, u.height * 1.20 + 40.0, rp.y)
 		if cam.is_position_behind(wp):
 			l.visible = false
 			continue
@@ -482,7 +483,7 @@ func _update_panel_labels() -> void:
 		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.66, p.size.x, h * 0.045))
 		_set_label(lbl_pause_goal, "往右走 → 拆外塔、拆内塔，再点亮水晶")
 		_place(lbl_pause_foot, Rect2(p.position.x, p.end.y - h * 0.08, p.size.x, h * 0.04))
-		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.2.1")
+		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.2.2")
 	elif show_result:
 		var p := _result_panel()
 		var win: bool = sim.winner == sim.BLUE
@@ -707,15 +708,17 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 	for u in sim.units:
 		if not u.is_alive() or u.kind == sim.MINION:
 			continue
-		var px: float = inner.position.x + u.pos.x / sim.map_w * inner.size.x
-		var py: float = inner.position.y + u.pos.y / sim.map_h * inner.size.y
+		var rp: Vector2 = sim.render_pos(u)
+		var px: float = inner.position.x + rp.x / sim.map_w * inner.size.x
+		var py: float = inner.position.y + rp.y / sim.map_h * inner.size.y
 		var c := BLUE if u.team == sim.BLUE else Color("f07a63")
 		var s := 7.0 if u.kind == sim.BASE else 5.0
 		_add_rect(Rect2(px - s * 0.5, py - s * 0.5, s, s), PANEL_DARK)
 		_add_rect(Rect2(px - s * 0.5 + 1, py - s * 0.5 + 1, s - 2, s - 2), c)
 	if sim.player != null:
-		var pp := Vector2(inner.position.x + sim.player.pos.x / sim.map_w * inner.size.x,
-			inner.position.y + sim.player.pos.y / sim.map_h * inner.size.y)
+		var prp: Vector2 = sim.render_pos(sim.player)
+		var pp := Vector2(inner.position.x + prp.x / sim.map_w * inner.size.x,
+			inner.position.y + prp.y / sim.map_h * inner.size.y)
 		_add_box(Rect2(pp - Vector2(4, 4), Vector2(8, 8)), CREAM, 2.0)
 
 
@@ -734,7 +737,8 @@ func _draw_world_bars(safe: Rect2, h: float) -> void:
 		if not u.is_alive():
 			continue
 		if u.kind == sim.TOWER or u.kind == sim.BASE:
-			var wp := Vector3(u.pos.x, u.height * 0.55 + 30.0, u.pos.y)
+			var rp: Vector2 = sim.render_pos(u)
+			var wp := Vector3(rp.x, u.height * 0.55 + 30.0, rp.y)
 			if cam.is_position_behind(wp):
 				continue
 			var sp := cam.unproject_position(wp)
@@ -749,7 +753,8 @@ func _draw_world_bars(safe: Rect2, h: float) -> void:
 	for u in sim.heroes:
 		if not u.is_alive() or u == sim.player:
 			continue
-		var wp := Vector3(u.pos.x, u.height * 1.10 + 18.0, u.pos.y)
+		var rp: Vector2 = sim.render_pos(u)
+		var wp := Vector3(rp.x, u.height * 1.10 + 18.0, rp.y)
 		if cam.is_position_behind(wp):
 			continue
 		var sp := cam.unproject_position(wp)

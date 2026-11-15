@@ -384,11 +384,16 @@ func _sync_hero(u) -> void:
 		item = hero_nodes[u.uid]
 	var root: Node3D = item["root"]
 	var s: float = item["scale"]
-	root.position = Vector3(u.pos.x, 0, u.pos.y)
+	var rp: Vector2 = sim.render_pos(u)
+	root.position = Vector3(rp.x, 0, rp.y)
 	# 侧视相机下给 20° 偏航，露出动物脸和涂装。
 	var yaw := PI * 0.5 - 0.34
 	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
-	var bob := absf(sin(u.walk_t * 9.0)) * (4.0 if u.moving else 0.0)
+	var step := 1.0 / 30.0
+	var wt: float = u.walk_t
+	if u.moving:
+		wt -= (1.0 - sim.interp_alpha) * step
+	var bob := absf(sin(wt * 9.0)) * (4.0 if u.moving else 0.0)
 	root.position.y = bob
 	var sxz := 1.0
 	var sy := 1.0
@@ -403,7 +408,7 @@ func _sync_hero(u) -> void:
 	var limbs: Dictionary = item["limbs"]
 	var now := Time.get_ticks_msec() * 0.001
 	var phase := now + float(u.uid) * 0.7
-	var swing := sin(u.walk_t * 9.0) if u.moving else 0.0
+	var swing := sin(wt * 9.0) if u.moving else 0.0
 
 	# 腿：走路前后摆；待机时轻微屈膝。
 	var leg_l: Node3D = limbs["leg_l"]
@@ -448,7 +453,7 @@ func _sync_hero(u) -> void:
 
 	# 头：走路点头 + 受击后仰 + 施法抬下巴。
 	var head: Node3D = limbs["head"]
-	var head_x := sin(u.walk_t * 9.0) * 0.045 * (1.0 if u.moving else 0.0)
+	var head_x := sin(wt * 9.0) * 0.045 * (1.0 if u.moving else 0.0)
 	head_x += sin(phase * 2.0) * 0.02
 	if u.hurt_anim > 0.0:
 		head_x -= 0.28
@@ -470,7 +475,12 @@ func _sync_minion(u) -> void:
 		item = minion_nodes[u.uid]
 	var root: Node3D = item["root"]
 	root.visible = true
-	root.position = Vector3(u.pos.x, absf(sin(u.walk_t * 8.0)) * (5.0 if u.moving else 0.0), u.pos.y)
+	var rp: Vector2 = sim.render_pos(u)
+	var step := 1.0 / 30.0
+	var wt: float = u.walk_t
+	if u.moving:
+		wt -= (1.0 - sim.interp_alpha) * step
+	root.position = Vector3(rp.x, absf(sin(wt * 8.0)) * (5.0 if u.moving else 0.0), rp.y)
 	var yaw := PI * 0.5 - 0.34
 	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
 	var sxz := 1.0
@@ -507,7 +517,8 @@ func _sync_shots() -> void:
 				add_child(node)
 			shot_nodes[p.view_id] = node
 		node.visible = true
-		node.position = Vector3(p.pos.x, 34.0, p.pos.y)
+		var rp: Vector2 = p.prev_pos.lerp(p.pos, sim.interp_alpha)
+		node.position = Vector3(rp.x, 34.0, rp.y)
 		node.material_override = _shot_material(Color(p.color.r, p.color.g, p.color.b, 0.95))
 		var sz: float = maxf(0.7, p.size / 7.0)
 		node.scale = Vector3(sz, sz, sz)

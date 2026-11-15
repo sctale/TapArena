@@ -27,6 +27,7 @@ class Unit:
 	var hero_id: String = ""
 	var display_name: String = ""
 	var pos := Vector2.ZERO
+	var prev_pos := Vector2.ZERO
 	var facing: float = 1.0
 	var move_dir := Vector2.ZERO
 
@@ -78,6 +79,7 @@ class Unit:
 
 class Projectile:
 	var pos := Vector2.ZERO
+	var prev_pos := Vector2.ZERO
 	var dir := Vector2.RIGHT
 	var team: int = 0
 	var src = null
@@ -132,6 +134,8 @@ var score_red: int = 0
 
 var player_move := Vector2.ZERO
 var skill_pressed: Array = [false, false, false]
+# 渲染插值：表现层在 prev_pos → pos 之间按 0..1 取值，消除 30Hz 模拟的台阶感。
+var interp_alpha: float = 1.0
 
 var lane: Array = []
 var rng := RandomNumberGenerator.new()
@@ -315,6 +319,7 @@ func new_unit(kind: int, team: int, display_name: String, pos: Vector2):
 	u.team = team
 	u.display_name = display_name
 	u.pos = pos
+	u.prev_pos = pos
 	u.cds = [0.0, 0.0, 0.0]
 	units.append(u)
 	return u
@@ -374,6 +379,10 @@ func make_hero(id: String, team: int, slot: int):
 
 func base_pos(team: int) -> Vector2:
 	return base_blue.pos if team == BLUE else base_red.pos
+
+
+func render_pos(u) -> Vector2:
+	return u.prev_pos.lerp(u.pos, clampf(interp_alpha, 0.0, 1.0))
 
 
 func set_skill(i: int) -> void:
@@ -445,6 +454,7 @@ func spawn_wave(team: int) -> void:
 
 
 func step_unit(u, dt: float) -> void:
+	u.prev_pos = u.pos
 	u.atk_anim = maxf(0.0, u.atk_anim - dt)
 	u.cast_anim = maxf(0.0, u.cast_anim - dt)
 	u.hurt_anim = maxf(0.0, u.hurt_anim - dt)
@@ -777,6 +787,7 @@ func shoot(src, dir: Vector2, dmg: float, color: Color, speed: float,
 		dir = Vector2.RIGHT
 	var p = Projectile.new()
 	p.pos = src.pos
+	p.prev_pos = p.pos
 	p.dir = dir.normalized()
 	p.team = src.team
 	p.src = src
@@ -802,6 +813,7 @@ func step_projectiles(dt: float) -> void:
 	for p in shots:
 		if not p.alive:
 			continue
+		p.prev_pos = p.pos
 		if p.homing and p.target != null and p.target.is_alive():
 			var to: Vector2 = p.target.pos - p.pos
 			if to.length_squared() > 0.01:
@@ -973,6 +985,7 @@ func add_xp(h, add: float) -> void:
 func respawn(h) -> void:
 	h.hp = h.max_hp
 	h.pos = base_pos(h.team) + Vector2(150.0 if h.team == BLUE else -150.0, 0.0)
+	h.prev_pos = h.pos
 	h.invuln_t = 1.6
 	h.stun_t = 0.0
 	h.slow_t = 0.0
