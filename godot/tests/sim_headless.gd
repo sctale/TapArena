@@ -4,9 +4,9 @@ extends SceneTree
 # 运行：godot --headless --path godot --script res://tests/sim_headless.gd
 
 const BattleSimScript = preload("res://scripts/core/battle_sim.gd")
-const HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat"]
+const HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl"]
 const MATCHES := 10
-const DT := 1.0 / 30.0
+const DT := 1.0 / 60.0
 const MAX_SIM_SECONDS := 320.0
 
 

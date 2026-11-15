@@ -100,11 +100,11 @@ func _grid_rect() -> Rect2:
 
 func card_rect(i: int) -> Rect2:
 	var g := _grid_rect()
-	var gap := g.size.x * 0.012
-	var cw := (g.size.x - gap * 2.0) / 3.0
+	var gap := g.size.x * 0.010
+	var cw := (g.size.x - gap * 3.0) / 4.0
 	var ch := (g.size.y - gap) / 2.0
-	var col := i % 3
-	var row := i / 3
+	var col := i % 4
+	var row := i / 4
 	return Rect2(g.position + Vector2(float(col) * (cw + gap), float(row) * (ch + gap)), Vector2(cw, ch))
 
 
@@ -152,8 +152,8 @@ func _make_labels() -> void:
 	lbl_hint = _mk_label(int(h * 0.021), Color(1, 1, 1, 0.72))
 	lbl_foot = _mk_label(int(h * 0.018), Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_RIGHT)
 	for i in range(heroes.size()):
-		hero_name_labels.append(_mk_label(int(h * 0.031), CREAM, HORIZONTAL_ALIGNMENT_LEFT))
-		var blurb := _mk_label(int(h * 0.020), Color(0.92, 0.96, 0.90, 0.82), HORIZONTAL_ALIGNMENT_LEFT)
+		hero_name_labels.append(_mk_label(int(h * 0.028), CREAM, HORIZONTAL_ALIGNMENT_LEFT))
+		var blurb := _mk_label(int(h * 0.018), Color(0.92, 0.96, 0.90, 0.82), HORIZONTAL_ALIGNMENT_LEFT)
 		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		hero_blurb_labels.append(blurb)
 
@@ -199,7 +199,7 @@ func _refresh_labels() -> void:
 	lbl_hint.text = "轻松：电脑更慢，适合第一次玩" if difficulty == 0 else "挑战：电脑更凶，会抢技能"
 	_place(lbl_foot, Rect2(safe.end.x - safe.size.x * 0.30, safe.end.y - h * 0.045,
 		safe.size.x * 0.26, h * 0.032))
-	lbl_foot.text = "v4.2.2-dev.1 · Godot"
+	lbl_foot.text = "v4.3.0-dev.1 · Godot"
 
 
 # ---- 绘制 ----

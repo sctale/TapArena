@@ -50,13 +50,14 @@ func _offset(punch_k: float) -> Vector3:
 func _process(delta: float) -> void:
 	if frozen:
 		return
-	focus = focus.lerp(target, 1.0 - exp(-14.0 * delta))
+	# 目标位置已经做过渲染插值，直接跟随即可，不再二次平滑，避免操作延迟。
+	focus = target
 	punch = lerp(punch, 0.0, 1.0 - exp(-6.0 * delta))
 	shake = lerp(shake, 0.0, 1.0 - exp(-8.0 * delta))
 	zoom = lerp(zoom, zoom_target, 1.0 - exp(-3.0 * delta))
 
 	var want := focus + _offset(1.0 + punch * 0.05)
-	position = position.lerp(want, 1.0 - exp(-14.0 * delta))
+	position = position.lerp(want, 1.0 - exp(-20.0 * delta))
 	if shake > 0.05:
 		position += Vector3(randf_range(-shake, shake), randf_range(-shake, shake) * 0.6, 0.0) * 2.2
 	look_at(focus + Vector3(0, 34, -66), Vector3.UP)

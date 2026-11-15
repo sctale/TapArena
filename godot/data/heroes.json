@@ -348,6 +348,121 @@
           "unlock_at_2": true
         }
       ]
+    },
+    {
+      "id": "panda",
+      "name": "团团",
+      "title": "竹林小胖",
+      "role": "战士",
+      "blurb": "圆滚滚但很能打，翠竹护盾特别结实。",
+      "model_id": "panda-base",
+      "hp": 1350,
+      "dmg": 50,
+      "range": 128,
+      "atk_interval": 0.76,
+      "move_speed": 238,
+      "radius": 38,
+      "height": 86,
+      "difficulty": 1,
+      "fur": "#F2F0EA",
+      "dark": "#2B2B2B",
+      "cream": "#FFFFFF",
+      "accent": "#5FA84A",
+      "skills": [
+        {
+          "name": "滚滚冲撞",
+          "hint": "团成一团往前滚，撞飞路上的敌人",
+          "kind": "dash",
+          "cd": 7,
+          "dmg": 92,
+          "radius": 120,
+          "color": "#BFE39B",
+          "range": 240,
+          "knock": 30,
+          "speed": 900
+        },
+        {
+          "name": "翠竹护盾",
+          "hint": "撑起竹叶盾，吸收伤害并反弹",
+          "kind": "shield",
+          "cd": 14,
+          "radius": 0,
+          "color": "#8FD46A",
+          "shield_pct": 0.22,
+          "buff_t": 4.0,
+          "slow": 1
+        },
+        {
+          "name": "竹林震地",
+          "hint": "重重坐地，震晕周围敌人",
+          "kind": "aoe",
+          "cd": 28,
+          "dmg": 180,
+          "radius": 215,
+          "color": "#A8E06A",
+          "stun": 0.6,
+          "knock": 34,
+          "unlock_at_2": true
+        }
+      ]
+    },
+    {
+      "id": "owl",
+      "name": "咕咕",
+      "title": "夜巡小猫头鹰",
+      "role": "法师",
+      "blurb": "月光弹会拐弯，夜里看得最清楚。",
+      "model_id": "owl-base",
+      "hp": 880,
+      "dmg": 54,
+      "range": 500,
+      "atk_interval": 0.86,
+      "move_speed": 250,
+      "radius": 30,
+      "height": 70,
+      "difficulty": 2,
+      "fur": "#8A6BB5",
+      "dark": "#4A3560",
+      "cream": "#E8DFF5",
+      "accent": "#F5C542",
+      "skills": [
+        {
+          "name": "月光弹",
+          "hint": "射出一枚穿透月刃，命中减速",
+          "kind": "projectile",
+          "cd": 5,
+          "dmg": 84,
+          "radius": 0,
+          "color": "#D9C2FF",
+          "speed": 680,
+          "range": 540,
+          "pierce": 1,
+          "slow": 0.6
+        },
+        {
+          "name": "羽刃旋风",
+          "hint": "翅膀卷起羽刃，划伤身边一圈敌人",
+          "kind": "aoe",
+          "cd": 9,
+          "dmg": 70,
+          "radius": 175,
+          "color": "#B79CFF",
+          "slow": 1.2
+        },
+        {
+          "name": "夜枭俯冲",
+          "hint": "从夜空俯冲，砸晕落点敌人",
+          "kind": "leap",
+          "cd": 26,
+          "dmg": 150,
+          "radius": 200,
+          "color": "#C9A6FF",
+          "stun": 0.7,
+          "range": 340,
+          "zone": true,
+          "unlock_at_2": true
+        }
+      ]
     }
   ]
 }

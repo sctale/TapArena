@@ -9,7 +9,7 @@ const InputHubScript = preload("res://scripts/ui/input_hub.gd")
 const HomeScript = preload("res://scripts/ui/home.gd")
 const SfxScript = preload("res://scripts/core/sfx.gd")
 
-const SIM_DT := 1.0 / 30.0
+const SIM_DT := 1.0 / 60.0
 
 var sim = null
 var view = null
@@ -33,6 +33,9 @@ var sim_frames := 0
 var sim_acc := 0.0
 var camera_follow := true
 var auto_run := false
+var cinematic := false
+var cinematic_until_ms := 0
+var cinematic_flash_until_ms := 0
 
 
 func _ready() -> void:
@@ -74,6 +77,7 @@ func _clear_scene() -> void:
 func _show_home() -> void:
 	_clear_scene()
 	match_active = false
+	cinematic = false
 	paused = false
 	Engine.time_scale = 1.0
 	hitstop_until_ms = 0
@@ -102,6 +106,7 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 
 	Engine.time_scale = 1.0
 	paused = false
+	cinematic = false
 	hitstop_until_ms = 0
 	sim_acc = 0.0
 	match_active = true
@@ -133,6 +138,10 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	if "--look-lane" in OS.get_cmdline_user_args():
 		camera_follow = false
 		cam.set_target(Vector3(700, 0, 800))
+		cam.snap()
+	if "--look-tower" in OS.get_cmdline_user_args():
+		camera_follow = false
+		cam.set_target(Vector3(1900, 0, 800))
 		cam.snap()
 	if "--top" in OS.get_cmdline_user_args():
 		camera_follow = false
@@ -178,6 +187,12 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		_toggle_pause()
 	if "--result" in OS.get_cmdline_user_args():
 		sim.end_match(sim.BLUE)
+	# 开发用：直接摧毁红方水晶，检查结束动画与结算页。
+	if "--victory" in OS.get_cmdline_user_args():
+		sim.towers_red[0].hp = 0.0
+		sim.towers_red[1].hp = 0.0
+		sim.deal_damage(sim.base_red, 99999.0, sim.player)
+		sim.step(0.016)
 		hud.queue_redraw()
 
 	print("[MATCH] hero=%s difficulty=%d seed=%d" % [hero_id, difficulty, seed_value])
@@ -203,7 +218,7 @@ func _process(delta: float) -> void:
 		var t0 := Time.get_ticks_usec()
 		sim_acc += delta
 		var steps := 0
-		while sim_acc >= SIM_DT and steps < 3:
+		while sim_acc >= SIM_DT and steps < 6:
 			sim.step(SIM_DT)
 			sim_acc -= SIM_DT
 			steps += 1
@@ -218,6 +233,15 @@ func _process(delta: float) -> void:
 		hitstop_until_ms = 0
 		if not paused:
 			Engine.time_scale = 1.0
+
+	if cinematic:
+		var now := Time.get_ticks_msec()
+		if now >= cinematic_flash_until_ms and Engine.time_scale < 1.0:
+			Engine.time_scale = 1.0
+		if now >= cinematic_until_ms:
+			cinematic = false
+			if hud != null:
+				hud.finish_cinematic()
 
 
 func _on_hitstop(seconds: float) -> void:
@@ -244,9 +268,28 @@ func _restart() -> void:
 	_start_match(current_hero, current_difficulty, current_seed + 1)
 
 
-func _on_match_ended(_winner: int) -> void:
-	if hud != null:
-		hud.queue_redraw()
+func _on_match_ended(winner: int) -> void:
+	if hud == null or sim == null:
+		return
+	var loser_base = sim.base_red if winner == sim.BLUE else sim.base_blue
+	if loser_base != null and not loser_base.is_alive():
+		var now := Time.get_ticks_msec()
+		cinematic = true
+		cinematic_until_ms = now + 2600
+		cinematic_flash_until_ms = now + 900
+		hud.start_cinematic()
+		camera_follow = false
+		if cam != null:
+			cam.set_target(Vector3(loser_base.pos.x, 0, loser_base.pos.y))
+			cam.set_zoom(0.72)
+			cam.add_shake(10.0)
+			cam.add_punch(1.4)
+		if view != null:
+			var col := Color(0.42, 0.72, 0.95) if winner == sim.BLUE else Color(0.92, 0.44, 0.38)
+			view.play_victory(loser_base, col)
+		Engine.time_scale = 0.35
+	else:
+		hud.finish_cinematic()
 
 
 func _on_banner(text: String, _duration: float) -> void:

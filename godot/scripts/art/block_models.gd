@@ -141,6 +141,31 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 44, 10.2), Vector3(8, 7, 1), "flat", accent)
 			_b(boxes, Vector3(9, 32, -14), Vector3(5, 6, 16), "fur", fur)
 			_b(boxes, Vector3(9, 40, -26), Vector3(5, 6, 12), "fur", _darker(fur, 0.7))
+		"panda":
+			# 熊猫：黑耳朵 + 黑眼圈 + 黑臂环/腿环 + 竹绿围巾
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9.5 * sx, 75, 0), Vector3(10, 10, 9), "fur", dark)
+				_b(boxes, Vector3(6.0 * sx, 66, 12.7), Vector3(7, 7, 2), "flat", dark)
+				_b(boxes, Vector3(20.0 * sx, 30, 0), Vector3(11, 18, 11), "fur", dark)
+				_b(boxes, Vector3(8.0 * sx, 0, 0), Vector3(14, 18, 14), "fur", dark)
+			_b(boxes, Vector3(0, 60, 13.0), Vector3(8, 4, 2), "flat", cream)
+			_b(boxes, Vector3(0, 62, 13.4), Vector3(4, 2, 1), "flat", Color("1a1a1a"))
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(0, 40, 10.2), Vector3(14, 12, 1), "flat", cream)
+			_b(boxes, Vector3(0, 32, -12), Vector3(9, 9, 8), "fur", dark)
+		"owl":
+			# 猫头鹰：耳羽 + 大圆眼 + 金色喙 + 深色翅膀 + 尾羽
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9.0 * sx, 76, 0), Vector3(7, 12, 7), "fur", dark)
+				_b(boxes, Vector3(7.0 * sx, 66, 12.9), Vector3(8, 8, 2), "flat", cream)
+				_b(boxes, Vector3(6.5 * sx, 69, 13.5), Vector3(4, 4, 1), "flat", dark)
+				_b(boxes, Vector3(20.0 * sx, 28, 0), Vector3(12, 24, 14), "fur", dark)
+				_b(boxes, Vector3(20.0 * sx, 30, 8), Vector3(6, 6, 2), "flat", cream)
+			_b(boxes, Vector3(0, 59, 13.2), Vector3(5, 7, 5), "flat", accent)
+			_b(boxes, Vector3(0, 38, 10.2), Vector3(20, 18, 1), "flat", cream)
+			_b(boxes, Vector3(0, 44, 10.6), Vector3(4, 4, 1), "flat", accent)
+			_b(boxes, Vector3(0, 30, -13), Vector3(12, 12, 10), "fur", dark)
+			_b(boxes, Vector3(0, 36, -21), Vector3(8, 8, 8), "fur", _darker(fur, 0.8))
 		_:
 			pass
 	return boxes
@@ -181,35 +206,85 @@ static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) ->
 		for sx in [-1, 1]:
 			_b(boxes, Vector3(sx * radius * 1.08, 8.0, 0), Vector3(6, radius * 0.9, radius * 1.25),
 				"stone", Color("5a3a32"))
+		# 双爪 + 脚
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(sx * body * 0.62, 12, 2), Vector3(7, 14, 7), "flat", _darker(tint, 0.82))
+			_b(boxes, Vector3(sx * body * 0.66, 9, 5), Vector3(8, 4, 8), "stone", Color("3a2a26"))
+			_b(boxes, Vector3(sx * body * 0.30, 0, body * 0.24), Vector3(9, 4, 9), "stone", Color("3a2a26"))
+		# 背部尖刺 + 胸口熔岩核心
+		for i in range(3):
+			_b(boxes, Vector3(float(i - 1) * 9.0, 18.0 + float(i % 2) * 8.0, -body * 0.55),
+				Vector3(7, 12, 7), "stone", Color("4a2a26"))
+		_b(boxes, Vector3(0, 9, body * 0.5 + 0.8), Vector3(9, 8, 2), "glow", Color("ff9a4a"))
 	else:
 		var body := radius * 1.85
 		_b(boxes, Vector3(0, 2, 0), Vector3(body, body, body), "flat", tint, {"front": "face_slime"})
 		_b(boxes, Vector3(0, 0, 0), Vector3(body * 0.86, 3, body * 0.86), "flat", _darker(color, 0.8))
 		_b(boxes, Vector3(0, body + 2.0, 0), Vector3(5, 10, 5), "log_side", Color("6fae4a"))
 		_b(boxes, Vector3(0, body + 12.0, 0), Vector3(15, 6, 9), "leaves", Color("7fcf5a"))
+		# 小手臂 + 白手套
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(sx * body * 0.60, 10, 1), Vector3(6, 12, 6), "flat", _darker(tint, 0.92))
+			_b(boxes, Vector3(sx * body * 0.60, 8, 3), Vector3(7, 4, 7), "flat", Color(0.96, 0.99, 1.0))
+			_b(boxes, Vector3(sx * body * 0.30, 0, body * 0.22), Vector3(9, 4, 8), "flat", _darker(color, 0.76))
+		# 侧芽 + 金色小花
+		_b(boxes, Vector3(4, body + 13, 0), Vector3(5, 8, 7), "leaves", Color("8fdf6a"))
+		_b(boxes, Vector3(-4, body + 9, 0), Vector3(4, 6, 5), "leaves", Color("6fbf4a"))
+		_b(boxes, Vector3(0, body + 18, 0), Vector3(6, 4, 6), "gold", Color("ffd76a"))
 	return VoxelModel.mesh(atlas, boxes)
 
 
-static func tower(atlas: PixelAtlas, color: Color, radius: float, height: float) -> ArrayMesh:
+static func tower(atlas: PixelAtlas, color: Color, radius: float, height: float, team: int) -> ArrayMesh:
+	# 卡通蘑菇塔：粗菌柄 + 多层菌盖，蓝方月光菇、红方熔岩菇。
 	var boxes: Array = []
-	var stone := Color(0.86, 0.86, 0.86)
-	var slab_h := height * 0.06
-	var base_h := height * 0.12
-	var mid_h := height * 0.40
-	var top_h := height * 0.26
-	_b(boxes, Vector3(0, 0, 0), Vector3(radius * 2.4, base_h, radius * 2.4), "stone_brick", stone)
-	_b(boxes, Vector3(0, base_h, 0), Vector3(radius * 1.8, mid_h, radius * 1.8), "stone_brick", stone)
-	_b(boxes, Vector3(0, base_h + mid_h - 10.0, 0), Vector3(radius * 1.92, 10, radius * 1.92), "flag", color)
-	_b(boxes, Vector3(0, base_h + mid_h, 0), Vector3(radius * 1.5, top_h, radius * 1.5), "stone_brick", _darker(stone, 0.94))
-	var slab_y := base_h + mid_h + top_h
-	_b(boxes, Vector3(0, slab_y, 0), Vector3(radius * 1.9, slab_h, radius * 1.9), "planks", Color(0.95, 0.95, 0.95))
-	for sx in [-1, 1]:
-		for sz in [-1, 1]:
-			_b(boxes, Vector3(radius * 0.72 * sx, slab_y + slab_h, radius * 0.72 * sz),
-				Vector3(14, height * 0.12, 14), "stone_brick", stone)
-	var pole_y := slab_y + slab_h + height * 0.12
-	_b(boxes, Vector3(0, pole_y, 0), Vector3(6, height * 0.16, 6), "log_side", Color(0.9, 0.9, 0.9))
-	_b(boxes, Vector3(0, pole_y + height * 0.05, radius * 0.42), Vector3(4, height * 0.11, radius * 0.8), "flag", color)
+	var cap_tile := "mushroom_blue" if team == 0 else "mushroom"
+	var cap_tint := Color(0.92, 1.0, 1.0) if team == 0 else Color(1, 0.96, 0.9)
+	var stalk_tile := "ice" if team == 0 else "log_side"
+	var stalk_tint := Color(0.92, 0.98, 1.0) if team == 0 else Color(0.55, 0.34, 0.30)
+	var gill_tint := Color(0.98, 0.96, 0.86) if team == 0 else Color(0.72, 0.46, 0.38)
+
+	# 草地/火山岩底座
+	_b(boxes, Vector3(0, 0, 0), Vector3(radius * 2.35, 10, radius * 2.35), "stone",
+		Color(0.78, 0.86, 0.88) if team == 0 else Color(0.42, 0.34, 0.32))
+	for i in range(4):
+		var ang := float(i) * PI * 0.5 + 0.4
+		var px := cos(ang) * radius * 1.15
+		var pz := sin(ang) * radius * 1.15
+		if team == 0:
+			_b(boxes, Vector3(px, 10, pz), Vector3(12, 10, 12), "ice", Color(0.85, 0.98, 1.0))
+		else:
+			_b(boxes, Vector3(px, 10, pz), Vector3(13, 8, 13), "lava", Color(0.95, 0.6, 0.35))
+
+	# 菌柄：三段，越往上越细
+	var stalk_y := 10.0
+	var stalks := [
+		[radius * 2.0, 22.0, radius * 1.0],
+		[radius * 1.85, 20.0, radius * 0.9],
+		[radius * 1.7, 18.0, radius * 0.8],
+	]
+	for s in stalks:
+		var w: float = s[0]
+		var hh: float = s[1]
+		_b(boxes, Vector3(0, stalk_y, 0), Vector3(w, hh, w), stalk_tile, stalk_tint)
+		stalk_y += hh
+
+	# 菌褶 + 四层菌盖（逐层收窄，形成圆顶轮廓）
+	_b(boxes, Vector3(0, stalk_y, 0), Vector3(radius * 1.9, 10, radius * 1.9), "flag", gill_tint)
+	var cap_y := stalk_y + 10.0
+	_b(boxes, Vector3(0, cap_y, 0), Vector3(radius * 2.25, 10, radius * 2.25), cap_tile, cap_tint)
+	_b(boxes, Vector3(0, cap_y + 10, 0), Vector3(radius * 1.98, 12, radius * 1.98), cap_tile,
+		_lighter(cap_tint, 0.03))
+	_b(boxes, Vector3(0, cap_y + 22, 0), Vector3(radius * 1.56, 14, radius * 1.56), cap_tile,
+		_lighter(cap_tint, 0.06))
+	_b(boxes, Vector3(0, cap_y + 36, 0), Vector3(radius * 1.02, 12, radius * 1.02), cap_tile,
+		_lighter(cap_tint, 0.10))
+	# 顶部发光核心
+	_b(boxes, Vector3(0, cap_y + 48, 0), Vector3(radius * 0.42, 10, radius * 0.42), "glow",
+		Color(0.75, 0.95, 1.0) if team == 0 else Color(1.0, 0.72, 0.3))
+	if team == 0:
+		_b(boxes, Vector3(0, cap_y + 58, 0), Vector3(9, 9, 9), "glow", Color(0.95, 1.0, 1.0))
+	else:
+		_b(boxes, Vector3(0, cap_y + 58, 0), Vector3(11, 7, 11), "glow", Color(1.0, 0.62, 0.25))
 	return VoxelModel.mesh(atlas, boxes)
 
 
@@ -287,35 +362,38 @@ static func base_crystal(atlas: PixelAtlas, color: Color, radius: float, height:
 	return VoxelModel.mesh(atlas, boxes)
 
 
-static func tower_ruins(atlas: PixelAtlas, color: Color, radius: float) -> ArrayMesh:
-	# 塔废墟：比原塔矮一半的断柱 + 塌落的石砖 + 倒下的旗杆和破旗。
+static func tower_ruins(atlas: PixelAtlas, color: Color, radius: float, team: int) -> ArrayMesh:
+	# 蘑菇塔废墟：断裂菌柄 + 倒地碎菌盖 + 散落白斑与碎石。
 	var boxes: Array = []
-	var stone := Color(0.90, 0.90, 0.90)
-	_b(boxes, Vector3(0, 0, 0), Vector3(radius * 2.35, 8, radius * 2.35), "stone", Color(0.82, 0.82, 0.82))
-	_b(boxes, Vector3(-radius * 0.30, 8, radius * 0.12), Vector3(radius * 1.30, 28, radius * 1.12),
-		"stone_brick", stone)
-	_b(boxes, Vector3(radius * 0.48, 8, -radius * 0.22), Vector3(radius * 0.82, 42, radius * 0.78),
-		"stone_brick", _darker(stone, 0.92))
-	_b(boxes, Vector3(-radius * 0.08, 36, -radius * 0.15), Vector3(radius * 0.62, 12, radius * 0.55),
-		"stone_brick", _lighter(stone, 0.05))
-	# 断口碎石
-	_b(boxes, Vector3(radius * 0.52, 50, -radius * 0.2), Vector3(11, 9, 11), "stone", _darker(stone, 0.85))
-	_b(boxes, Vector3(-radius * 0.45, 32, radius * 0.4), Vector3(9, 7, 9), "stone", _darker(stone, 0.8))
-	# 塌落的木顶
-	_b(boxes, Vector3(radius * 0.85, 3, radius * 0.35), Vector3(radius * 1.15, 5, radius * 0.85),
-		"planks", Color(0.82, 0.82, 0.82))
-	# 倒下的旗杆
-	_b(boxes, Vector3(-radius * 0.15, 8, radius * 1.15), Vector3(radius * 2.0, 5, 5),
-		"log_side", Color(0.85, 0.85, 0.85))
-	# 挂在断柱上的破旗
-	_b(boxes, Vector3(radius * 0.62, 24, -radius * 0.62), Vector3(4, 16, radius * 0.72), "flag", color)
-	# 周围散落碎石
-	for i in range(5):
-		var ang := float(i) * 1.26
-		var rx := cos(ang) * radius * 1.55
-		var rz := sin(ang) * radius * 1.35
-		_b(boxes, Vector3(rx, 0, rz), Vector3(radius * 0.26, 6 + float(i % 3) * 4.0, radius * 0.24),
-			"stone", Color(0.62, 0.62, 0.62))
+	var cap_tile := "mushroom_blue" if team == 0 else "mushroom"
+	var cap_tint := Color(0.92, 1.0, 1.0) if team == 0 else Color(1, 0.96, 0.9)
+	var stalk_tile := "planks" if team == 0 else "log_side"
+	var stalk_tint := Color(0.95, 0.94, 0.86) if team == 0 else Color(0.52, 0.32, 0.28)
+	_b(boxes, Vector3(0, 0, 0), Vector3(radius * 2.2, 8, radius * 2.2), "stone",
+		Color(0.72, 0.78, 0.78) if team == 0 else Color(0.4, 0.33, 0.31))
+	# 断裂的菌柄（高低两截）
+	_b(boxes, Vector3(-radius * 0.22, 8, radius * 0.1), Vector3(radius * 1.15, 24, radius * 0.95),
+		stalk_tile, stalk_tint)
+	_b(boxes, Vector3(radius * 0.38, 8, -radius * 0.18), Vector3(radius * 0.72, 14, radius * 0.68),
+		stalk_tile, _darker(stalk_tint, 0.88))
+	_b(boxes, Vector3(radius * 0.38, 22, -radius * 0.18), Vector3(radius * 0.52, 7, radius * 0.5),
+		stalk_tile, _lighter(stalk_tint, 0.04))
+	# 倒地的碎菌盖
+	_b(boxes, Vector3(radius * 0.95, 3, radius * 0.45), Vector3(radius * 1.5, 7, radius * 1.15),
+		cap_tile, cap_tint)
+	_b(boxes, Vector3(-radius * 0.65, 2, radius * 0.85), Vector3(radius * 0.85, 5, radius * 0.7),
+		cap_tile, _darker(cap_tint, 0.92))
+	# 散落白斑与碎石
+	for i in range(4):
+		_b(boxes, Vector3(-radius * 1.1 + float(i) * radius * 0.72, 0, radius * 1.2),
+			Vector3(7, 5, 7), "flag", Color(0.96, 0.94, 0.84))
+	for i in range(3):
+		var ang := float(i) * 1.7 + 0.5
+		_b(boxes, Vector3(cos(ang) * radius * 1.45, 0, sin(ang) * radius * 1.35),
+			Vector3(radius * 0.24, 6 + float(i % 2) * 4.0, radius * 0.22), "stone", Color(0.6, 0.6, 0.58))
+	# 残余微光
+	_b(boxes, Vector3(0, 26, 0), Vector3(8, 6, 8), "glow",
+		Color(0.7, 0.92, 1.0) if team == 0 else Color(1.0, 0.6, 0.25))
 	return VoxelModel.mesh(atlas, boxes)
 
 

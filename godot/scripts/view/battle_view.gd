@@ -291,11 +291,11 @@ func _add_structure(u) -> void:
 
 	if u.kind == sim.TOWER:
 		var mesh = _model("tower_%d" % u.team, func(): return BlockModels.tower(
-			atlas, team_c, u.radius, u.height))
+			atlas, team_c, u.radius, u.height, u.team))
 		var body := _make_instance(mesh)
 		root.add_child(body)
 		var ruin_mesh = _model("tower_ruins_%d" % u.team, func(): return BlockModels.tower_ruins(
-			atlas, team_c, u.radius))
+			atlas, team_c, u.radius, u.team))
 		var ruins := _make_instance(ruin_mesh)
 		ruins.visible = false
 		root.add_child(ruins)
@@ -632,6 +632,18 @@ func _spawn_slash(pos: Vector3, color: Color) -> void:
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node)
 	fx_items.append({"node": node, "t": 0.0, "life": 0.13, "start": 0.6, "end": 1.1})
+
+
+func play_victory(base, color: Color) -> void:
+	# 水晶破碎演出：大范围扩散环 + 多次爆点 + 方块碎块。
+	var center := Vector3(base.pos.x, base.height * 0.45, base.pos.y)
+	_spawn_ring(Vector3(base.pos.x, 6.0, base.pos.y), color, base.radius * 2.4, 1.0)
+	_spawn_burst(center, Color(1, 1, 1), 0.6)
+	_spawn_debris(center, color, 26)
+	for i in range(6):
+		var p := Vector3(base.pos.x + rng.randf_range(-90.0, 90.0),
+			rng.randf_range(20.0, 110.0), base.pos.y + rng.randf_range(-90.0, 90.0))
+		_spawn_burst(p, color, 0.45)
 
 
 func _spawn_debris(pos: Vector3, color: Color, count: int) -> void:

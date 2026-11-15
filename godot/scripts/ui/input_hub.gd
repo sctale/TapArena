@@ -39,6 +39,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 	var pos := event.position
 	if event.pressed:
 		if sim.over:
+			if not hud.result_ready:
+				return
 			if hud.result_restart_rect().has_point(pos):
 				restart_requested.emit()
 			elif hud.result_home_rect().has_point(pos):

@@ -19,8 +19,8 @@ func _process(_delta: float) -> bool:
 		if main.home == null:
 			failures.append("启动后没有首页")
 		else:
-			if main.home.heroes.size() != 6:
-				failures.append("首页英雄数量不是 6")
+			if main.home.heroes.size() != 8:
+				failures.append("首页英雄数量不是 8")
 			main.home._tap(main.home.card_rect(1).get_center())
 	elif frame == 6:
 		if main.home != null:

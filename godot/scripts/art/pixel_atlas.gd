@@ -12,7 +12,7 @@ const ORDER := [
 	"grass_top", "grass_side", "dirt", "stone", "stone_brick", "sand",
 	"log_side", "log_top", "leaves", "planks", "path", "crystal",
 	"fur", "flat", "face_slime", "flag", "glow", "cloud", "mushroom", "gold",
-	"ice", "lava", "face_angry",
+	"ice", "lava", "face_angry", "mushroom_blue",
 ]
 
 var texture: ImageTexture
@@ -231,5 +231,13 @@ func _paint(tile: String, i: int) -> void:
 					_px(ox, oy, x, 11, Color("232323"))
 				else:
 					_px(ox, oy, x, 12, Color("232323"))
+		"mushroom_blue":
+			_fill(ox, oy, Color("4f9fc0"))
+			for k in range(8):
+				var cx := 2 + int(_h(k, 8, 34) * 12.0)
+				var cy := 2 + int(_h(k, 9, 35) * 12.0)
+				for y in range(2):
+					for x in range(2):
+						_px(ox, oy, cx + x, cy + y, Color("e8f8ff"))
 		_:
 			_fill(ox, oy, Color("ff00ff"))

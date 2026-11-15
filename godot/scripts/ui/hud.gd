@@ -9,6 +9,8 @@ var cam: Camera3D = null
 var input_hub = null
 var paused := false
 var sound_on := true
+var result_ready := true
+var cinematic_start_ms := 0
 var font: Font = null
 var icons = null
 
@@ -44,6 +46,8 @@ var lbl_res_stats: Label
 var lbl_res_stats2: Label
 var lbl_res_btn: Label
 var lbl_res_home: Label
+var lbl_cinematic: Label
+var lbl_cinematic_sub: Label
 var hero_labels: Dictionary = {}
 
 const PANEL_FILL := Color("2b3531")
@@ -336,6 +340,8 @@ func _make_labels() -> void:
 	lbl_res_stats2 = _mk_label(int(h * 0.023), Color(0.86, 0.96, 0.88, 0.85))
 	lbl_res_btn = _mk_label(int(h * 0.030), INK)
 	lbl_res_home = _mk_label(int(h * 0.028), CREAM)
+	lbl_cinematic = _mk_label(int(h * 0.065), GOLD)
+	lbl_cinematic_sub = _mk_label(int(h * 0.026), Color(1, 0.96, 0.86, 0.85))
 
 
 func _set_label(l: Label, text: String) -> void:
@@ -385,12 +391,14 @@ func _update_labels() -> void:
 	var p = sim.player
 
 	if p != null and show_battle:
-		var plate := Rect2(_safe().position.x + 12.0, _safe().position.y + 12.0, _safe().size.x * 0.32, h * 0.155)
-		var text_x := plate.position.x + plate.size.y * 1.02
-		var name_w := plate.end.x - text_x - 10.0
-		_place(lbl_plate_name, Rect2(text_x, plate.position.y + plate.size.y * 0.05, name_w, plate.size.y * 0.34))
+		var plate := _plate_rect(_safe(), h)
+		var av := plate.size.y - 16.0
+		var text_x := plate.position.x + av + 16.0
+		var name_w := plate.end.x - text_x - 12.0
+		var chip := _ult_chip_rect(plate)
+		_place(lbl_plate_name, Rect2(text_x, plate.position.y + 4.0, name_w, plate.size.y * 0.30))
 		_set_label(lbl_plate_name, "%s · %s" % [str(p.def.get("name", "?")), str(p.def.get("role", ""))])
-		_place(lbl_plate_sub, Rect2(text_x, plate.position.y + plate.size.y * 0.74, name_w, plate.size.y * 0.22))
+		_place(lbl_plate_sub, Rect2(chip.end.x + 12.0, chip.position.y, plate.end.x - chip.end.x - 24.0, chip.size.y))
 		_set_label(lbl_plate_sub, "2 级解锁大招" if p.level < 2 else "大招已解锁")
 	else:
 		lbl_plate_name.visible = false
@@ -455,13 +463,25 @@ func _update_labels() -> void:
 	else:
 		lbl_sudden.visible = false
 
+	var show_cine: bool = sim.over and not result_ready
+	if show_cine:
+		_place(lbl_cinematic, Rect2(_safe().position.x, _safe().position.y + h * 0.36,
+			_safe().size.x, h * 0.12), true)
+		_set_label(lbl_cinematic, "水晶破碎！")
+		_place(lbl_cinematic_sub, Rect2(_safe().position.x, _safe().position.y + h * 0.49,
+			_safe().size.x, h * 0.05), true)
+		_set_label(lbl_cinematic_sub, "正在结算…")
+	else:
+		lbl_cinematic.visible = false
+		lbl_cinematic_sub.visible = false
+
 	_update_panel_labels()
 
 
 func _update_panel_labels() -> void:
 	var h := _safe().size.y
 	var show_pause: bool = paused and sim != null and not sim.over
-	var show_result: bool = sim != null and sim.over
+	var show_result: bool = sim != null and sim.over and result_ready
 	for l in [lbl_pause_title, lbl_pause_goal, lbl_pause_btn1, lbl_pause_btn2, lbl_pause_btn3,
 			lbl_pause_sound, lbl_pause_foot, lbl_res_title, lbl_res_hero, lbl_res_stats,
 			lbl_res_stats2, lbl_res_btn, lbl_res_home]:
@@ -483,7 +503,7 @@ func _update_panel_labels() -> void:
 		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.66, p.size.x, h * 0.045))
 		_set_label(lbl_pause_goal, "往右走 → 拆外塔、拆内塔，再点亮水晶")
 		_place(lbl_pause_foot, Rect2(p.position.x, p.end.y - h * 0.08, p.size.x, h * 0.04))
-		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.2.2")
+		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.3.0")
 	elif show_result:
 		var p := _result_panel()
 		var win: bool = sim.winner == sim.BLUE
@@ -517,9 +537,13 @@ func _draw() -> void:
 	var safe := _safe()
 	_begin_batch()
 	if sim.over:
-		_draw_result_bg(safe)
-		_flush_batches()
-		_draw_result_icons(safe)
+		if result_ready:
+			_draw_result_bg(safe)
+			_flush_batches()
+			_draw_result_icons(safe)
+		else:
+			_draw_cinematic(safe)
+			_flush_batches()
 	elif paused:
 		_draw_pause(safe)
 		_flush_batches()
@@ -599,7 +623,7 @@ func _draw_battle_fg(safe: Rect2) -> void:
 
 
 func _plate_rect(safe: Rect2, h: float) -> Rect2:
-	return Rect2(safe.position.x + 12.0, safe.position.y + 12.0, safe.size.x * 0.32, h * 0.155)
+	return Rect2(safe.position.x + 12.0, safe.position.y + 12.0, safe.size.x * 0.34, h * 0.17)
 
 
 func _draw_player_plate_bg(safe: Rect2, h: float) -> void:
@@ -609,13 +633,13 @@ func _draw_player_plate_bg(safe: Rect2, h: float) -> void:
 	var plate := _plate_rect(safe, h)
 	_panel(plate, PANEL_FILL)
 
-	var av := plate.size.y * 0.86
-	var av_rect := Rect2(plate.position.x + 5.0, plate.position.y + (plate.size.y - av) * 0.5, av, av)
+	var av := plate.size.y - 16.0
+	var av_rect := Rect2(plate.position.x + 8.0, plate.position.y + 8.0, av, av)
 	_add_rect(Rect2(av_rect.position - Vector2(2, 2), av_rect.size + Vector2(4, 4)), PANEL_DARK)
 
-	var text_x := plate.position.x + plate.size.y * 1.02
-	var name_w := plate.end.x - text_x - 10.0
-	var hp_bar := Rect2(text_x, plate.position.y + plate.size.y * 0.40, name_w, plate.size.y * 0.26)
+	var text_x := plate.position.x + av + 16.0
+	var name_w := plate.end.x - text_x - 12.0
+	var hp_bar := Rect2(text_x, plate.position.y + plate.size.y * 0.38, name_w, plate.size.y * 0.155)
 	_add_rect(Rect2(hp_bar.position - Vector2(2, 2), hp_bar.size + Vector2(4, 4)), PANEL_DARK)
 	_add_rect(hp_bar, Color(0.10, 0.14, 0.12, 0.95))
 	var hp_k := clampf(p.hp / p.max_hp, 0.0, 1.0)
@@ -623,37 +647,43 @@ func _draw_player_plate_bg(safe: Rect2, h: float) -> void:
 	_add_rect(Rect2(hp_bar.position, Vector2(hp_bar.size.x * hp_k, hp_bar.size.y)), hp_color)
 	_add_rect(Rect2(hp_bar.position, Vector2(hp_bar.size.x, 2)), Color(1, 1, 1, 0.22))
 
-	var xp_bar := Rect2(text_x, hp_bar.end.y + 5.0, name_w, plate.size.y * 0.085)
+	var xp_bar := Rect2(text_x, hp_bar.end.y + 5.0, name_w, plate.size.y * 0.075)
 	_add_rect(xp_bar, Color(0.09, 0.12, 0.10, 0.95))
 	var xp_k := 1.0 if p.level >= 2 else clampf(p.xp / sim.xp_to_level2, 0.0, 1.0)
 	_add_rect(Rect2(xp_bar.position, Vector2(xp_bar.size.x * xp_k, xp_bar.size.y)), GOLD)
 
-	var chip := Rect2(plate.end.x - safe.size.x * 0.11 - 8.0, plate.position.y + 8.0,
-		safe.size.x * 0.11, plate.size.y * 0.40)
+	var chip := _ult_chip_rect(plate)
 	_add_rect(chip, PANEL_DEEP)
 	_add_rect(Rect2(chip.position, Vector2(chip.size.x, 2)), Color(1, 1, 1, 0.16))
 
 
+func _ult_chip_rect(plate: Rect2) -> Rect2:
+	var av := plate.size.y - 16.0
+	var text_x := plate.position.x + av + 16.0
+	var name_w := plate.end.x - text_x - 12.0
+	var y := plate.position.y + plate.size.y * 0.665
+	return Rect2(text_x, y, name_w * 0.34, plate.size.y * 0.16)
+
+
 func _draw_player_plate_fg(safe: Rect2, h: float, p) -> void:
 	var plate := _plate_rect(safe, h)
-	var av := plate.size.y * 0.86
-	var av_rect := Rect2(plate.position.x + 5.0, plate.position.y + (plate.size.y - av) * 0.5, av, av)
+	var av := plate.size.y - 16.0
+	var av_rect := Rect2(plate.position.x + 8.0, plate.position.y + 8.0, av, av)
 	var lv_s := av * 0.30
 	var lv_c := av_rect.end - Vector2(lv_s * 0.5, lv_s * 0.5)
 	_add_disc(lv_c, lv_s * 0.5, GOLD)
 	_add_disc(lv_c, lv_s * 0.5 - 2.0, PANEL_DEEP)
 	_digit(str(p.level), Vector2(lv_c.x - lv_s * 0.14, lv_c.y - lv_s * 0.30), maxf(1.0, h * 0.0028), CREAM, false)
 
-	var chip := Rect2(plate.end.x - safe.size.x * 0.11 - 8.0, plate.position.y + 8.0,
-		safe.size.x * 0.11, plate.size.y * 0.40)
+	var chip := _ult_chip_rect(plate)
 	var ult_k := 1.0 if p.level >= 2 else clampf(p.xp / sim.xp_to_level2, 0.0, 1.0)
 	var chip_icon: Texture2D = icons.tex("ui_star")
 	var ics := chip.size.y * 0.62
-	draw_texture_rect(chip_icon, Rect2(chip.position.x + 4, chip.get_center().y - ics * 0.5, ics, ics), false,
+	draw_texture_rect(chip_icon, Rect2(chip.position.x + 6, chip.get_center().y - ics * 0.5, ics, ics), false,
 		Color(1, 1, 1, 0.35 + ult_k * 0.65))
-	var num := "%d" % int(ult_k * 100.0)
-	_digit(num, Vector2(chip.position.x + ics + 8.0, chip.get_center().y - h * 0.0032 * 3.5),
-		maxf(1.0, h * 0.0032), GOLD if p.level >= 2 else Color(1, 0.95, 0.82, 0.8), false)
+	var num := "%d%%" % int(ult_k * 100.0)
+	_digit(num, Vector2(chip.position.x + ics + 12.0, chip.get_center().y - h * 0.0034 * 3.5),
+		maxf(1.0, h * 0.0034), GOLD if p.level >= 2 else Color(1, 0.95, 0.82, 0.85), false)
 
 
 func _draw_score_bg(safe: Rect2, h: float) -> void:
@@ -872,6 +902,24 @@ func _draw_pause(safe: Rect2) -> void:
 	_button(sound_rect(), Color("3a4a40"))
 	_digit_center(_time_text(sim.clock), Rect2(p.position.x, p.position.y + p.size.y * 0.595,
 		p.size.x, safe.size.y * 0.05), maxf(2.0, safe.size.y * 0.0042), CREAM)
+
+
+func _draw_cinematic(safe: Rect2) -> void:
+	_add_rect(Rect2(Vector2.ZERO, viewport_size()), Color(0.03, 0.05, 0.08, 0.55))
+	var k := clampf(float(Time.get_ticks_msec() - cinematic_start_ms) / 380.0, 0.0, 1.0)
+	if k < 1.0:
+		_add_rect(Rect2(Vector2.ZERO, viewport_size()), Color(1, 1, 1, (1.0 - k) * 0.85))
+
+
+func start_cinematic() -> void:
+	result_ready = false
+	cinematic_start_ms = Time.get_ticks_msec()
+	queue_redraw()
+
+
+func finish_cinematic() -> void:
+	result_ready = true
+	queue_redraw()
 
 
 func _draw_result_bg(safe: Rect2) -> void:
