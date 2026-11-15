@@ -15,12 +15,22 @@ static func shader() -> Shader:
 
 
 static func material_for(atlas: PixelAtlas, palette: PackedColorArray) -> ShaderMaterial:
+	return _material(atlas, palette, shader())
+
+
+static func fade_material_for(atlas: PixelAtlas, palette: PackedColorArray) -> ShaderMaterial:
+	var mat := _material(atlas, palette, load("res://shaders/voxel_fade.gdshader"))
+	mat.set_shader_parameter("fade", 1.0)
+	return mat
+
+
+static func _material(atlas: PixelAtlas, palette: PackedColorArray, shader_res: Shader) -> ShaderMaterial:
 	var img := Image.create(PALETTE_SIZE, 1, false, Image.FORMAT_RGBA8)
 	for i in range(PALETTE_SIZE):
 		img.set_pixel(i, 0, palette[i] if i < palette.size() else Color.WHITE)
 	var palette_tex := ImageTexture.create_from_image(img)
 	var mat := ShaderMaterial.new()
-	mat.shader = shader()
+	mat.shader = shader_res
 	mat.set_shader_parameter("albedo_tex", atlas.texture)
 	mat.set_shader_parameter("palette_tex", palette_tex)
 	return mat

@@ -399,7 +399,8 @@ func _update_labels() -> void:
 		_place(lbl_plate_name, Rect2(text_x, plate.position.y + 4.0, name_w, plate.size.y * 0.30))
 		_set_label(lbl_plate_name, "%s · %s" % [str(p.def.get("name", "?")), str(p.def.get("role", ""))])
 		_place(lbl_plate_sub, Rect2(chip.end.x + 12.0, chip.position.y, plate.end.x - chip.end.x - 24.0, chip.size.y))
-		_set_label(lbl_plate_sub, "2 级解锁大招" if p.level < 2 else "大招已解锁")
+		_set_label(lbl_plate_sub, "大招冷却中" if p.level >= 2 and p.cds[2] > 0.0
+			else ("2 级解锁大招" if p.level < 2 else "大招已就绪"))
 	else:
 		lbl_plate_name.visible = false
 		lbl_plate_sub.visible = false
@@ -503,7 +504,7 @@ func _update_panel_labels() -> void:
 		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.66, p.size.x, h * 0.045))
 		_set_label(lbl_pause_goal, "往右走 → 拆外塔、拆内塔，再点亮水晶")
 		_place(lbl_pause_foot, Rect2(p.position.x, p.end.y - h * 0.08, p.size.x, h * 0.04))
-		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.3.0")
+		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.3.1")
 	elif show_result:
 		var p := _result_panel()
 		var win: bool = sim.winner == sim.BLUE
@@ -618,7 +619,8 @@ func _draw_battle_fg(safe: Rect2) -> void:
 			safe.size.x * 0.32, h * 0.14)
 		_panel(box, PANEL_FILL)
 		_digit_center("%d" % maxi(1, ceili(p.respawn_t)),
-			Rect2(box.position.x, box.position.y + 6, box.size.x, box.size.y * 0.55), h * 0.010, CREAM)
+			Rect2(box.position.x, box.position.y + 6, box.size.x, box.size.y * 0.55), h * 0.010,
+			Color(1, 1, 1, 1))
 		_add_rect(Rect2(box.position.x, box.get_center().y + 4, box.size.x, 2), Color(1, 1, 1, 0.18))
 
 
@@ -682,8 +684,12 @@ func _draw_player_plate_fg(safe: Rect2, h: float, p) -> void:
 	draw_texture_rect(chip_icon, Rect2(chip.position.x + 6, chip.get_center().y - ics * 0.5, ics, ics), false,
 		Color(1, 1, 1, 0.35 + ult_k * 0.65))
 	var num := "%d%%" % int(ult_k * 100.0)
+	var num_col := GOLD if p.level >= 2 else Color(1, 0.95, 0.82, 0.85)
+	if p.level >= 2 and p.cds[2] > 0.0:
+		num = "%d" % ceili(p.cds[2])
+		num_col = Color(1, 1, 1, 1)
 	_digit(num, Vector2(chip.position.x + ics + 12.0, chip.get_center().y - h * 0.0034 * 3.5),
-		maxf(1.0, h * 0.0034), GOLD if p.level >= 2 else Color(1, 0.95, 0.82, 0.85), false)
+		maxf(1.0, h * 0.0034), num_col, false)
 
 
 func _draw_score_bg(safe: Rect2, h: float) -> void:
@@ -845,7 +851,7 @@ func _draw_skill_fg(safe: Rect2, h: float) -> void:
 			var ratio := clampf(p.cds[i] / total, 0.0, 1.0)
 			var wh := square.size.y * ratio
 			_add_rect(Rect2(square.position.x, square.end.y - wh, square.size.x, wh), Color(0, 0, 0, 0.62))
-			_digit_center("%.1f" % p.cds[i], square, maxf(2.0, h * 0.0038), Color(1, 1, 1, 0.95), true)
+			_digit_center("%.1f" % p.cds[i], square, maxf(2.0, h * 0.0038), Color(1, 1, 1, 1), true)
 
 		if locked:
 			_digit_center("2", Rect2(square.position.x, square.position.y + square.size.y * 0.36,

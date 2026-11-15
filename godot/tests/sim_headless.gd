@@ -120,7 +120,7 @@ func _init() -> void:
 
 	var rule_issues := _rule_checks()
 	if rule_issues.is_empty():
-		print("RULE_OK base_protection")
+		print("RULE_OK base_protection/base_heal/ult_cd")
 	else:
 		failures += 1
 		for issue in rule_issues:
@@ -174,5 +174,33 @@ func _rule_checks() -> Array:
 	sim2.deal_damage(sim2.base_red, 500.0, sim2.player)
 	if sim2.base_red.hp >= sd_hp:
 		issues.append("终极对决时水晶仍受保护")
+
+	# 基地回血：圈内要快，出圈立刻停止。
+	var sim3 = BattleSimScript.new()
+	sim3.setup("tiger", 0, 779)
+	var bh = sim3.player
+	bh.hp = bh.max_hp * 0.2
+	var bh0: float = bh.hp
+	for i in range(60):
+		sim3.step(1.0 / 60.0)
+	if bh.hp < bh0 + bh.max_hp * 0.10:
+		issues.append("基地内回血过慢")
+	bh.pos = Vector2(1500, 800)
+	bh.prev_pos = bh.pos
+	var bh1: float = bh.hp
+	for i in range(30):
+		sim3.step(1.0 / 60.0)
+	if bh.hp > bh1 + 1.0:
+		issues.append("离开基地后仍在回血")
+
+	# 所有英雄的大招都应立刻进入冷却。
+	for id in HERO_IDS:
+		var simu = BattleSimScript.new()
+		simu.setup(id, 0, 780)
+		simu.player.level = 2
+		simu.player.xp = simu.xp_to_level2
+		simu.try_cast(simu.player, 2)
+		if simu.player.cds[2] <= 0.0:
+			issues.append("%s 大招未立即进入冷却" % id)
 
 	return issues

@@ -145,6 +145,7 @@ var map_h: float = 1600.0
 var sudden_death_time: float = 180.0
 var match_cap: float = 285.0
 var respawn_time: float = 5.5
+var base_heal_per_sec: float = 0.15
 var wave_interval: float = 18.0
 var xp_to_level2: float = 180.0
 var xp_passive_per_sec: float = 1.0
@@ -207,6 +208,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	sudden_death_time = float(rules.get("sudden_death_time", 180))
 	match_cap = float(rules.get("match_cap", 285))
 	respawn_time = float(rules.get("respawn_time", 5.5))
+	base_heal_per_sec = float(rules.get("base_heal_per_sec", 0.15))
 	wave_interval = float(rules.get("wave_interval", 18))
 	xp_to_level2 = float(rules.get("xp_to_level2", 180))
 	xp_passive_per_sec = float(rules.get("xp_passive_per_sec", 1))
@@ -480,8 +482,11 @@ func step_unit(u, dt: float) -> void:
 
 	u.atk_timer -= dt
 
-	if u.kind == HERO and u.calm_t > 5.0 and u.hp < u.max_hp:
-		u.hp = minf(u.max_hp, u.hp + u.max_hp * 0.015 * dt)
+	# 只在自家水晶范围内快速回血；离开范围立刻停止，不做脱战持续回血。
+	if u.kind == HERO and u.hp < u.max_hp:
+		var home = base_blue if u.team == BLUE else base_red
+		if home != null and u.pos.distance_to(home.pos) <= home.radius + 90.0:
+			u.hp = minf(u.max_hp, u.hp + u.max_hp * base_heal_per_sec * dt)
 
 	if u.stun_t > 0.0:
 		u.moving = false

@@ -143,6 +143,18 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		camera_follow = false
 		cam.set_target(Vector3(1900, 0, 800))
 		cam.snap()
+	# 调试：把玩家放到蓝方内塔后方，检查建筑半透明。
+	if "--behind" in OS.get_cmdline_user_args():
+		sim.player.pos = Vector2(700, 650)
+		sim.player.prev_pos = sim.player.pos
+		camera_follow = false
+		cam.set_target(Vector3(730, 0, 720))
+		cam.snap()
+	# 调试：直接升到 2 级并释放大招，检查冷却显示。
+	if "--ult" in OS.get_cmdline_user_args():
+		sim.player.level = 2
+		sim.player.xp = sim.xp_to_level2
+		sim.try_cast(sim.player, 2)
 	if "--top" in OS.get_cmdline_user_args():
 		camera_follow = false
 		cam.frozen = true

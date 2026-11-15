@@ -4,6 +4,7 @@
   "sudden_death_time": 180,
   "match_cap": 285,
   "respawn_time": 5.5,
+  "base_heal_per_sec": 0.15,
   "wave_interval": 18,
   "xp_to_level2": 110,
   "xp_passive_per_sec": 1.8,

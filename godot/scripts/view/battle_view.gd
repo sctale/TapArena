@@ -24,6 +24,7 @@ var shot_mats: Dictionary = {}
 var alpha_mats: Dictionary = {}
 var model_cache: Dictionary = {}
 var mesh_mats: Dictionary = {}
+var fade_mats: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var sync_us_total := 0
 var sync_frames := 0
@@ -87,6 +88,16 @@ func _mesh_material(mesh: ArrayMesh) -> ShaderMaterial:
 	var palette: PackedColorArray = mesh.get_meta("palette", PackedColorArray())
 	var mat := VoxelModel.material_for(atlas, palette)
 	mesh_mats[id] = mat
+	return mat
+
+
+func _mesh_fade_material(mesh: ArrayMesh) -> ShaderMaterial:
+	var id := mesh.get_instance_id()
+	if fade_mats.has(id):
+		return fade_mats[id]
+	var palette: PackedColorArray = mesh.get_meta("palette", PackedColorArray())
+	var mat := VoxelModel.fade_material_for(atlas, palette)
+	fade_mats[id] = mat
 	return mat
 
 
@@ -299,7 +310,8 @@ func _add_structure(u) -> void:
 		var ruins := _make_instance(ruin_mesh)
 		ruins.visible = false
 		root.add_child(ruins)
-		structure_nodes[u.uid] = {"root": root, "body": body, "crystal": null, "ruins": ruins}
+		structure_nodes[u.uid] = {"root": root, "body": body, "crystal": null, "ruins": ruins, "fade": 0.0,
+			"body_mat": body.material_override, "body_fade": _mesh_fade_material(mesh)}
 	else:
 		var ped = _model("base_ped_%d" % u.team, func(): return BlockModels.base_pedestal(
 			atlas, u.radius, u.team))
@@ -315,7 +327,9 @@ func _add_structure(u) -> void:
 		var ruins := _make_instance(ruin_mesh)
 		ruins.visible = false
 		root.add_child(ruins)
-		structure_nodes[u.uid] = {"root": root, "body": ped_node, "crystal": crystal, "ruins": ruins}
+		structure_nodes[u.uid] = {"root": root, "body": ped_node, "crystal": crystal, "ruins": ruins, "fade": 0.0,
+			"body_mat": ped_node.material_override, "body_fade": _mesh_fade_material(ped),
+			"crystal_mat": crystal.material_override, "crystal_fade": _mesh_fade_material(cry)}
 
 
 func _process(delta: float) -> void:
@@ -358,6 +372,28 @@ func _sync_units(delta: float) -> void:
 						c.position.y = 40.0 + sin(Time.get_ticks_msec() * 0.002) * 5.0
 				if item["ruins"] != null:
 					item["ruins"].visible = not alive
+				# 玩家走到建筑后方时把建筑淡出，避免挡住操作角色。
+				var fade_target := 0.0
+				if alive and sim.player != null and sim.player.is_alive():
+					var pp: Vector2 = sim.render_pos(sim.player)
+					if pp.y < u.pos.y - 8.0 and absf(pp.x - u.pos.x) < u.radius * 1.7 \
+							and (u.pos.y - pp.y) < 240.0:
+						fade_target = 0.55
+				var fade: float = item.get("fade", 0.0)
+				fade = lerpf(fade, fade_target, 1.0 - exp(-10.0 * delta))
+				item["fade"] = fade
+				if item["body"] != null:
+					if fade > 0.02:
+						item["body"].material_override = item["body_fade"]
+						item["body_fade"].set_shader_parameter("fade", 1.0 - fade)
+					else:
+						item["body"].material_override = item["body_mat"]
+				if item["crystal"] != null:
+					if fade > 0.02:
+						item["crystal"].material_override = item["crystal_fade"]
+						item["crystal_fade"].set_shader_parameter("fade", 1.0 - fade)
+					else:
+						item["crystal"].material_override = item["crystal_mat"]
 
 	for uid in hero_nodes:
 		var item: Dictionary = hero_nodes[uid]
