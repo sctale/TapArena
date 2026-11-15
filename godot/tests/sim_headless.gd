@@ -79,6 +79,18 @@ func _init() -> void:
 				issues.append("英雄数值 NaN uid=%d" % u.uid)
 				break
 
+		# 结算页要显示全员战绩：结束原因与英雄输出必须有值。
+		if sim.end_reason == "":
+			issues.append("结束原因为空")
+		var total_damage := 0.0
+		for u in sim.heroes:
+			if u.damage_dealt < 0.0 or is_nan(u.damage_dealt):
+				issues.append("英雄输出异常 uid=%d" % u.uid)
+				break
+			total_damage += u.damage_dealt
+		if total_damage <= 0.0:
+			issues.append("英雄输出统计为 0")
+
 		if bypass != "":
 			issues.append(bypass)
 

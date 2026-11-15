@@ -41,9 +41,13 @@ var lbl_pause_btn3: Label
 var lbl_pause_sound: Label
 var lbl_pause_foot: Label
 var lbl_res_title: Label
-var lbl_res_hero: Label
-var lbl_res_stats: Label
-var lbl_res_stats2: Label
+var lbl_res_reason: Label
+var lbl_res_hint: Label
+var lbl_res_head_name: Label
+var lbl_res_head_k: Label
+var lbl_res_head_d: Label
+var lbl_res_head_dmg: Label
+var lbl_res_names: Array = []
 var lbl_res_btn: Label
 var lbl_res_home: Label
 var lbl_cinematic: Label
@@ -127,8 +131,14 @@ func _pause_panel() -> Rect2:
 
 func _result_panel() -> Rect2:
 	var safe := _safe()
-	return Rect2(safe.position.x + safe.size.x * 0.24, safe.position.y + safe.size.y * 0.10,
-		safe.size.x * 0.52, safe.size.y * 0.80)
+	return Rect2(safe.position.x + safe.size.x * 0.16, safe.position.y + safe.size.y * 0.075,
+		safe.size.x * 0.68, safe.size.y * 0.85)
+
+
+func _result_table_rect() -> Rect2:
+	var p := _result_panel()
+	return Rect2(p.position.x + p.size.x * 0.05, p.position.y + p.size.y * 0.285,
+		p.size.x * 0.90, p.size.y * 0.455)
 
 
 func resume_rect() -> Rect2:
@@ -162,17 +172,17 @@ func sound_rect() -> Rect2:
 func result_restart_rect() -> Rect2:
 	var safe := _safe()
 	var p := _result_panel()
-	var bw := p.size.x * 0.36
-	return Rect2(p.position.x + p.size.x * 0.12, p.position.y + p.size.y * 0.70,
-		bw, safe.size.y * 0.10)
+	var bw := p.size.x * 0.34
+	return Rect2(p.position.x + p.size.x * 0.14, p.position.y + p.size.y * 0.80,
+		bw, safe.size.y * 0.090)
 
 
 func result_home_rect() -> Rect2:
 	var safe := _safe()
 	var p := _result_panel()
-	var bw := p.size.x * 0.36
-	return Rect2(p.end.x - p.size.x * 0.12 - bw, p.position.y + p.size.y * 0.70,
-		bw, safe.size.y * 0.10)
+	var bw := p.size.x * 0.34
+	return Rect2(p.end.x - p.size.x * 0.14 - bw, p.position.y + p.size.y * 0.80,
+		bw, safe.size.y * 0.090)
 
 
 # ---- 形状批 ----
@@ -189,13 +199,15 @@ func _make_batches() -> void:
 	rect_mm.transform_format = MultiMesh.TRANSFORM_2D
 	rect_mm.use_colors = true
 	rect_mm.mesh = quad
-	rect_mm.instance_count = 900
+	# 像素数字每个亮点都是一个矩形，带描边时消耗很快；结算页 6 人 × 3 列会超过 2000，
+	# 团战时大量飘字也需要余量。
+	rect_mm.instance_count = 4096
 
 	rect_mm_fg = MultiMesh.new()
 	rect_mm_fg.transform_format = MultiMesh.TRANSFORM_2D
 	rect_mm_fg.use_colors = true
 	rect_mm_fg.mesh = quad
-	rect_mm_fg.instance_count = 900
+	rect_mm_fg.instance_count = 4096
 
 	disc_mm = MultiMesh.new()
 	disc_mm.transform_format = MultiMesh.TRANSFORM_2D
@@ -301,6 +313,16 @@ func _digit_center(text: String, r: Rect2, px: float, color: Color, outline := t
 	_digit(text, Vector2(r.get_center().x - sz.x * 0.5, r.get_center().y - sz.y * 0.5), px, color, outline)
 
 
+func _digit_mid(text: String, center_x: float, y: float, px: float, color: Color) -> void:
+	var sz: Vector2 = icons.number_size(text, px)
+	_digit(text, Vector2(center_x - sz.x * 0.5, y), px, color, true)
+
+
+func _digit_right(text: String, right_x: float, y: float, px: float, color: Color) -> void:
+	var sz: Vector2 = icons.number_size(text, px)
+	_digit(text, Vector2(right_x - sz.x, y), px, color, true)
+
+
 # ---- Label 缓存 ----
 
 func _mk_label(size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> Label:
@@ -335,9 +357,14 @@ func _make_labels() -> void:
 	lbl_pause_goal = _mk_label(int(h * 0.019), Color(1, 0.96, 0.85, 0.8))
 	lbl_pause_foot = _mk_label(int(h * 0.017), Color(1, 1, 1, 0.55))
 	lbl_res_title = _mk_label(int(h * 0.050), GOLD)
-	lbl_res_hero = _mk_label(int(h * 0.028), CREAM)
-	lbl_res_stats = _mk_label(int(h * 0.023), Color(1, 0.96, 0.86, 0.92))
-	lbl_res_stats2 = _mk_label(int(h * 0.023), Color(0.86, 0.96, 0.88, 0.85))
+	lbl_res_reason = _mk_label(int(h * 0.024), Color(1, 0.96, 0.86, 0.92))
+	lbl_res_hint = _mk_label(int(h * 0.019), Color(1, 1, 1, 0.62))
+	lbl_res_head_name = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65), HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_res_head_k = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65))
+	lbl_res_head_d = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65))
+	lbl_res_head_dmg = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65), HORIZONTAL_ALIGNMENT_RIGHT)
+	for i in range(6):
+		lbl_res_names.append(_mk_label(int(h * 0.021), CREAM, HORIZONTAL_ALIGNMENT_LEFT))
 	lbl_res_btn = _mk_label(int(h * 0.030), INK)
 	lbl_res_home = _mk_label(int(h * 0.028), CREAM)
 	lbl_cinematic = _mk_label(int(h * 0.065), GOLD)
@@ -399,7 +426,7 @@ func _update_labels() -> void:
 		_place(lbl_plate_name, Rect2(text_x, plate.position.y + 4.0, name_w, plate.size.y * 0.30))
 		_set_label(lbl_plate_name, "%s · %s" % [str(p.def.get("name", "?")), str(p.def.get("role", ""))])
 		_place(lbl_plate_sub, Rect2(chip.end.x + 12.0, chip.position.y, plate.end.x - chip.end.x - 24.0, chip.size.y))
-		_set_label(lbl_plate_sub, "大招冷却中" if p.level >= 2 and p.cds[2] > 0.0
+		_set_label(lbl_plate_sub, "大招冷却 %d 秒" % ceili(p.cds[2]) if p.level >= 2 and p.cds[2] > 0.0
 			else ("2 级解锁大招" if p.level < 2 else "大招已就绪"))
 	else:
 		lbl_plate_name.visible = false
@@ -460,7 +487,13 @@ func _update_labels() -> void:
 		var panel := _score_rect(_safe(), h)
 		_place(lbl_sudden, Rect2(_safe().position.x + w * 0.5 - w * 0.16,
 			panel.end.y + h * 0.024, w * 0.32, h * 0.032), true)
-		_set_label(lbl_sudden, "终极对决 · 水晶全开")
+		var left := maxi(0, ceili(sim.match_cap - sim.clock))
+		if left <= 60:
+			_set_label(lbl_sudden, "结算倒计时 %d:%02d" % [left / 60, left % 60])
+			lbl_sudden.add_theme_color_override("font_color", Color("ff9a7a"))
+		else:
+			_set_label(lbl_sudden, "终极对决 · 水晶全开")
+			lbl_sudden.add_theme_color_override("font_color", Color("ffd76a"))
 	else:
 		lbl_sudden.visible = false
 
@@ -484,8 +517,11 @@ func _update_panel_labels() -> void:
 	var show_pause: bool = paused and sim != null and not sim.over
 	var show_result: bool = sim != null and sim.over and result_ready
 	for l in [lbl_pause_title, lbl_pause_goal, lbl_pause_btn1, lbl_pause_btn2, lbl_pause_btn3,
-			lbl_pause_sound, lbl_pause_foot, lbl_res_title, lbl_res_hero, lbl_res_stats,
-			lbl_res_stats2, lbl_res_btn, lbl_res_home]:
+			lbl_pause_sound, lbl_pause_foot, lbl_res_title, lbl_res_reason, lbl_res_hint,
+			lbl_res_head_name, lbl_res_head_k, lbl_res_head_d, lbl_res_head_dmg,
+			lbl_res_btn, lbl_res_home]:
+		(l as Label).visible = false
+	for l in lbl_res_names:
 		(l as Label).visible = false
 
 	if show_pause:
@@ -508,18 +544,46 @@ func _update_panel_labels() -> void:
 	elif show_result:
 		var p := _result_panel()
 		var win: bool = sim.winner == sim.BLUE
-		_place(lbl_res_title, Rect2(p.position.x, p.position.y + p.size.y * 0.04, p.size.x, p.size.y * 0.10))
+		_place(lbl_res_title, Rect2(p.position.x, p.position.y + p.size.y * 0.02,
+			p.size.x, p.size.y * 0.095))
 		_set_label(lbl_res_title, "胜利！" if win else "差一点点！")
 		lbl_res_title.add_theme_color_override("font_color", GOLD if win else Color("ffb3a6"))
-		var pdata = sim.player
-		if pdata != null:
-			_place(lbl_res_hero, Rect2(p.position.x, p.position.y + p.size.y * 0.15, p.size.x, p.size.y * 0.05))
-			_set_label(lbl_res_hero, "%s · %s" % [str(pdata.def.get("name", "?")), str(pdata.def.get("role", ""))])
-		_place(lbl_res_stats, Rect2(p.position.x, p.position.y + p.size.y * 0.42, p.size.x, p.size.y * 0.05))
-		_set_label(lbl_res_stats, "击杀 蓝 %d : %d 红   ·   用时 %s" % [sim.score_blue, sim.score_red, _time_text(sim.clock)])
-		if pdata != null:
-			_place(lbl_res_stats2, Rect2(p.position.x, p.position.y + p.size.y * 0.48, p.size.x, p.size.y * 0.05))
-			_set_label(lbl_res_stats2, "你击败了 %d 位，倒下 %d 次" % [pdata.kills, pdata.deaths])
+		_place(lbl_res_reason, Rect2(p.position.x, p.position.y + p.size.y * 0.105,
+			p.size.x, p.size.y * 0.055))
+		_set_label(lbl_res_reason, sim.end_reason if not sim.end_reason.is_empty() else "水晶被摧毁")
+		_place(lbl_res_hint, Rect2(p.position.x, p.position.y + p.size.y * 0.75,
+			p.size.x, p.size.y * 0.04))
+		_set_label(lbl_res_hint, "用时 %s · 蓝队 %d : %d 红队 · 金色边框是你" %
+			[_time_text(sim.clock), sim.score_blue, sim.score_red])
+
+		var table := _result_table_rect()
+		var row_h := table.size.y / 6.0
+		var hy := p.position.y + p.size.y * 0.225
+		var hh := p.size.y * 0.045
+		var hx := table.position.x
+		var hw := table.size.x
+		_place(lbl_res_head_name, Rect2(hx + hw * 0.095, hy, hw * 0.30, hh), true)
+		_set_label(lbl_res_head_name, "英雄")
+		_place(lbl_res_head_k, Rect2(hx + hw * 0.44, hy, hw * 0.16, hh), true)
+		_set_label(lbl_res_head_k, "击杀")
+		_place(lbl_res_head_d, Rect2(hx + hw * 0.56, hy, hw * 0.16, hh), true)
+		_set_label(lbl_res_head_d, "死亡")
+		_place(lbl_res_head_dmg, Rect2(hx + hw * 0.82, hy, hw * 0.155, hh), true)
+		_set_label(lbl_res_head_dmg, "输出")
+
+		for i in range(mini(6, sim.heroes.size())):
+			var u = sim.heroes[i]
+			var l: Label = lbl_res_names[i]
+			var ry := table.position.y + row_h * float(i)
+			_place(l, Rect2(hx + hw * 0.095, ry, hw * 0.30, row_h), true)
+			var nm := str(u.def.get("name", "?"))
+			if u == sim.player:
+				_set_label(l, "%s（你）" % nm)
+				l.add_theme_color_override("font_color", GOLD)
+			else:
+				_set_label(l, ("蓝 · " if u.team == sim.BLUE else "红 · ") + nm)
+				l.add_theme_color_override("font_color",
+					Color(0.78, 0.90, 1.0) if u.team == sim.BLUE else Color(1.0, 0.80, 0.74))
 		_place(lbl_res_btn, result_restart_rect())
 		_set_label(lbl_res_btn, "再来一局")
 		_place(lbl_res_home, result_home_rect())
@@ -849,9 +913,17 @@ func _draw_skill_fg(safe: Rect2, h: float) -> void:
 		if cooling:
 			var total: float = maxf(0.01, float(s.get("cd", 1.0)))
 			var ratio := clampf(p.cds[i] / total, 0.0, 1.0)
-			var wh := square.size.y * ratio
-			_add_rect(Rect2(square.position.x, square.end.y - wh, square.size.x, wh), Color(0, 0, 0, 0.62))
-			_digit_center("%.1f" % p.cds[i], square, maxf(2.0, h * 0.0038), Color(1, 1, 1, 1), true)
+			# 成熟 MOBA 的做法：整个方格轻微压暗 + 剩余冷却的扇形遮罩，数字覆盖在中间。
+			# 扇形从 12 点方向顺时针缩短，玩家一眼能看出「还剩多少」。
+			var c := square.get_center()
+			var rad := square.size.x * 0.72
+			_add_rect(square, Color(0.02, 0.03, 0.03, 0.30))
+			_draw_cd_sweep(c, rad, ratio, Color(0.02, 0.03, 0.03, 0.66))
+			if ratio < 0.999:
+				var a_end := -PI * 0.5 + TAU * ratio
+				draw_line(c, c + Vector2(cos(a_end), sin(a_end)) * rad,
+					Color(1, 1, 1, 0.45), maxf(1.0, h * 0.0018))
+			_digit_center(str(ceili(p.cds[i])), square, maxf(2.0, h * 0.0046), Color(1, 1, 1, 1), true)
 
 		if locked:
 			_digit_center("2", Rect2(square.position.x, square.position.y + square.size.y * 0.36,
@@ -861,6 +933,22 @@ func _draw_skill_fg(safe: Rect2, h: float) -> void:
 			var glow := 0.5 + sin(Time.get_ticks_msec() * 0.004) * 0.3
 			_add_box(Rect2(square.position - Vector2(5, 5), square.size + Vector2(10, 10)),
 				Color(1.0, 0.86, 0.35, glow), 2.0)
+
+
+func _draw_cd_sweep(center: Vector2, radius: float, ratio: float, color: Color) -> void:
+	if ratio <= 0.001:
+		return
+	if ratio >= 0.999:
+		draw_circle(center, radius, color)
+		return
+	var steps := maxi(4, ceili(40.0 * ratio))
+	var pts := PackedVector2Array()
+	pts.append(center)
+	var start := -PI * 0.5
+	for k in range(steps + 1):
+		var a := start + TAU * ratio * float(k) / float(steps)
+		pts.append(center + Vector2(cos(a), sin(a)) * radius)
+	draw_colored_polygon(pts, color)
 
 
 func _square_inside(r: Rect2) -> Rect2:
@@ -929,36 +1017,59 @@ func finish_cinematic() -> void:
 
 
 func _draw_result_bg(safe: Rect2) -> void:
-	_add_rect(Rect2(Vector2.ZERO, viewport_size()), Color(0.03, 0.07, 0.06, 0.76))
+	_add_rect(Rect2(Vector2.ZERO, viewport_size()), Color(0.03, 0.07, 0.06, 0.82))
 	var p := _result_panel()
 	_panel(p, PANEL_FILL)
 
-	var hero = sim.player
-	if hero != null:
-		var av := safe.size.y * 0.15
-		var ar := Rect2(p.get_center().x - av * 0.5, p.position.y + p.size.y * 0.21, av, av)
-		_add_rect(Rect2(ar.position - Vector2(3, 3), ar.size + Vector2(6, 6)), PANEL_DARK)
+	# 6 人战绩表：按蓝队 3 人、红队 3 人排列，玩家一行用金色边框标出。
+	var table := _result_table_rect()
+	var row_h := table.size.y / 6.0
+	var dpx := maxf(2.4, safe.size.y * 0.0048)
+	var count := mini(6, sim.heroes.size())
+	_add_rect(Rect2(table.position.x, table.position.y - 8.0, table.size.x, 2), Color(1, 1, 1, 0.22))
+	for i in range(count):
+		var u = sim.heroes[i]
+		var row := Rect2(table.position.x, table.position.y + row_h * float(i),
+			table.size.x, row_h - 2.0)
+		var is_me: bool = u == sim.player
+		var fill := Color(0.20, 0.32, 0.38, 0.55) if u.team == sim.BLUE \
+			else Color(0.38, 0.24, 0.22, 0.55)
+		if is_me:
+			fill = Color(0.98, 0.80, 0.35, 0.20)
+		_add_rect(row, fill)
+		_add_rect(Rect2(row.position.x, row.position.y, 5.0, row.size.y),
+			BLUE if u.team == sim.BLUE else Color("f07a63"))
+		if is_me:
+			_add_box(row, GOLD, 2.0)
+		var ty := row.position.y + (row.size.y - 7.0 * dpx) * 0.5
+		_digit_mid(str(u.kills), table.position.x + table.size.x * 0.52, ty, dpx, CREAM)
+		_digit_mid(str(u.deaths), table.position.x + table.size.x * 0.64, ty, dpx, CREAM)
+		_digit_right(str(int(round(u.damage_dealt))), table.position.x + table.size.x * 0.975,
+			ty, dpx, GOLD if is_me else CREAM)
 
-	var r := result_restart_rect()
-	_button(r, GOLD)
+	_button(result_restart_rect(), GOLD)
 	_button(result_home_rect(), Color("4a5a50"))
 
 
-func _draw_result_icons(safe: Rect2) -> void:
-	var p := _result_panel()
-	var hero = sim.player
-	if hero != null:
-		var av := safe.size.y * 0.15
-		var ar := Rect2(p.get_center().x - av * 0.5, p.position.y + p.size.y * 0.21, av, av)
-		var portrait: Texture2D = icons.hero_portrait(hero.hero_id, hero.fur,
-			hero.def.get("cream_c", hero.fur), hero.def.get("dark_c", hero.fur), hero.accent)
+func _draw_result_icons(_safe_rect: Rect2) -> void:
+	var table := _result_table_rect()
+	var row_h := table.size.y / 6.0
+	var count := mini(6, sim.heroes.size())
+	var best = null
+	for u in sim.heroes:
+		if best == null or u.damage_dealt > best.damage_dealt:
+			best = u
+	for i in range(count):
+		var u = sim.heroes[i]
+		var ry := table.position.y + row_h * float(i)
+		var ps := row_h * 0.62
+		var ar := Rect2(table.position.x + table.size.x * 0.025,
+			ry + (row_h - 2.0 - ps) * 0.5, ps, ps)
+		if u == sim.player:
+			draw_rect(Rect2(ar.position - Vector2(3, 3), ar.size + Vector2(6, 6)), GOLD, false, 3.0)
+		var portrait: Texture2D = icons.hero_portrait(u.hero_id, u.fur,
+			u.def.get("cream_c", u.fur), u.def.get("dark_c", u.fur), u.accent)
 		draw_texture_rect(portrait, ar, false)
-
-	var stars := 3 if sim.winner == sim.BLUE else 0
-	for i in range(3):
-		var icon: Texture2D = icons.tex("ui_star")
-		var s := safe.size.y * 0.035
-		var sx := p.get_center().x - s * 1.6 + float(i) * s * 1.25
-		var sy := p.position.y + p.size.y * 0.60
-		draw_texture_rect(icon, Rect2(sx, sy, s, s), false,
-			Color(1, 1, 1, 1) if i < stars else Color(0.35, 0.38, 0.36, 0.9))
+		if u == best and u.damage_dealt > 0.0:
+			var s := ps * 0.38
+			draw_texture_rect(icons.tex("ui_star"), Rect2(ar.end.x - s * 0.7, ar.position.y - s * 0.5, s, s), false)

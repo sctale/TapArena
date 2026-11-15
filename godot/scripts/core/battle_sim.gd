@@ -45,6 +45,7 @@ class Unit:
 	var level2_time: float = -1.0
 	var kills: int = 0
 	var deaths: int = 0
+	var damage_dealt: float = 0.0
 
 	var stun_t: float = 0.0
 	var slow_t: float = 0.0
@@ -124,6 +125,10 @@ var base_red = null
 var player = null
 
 var winner: int = -1
+var end_reason: String = ""
+var warned_45 := false
+var warned_15 := false
+var final_push := false
 var clock: float = 0.0
 var wave_t: float = 0.0
 var over: bool = false
@@ -198,6 +203,10 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	started = false
 	sudden_death = false
 	winner = -1
+	end_reason = ""
+	warned_45 = false
+	warned_15 = false
+	final_push = false
 	score_blue = 0
 	score_red = 0
 	player_move = Vector2.ZERO
@@ -401,10 +410,21 @@ func step(dt: float) -> void:
 		sudden_death = true
 		banner.emit("终极对决！水晶护盾全部消失", 3.2)
 		sfx.emit("ult")
+	if not warned_45 and clock >= 240.0:
+		warned_45 = true
+		final_push = true
+		banner.emit("最后 45 秒！防御塔停火，兵线加速", 3.2)
+	if not warned_15 and clock >= 270.0:
+		warned_15 = true
+		banner.emit("最后 15 秒！", 2.4)
 
+	# 最后 45 秒兵线加速，让「终极对决」真的能打出结果，而不是干等时间到。
+	var wave_gap := wave_interval
+	if clock >= 240.0:
+		wave_gap = maxf(8.0, wave_interval * 0.5)
 	wave_t -= dt
 	if wave_t <= 0.0:
-		wave_t = wave_interval
+		wave_t = wave_gap
 		spawn_wave(BLUE)
 		spawn_wave(RED)
 
@@ -421,9 +441,9 @@ func step(dt: float) -> void:
 		var b: float = base_blue.hp / base_blue.max_hp
 		var r: float = base_red.hp / base_red.max_hp
 		if absf(b - r) < 0.01:
-			end_match(BLUE if score_blue >= score_red else RED)
+			end_match(BLUE if score_blue >= score_red else RED, "时间到 · 积分领先")
 		else:
-			end_match(BLUE if b > r else RED)
+			end_match(BLUE if b > r else RED, "时间到 · 水晶血量领先")
 		banner.emit("时间到！按水晶血量判定", 4.0)
 		return
 
@@ -767,6 +787,9 @@ func step_minion(m, dt: float) -> void:
 
 
 func step_structure(s) -> void:
+	# 最后 45 秒防御塔过载停火：双方都能真正推掉水晶，避免只靠时间到结算。
+	if final_push:
+		return
 	var target = nearest_enemy(s, s.attack_range)
 	if target == null:
 		return
@@ -908,7 +931,10 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 		target.shield -= absorb
 		amount -= absorb
 
+	var hp_damage := maxf(0.0, minf(amount, maxf(target.hp, 0.0)))
 	target.hp -= amount
+	if src != null and src.kind == HERO and target.kind == HERO and hp_damage > 0.0:
+		src.damage_dealt += hp_damage
 	if amount > 0.1:
 		target.calm_t = 0.0
 	if amount >= 1.0:
@@ -1141,9 +1167,10 @@ func separate_units() -> void:
 				move_to(b, b.pos - n * push)
 
 
-func end_match(winner_team: int) -> void:
+func end_match(winner_team: int, reason := "水晶被摧毁") -> void:
 	over = true
 	winner = winner_team
+	end_reason = reason
 	banner.emit("胜利！水晶亮起来了" if winner_team == BLUE else "水晶被点亮了…再来一局？", 6.0)
 	sfx.emit("win" if winner_team == BLUE else "lose")
 	match_ended.emit(winner_team)

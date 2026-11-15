@@ -70,6 +70,6 @@
     "max_tiers": 3,
     "respawn_cut": 0.55,
     "min_respawn": 3.8,
-    "sudden_death_structure_mul": 1.8
+    "sudden_death_structure_mul": 2.4
   }
 }

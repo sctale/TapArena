@@ -19,8 +19,9 @@ static func material_for(atlas: PixelAtlas, palette: PackedColorArray) -> Shader
 
 
 static func fade_material_for(atlas: PixelAtlas, palette: PackedColorArray) -> ShaderMaterial:
+	# 0 = 不透明；渲染层按遮挡程度逐步加大 fade（抖动裁剪）。
 	var mat := _material(atlas, palette, load("res://shaders/voxel_fade.gdshader"))
-	mat.set_shader_parameter("fade", 1.0)
+	mat.set_shader_parameter("fade", 0.0)
 	return mat
 
 

@@ -372,26 +372,26 @@ func _sync_units(delta: float) -> void:
 						c.position.y = 40.0 + sin(Time.get_ticks_msec() * 0.002) * 5.0
 				if item["ruins"] != null:
 					item["ruins"].visible = not alive
-				# 玩家走到建筑后方时把建筑淡出，避免挡住操作角色。
+				# 玩家走到建筑后方时把建筑挖空（抖动裁剪），保证角色轮廓清楚可见。
 				var fade_target := 0.0
 				if alive and sim.player != null and sim.player.is_alive():
 					var pp: Vector2 = sim.render_pos(sim.player)
-					if pp.y < u.pos.y - 8.0 and absf(pp.x - u.pos.x) < u.radius * 1.7 \
+					if pp.y < u.pos.y - 8.0 and absf(pp.x - u.pos.x) < u.radius * 1.15 \
 							and (u.pos.y - pp.y) < 240.0:
-						fade_target = 0.55
+						fade_target = 0.70
 				var fade: float = item.get("fade", 0.0)
-				fade = lerpf(fade, fade_target, 1.0 - exp(-10.0 * delta))
+				fade = lerpf(fade, fade_target, 1.0 - exp(-12.0 * delta))
 				item["fade"] = fade
 				if item["body"] != null:
 					if fade > 0.02:
 						item["body"].material_override = item["body_fade"]
-						item["body_fade"].set_shader_parameter("fade", 1.0 - fade)
+						item["body_fade"].set_shader_parameter("fade", fade)
 					else:
 						item["body"].material_override = item["body_mat"]
 				if item["crystal"] != null:
 					if fade > 0.02:
 						item["crystal"].material_override = item["crystal_fade"]
-						item["crystal_fade"].set_shader_parameter("fade", 1.0 - fade)
+						item["crystal_fade"].set_shader_parameter("fade", fade)
 					else:
 						item["crystal"].material_override = item["crystal_mat"]
 
