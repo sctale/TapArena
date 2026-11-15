@@ -78,9 +78,9 @@
     }
   },
   "hitstop": {
-    "threshold": 45,
+    "threshold": 90,
     "scale": 0.18,
-    "duration": 0.045
+    "duration": 0.040
   },
   "comeback": {
     "max_tiers": 3,

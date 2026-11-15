@@ -416,7 +416,7 @@
           "name": "竹林震地",
           "hint": "重重坐地，震晕周围敌人",
           "kind": "aoe",
-          "fx": "bamboo",
+          "fx": "bamboo_ult",
           "cd": 28,
           "dmg": 180,
           "radius": 215,

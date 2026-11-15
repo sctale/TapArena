@@ -23,6 +23,7 @@ var shot_free: Array = []
 var zone_nodes: Array = []
 var fx_items: Array = []
 var debris_items: Array = []
+var sprout_items: Array = []
 var shot_mats: Dictionary = {}
 var shot_meshes: Dictionary = {}
 var alpha_mats: Dictionary = {}
@@ -381,6 +382,7 @@ func _process(delta: float) -> void:
 	_sync_zones()
 	_step_fx(delta)
 	_step_debris(delta)
+	_step_sprouts(delta)
 	sync_us_total += Time.get_ticks_usec() - t0
 	sync_frames += 1
 	if sync_frames >= 300:
@@ -898,6 +900,8 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_stars(pos, color, 8 if style == "starfall" else 5, radius)
 		"leaf", "leafheal":
 			_spawn_leaves(pos, color, maxf(radius, 130.0))
+		"bamboo_ult":
+			_spawn_bamboo(pos, color, maxf(radius, 190.0))
 		"leafsmash", "quake", "bamboo", "spikes":
 			_spawn_ground(pos, color, maxf(radius, 150.0), style)
 		"moon", "nightfall":
@@ -969,6 +973,93 @@ func _spawn_ground(pos: Vector3, color: Color, radius: float, style: String) -> 
 			at.y = 18.0
 			_add_fx_mesh(mesh, mat, at, 0.75, 0.15, 1.25,
 				Vector3.ZERO, Vector3.ZERO, Vector3(0.2, ang, 0.15))
+
+
+func _spawn_bamboo(pos: Vector3, color: Color, radius: float) -> void:
+	# 熊猫大招「竹林震地」：一圈竹竿从地里拔起来，带竹节、竹叶和地面冲击环。
+	var ground := TorusMesh.new()
+	ground.inner_radius = radius * 0.84
+	ground.outer_radius = radius * 0.95
+	ground.rings = 32
+	ground.ring_segments = 4
+	_add_fx_mesh(ground, _fx_mat(Color("A8E06A"), 0.85), Vector3(pos.x, 6.0, pos.z), 1.15, 0.55, 1.15)
+
+	var stalk := _fx_mat(Color("7CBF4A"), 0.98)
+	var node_mat := _fx_mat(Color("4E8C34"), 0.98)
+	var leaf := _fx_mat(Color("9BD968"), 0.96)
+	var count := 11
+	for i in range(count):
+		var ang := TAU * float(i) / float(count) + rng.randf_range(-0.10, 0.10)
+		var rr := radius * rng.randf_range(0.20, 0.88)
+		var at := pos + Vector3(cos(ang), 0.0, sin(ang)) * rr
+		_make_bamboo(at, rng.randf_range(120.0, 190.0), rng.randf_range(12.0, 17.0),
+			stalk, node_mat, leaf, float(i) * 0.035, ang)
+
+
+func _make_bamboo(base: Vector3, tall: float, thick: float, stalk: Material, node_mat: Material,
+		leaf: Material, delay: float, ang: float) -> void:
+	# 根节点贴地，整体按 Y 轴拉伸，看起来就是从土里长出来。
+	var root := Node3D.new()
+	root.position = base
+	root.rotation.y = ang
+	add_child(root)
+	var seg_h := tall / 3.0
+	for s in range(3):
+		var seg := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(thick, seg_h * 0.93, thick)
+		seg.mesh = box
+		seg.position = Vector3(0.0, seg_h * (float(s) + 0.5), 0.0)
+		seg.material_override = stalk if s % 2 == 0 else node_mat
+		seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(seg)
+	for s in range(2):
+		var ring := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(thick * 1.28, thick * 0.22, thick * 1.28)
+		ring.mesh = box
+		ring.position = Vector3(0.0, seg_h * float(s + 1), 0.0)
+		ring.material_override = node_mat
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(ring)
+	for l in range(4):
+		var lf := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(7.0, 3.0, 30.0)
+		lf.mesh = box
+		lf.position = Vector3(cos(TAU * float(l) / 4.0) * 16.0, tall - 14.0 + float(l % 2) * 12.0,
+			sin(TAU * float(l) / 4.0) * 16.0)
+		lf.rotation = Vector3(0.22, TAU * float(l) / 4.0, 0.30)
+		lf.material_override = leaf
+		lf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(lf)
+	root.visible = false
+	sprout_items.append({"node": root, "t": -delay, "grow": 0.16, "hold": 0.75, "fade": 0.30})
+
+
+func _step_sprouts(delta: float) -> void:
+	for i in range(sprout_items.size() - 1, -1, -1):
+		var item: Dictionary = sprout_items[i]
+		item["t"] = float(item["t"]) + delta
+		var node: Node3D = item["node"]
+		var t: float = float(item["t"])
+		if t < 0.0:
+			continue
+		node.visible = true
+		var grow: float = float(item["grow"])
+		var hold_end: float = grow + float(item["hold"])
+		var total: float = hold_end + float(item["fade"])
+		if t >= total:
+			node.queue_free()
+			sprout_items.remove_at(i)
+			continue
+		var k := 1.0
+		if t < grow:
+			var g := t / grow
+			k = 1.0 - pow(1.0 - g, 3.0)
+		elif t > hold_end:
+			k = 1.0 - (t - hold_end) / float(item["fade"])
+		node.scale = Vector3(1.0, maxf(0.04, k), 1.0)
 
 
 func _spawn_moon(pos: Vector3, color: Color, radius: float) -> void:

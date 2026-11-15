@@ -284,6 +284,33 @@ func _rule_checks() -> Array:
 		if not sim7.boss.is_alive() or sim7.boss.hp < sim7.boss.max_hp:
 			issues.append("峡谷巨兽 25 秒后没有复活")
 
+	# 技能最高优先级：移动过程中按技能当帧生效；位移期间不触发顿帧。
+	var sim8 = BattleSimScript.new()
+	sim8.setup("panda", 0, 785)
+	var p8 = sim8.player
+	var stop_count: Array = [0]
+	sim8.hitstop.connect(func(_s): stop_count[0] += 1)
+	p8.prev_pos = p8.pos
+	sim8.player_move = Vector2(1, 0)
+	sim8.set_skill(0)
+	var before_x: float = p8.pos.x
+	sim8.step_hero(p8, 0.0167)
+	if p8.cds[0] <= 0.0:
+		issues.append("移动中的技能输入被丢弃")
+	if p8.pos.x < before_x + 150.0:
+		issues.append("技能没有在移动当帧释放")
+	if p8.dash_t <= 0.0:
+		issues.append("位移后没有记录位移状态")
+	stop_count[0] = 0
+	var dummy = sim8.heroes[3]
+	sim8.hit_with_fx(dummy, 120.0, p8)
+	if stop_count[0] != 0:
+		issues.append("位移期间触发了顿帧")
+	p8.dash_t = 0.0
+	sim8.hit_with_fx(dummy, 120.0, p8)
+	if stop_count[0] != 1:
+		issues.append("位移结束后没有恢复顿帧")
+
 	# 所有英雄的大招都应立刻进入冷却。
 	for id in HERO_IDS:
 		var simu = BattleSimScript.new()

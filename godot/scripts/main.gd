@@ -33,6 +33,7 @@ var sim_frames := 0
 var sim_acc := 0.0
 var camera_follow := true
 var auto_run := false
+var dash_auto := false
 var cinematic := false
 var cinematic_until_ms := 0
 var cinematic_flash_until_ms := 0
@@ -132,6 +133,8 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	# 调试：`-- --look-base` 把镜头固定在蓝方基地，用于核对素材颜色。
 	camera_follow = true
 	auto_run = "--auto-run" in OS.get_cmdline_user_args()
+	# 调试：移动中不断放 1 技能，检查位移手感和镜头跟随。
+	dash_auto = "--dash" in OS.get_cmdline_user_args()
 	if "--look-base" in OS.get_cmdline_user_args():
 		camera_follow = false
 		cam.set_target(Vector3(230, 0, 800))
@@ -248,6 +251,8 @@ func _process(delta: float) -> void:
 	if not paused:
 		if auto_run and sim.player != null:
 			sim.player_move = Vector2(1, 0)
+			if dash_auto and sim.player.cds[0] <= 0.0:
+				sim.set_skill(0)
 		var t0 := Time.get_ticks_usec()
 		sim_acc += delta
 		var steps := 0

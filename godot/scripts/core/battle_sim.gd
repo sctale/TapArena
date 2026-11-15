@@ -51,6 +51,7 @@ class Unit:
 	var stun_t: float = 0.0
 	var slow_t: float = 0.0
 	var invuln_t: float = 0.0
+	var dash_t: float = 0.0
 	var hurt_t: float = 0.0
 	var shield: float = 0.0
 	var shield_t: float = 0.0
@@ -651,6 +652,7 @@ func step_unit(u, dt: float) -> void:
 	u.stun_t = maxf(0.0, u.stun_t - dt)
 	u.slow_t = maxf(0.0, u.slow_t - dt)
 	u.invuln_t = maxf(0.0, u.invuln_t - dt)
+	u.dash_t = maxf(0.0, u.dash_t - dt)
 	u.shield_t = maxf(0.0, u.shield_t - dt)
 	u.thorn_t = maxf(0.0, u.thorn_t - dt)
 	if u.shield_t <= 0.0:
@@ -697,6 +699,12 @@ func step_unit(u, dt: float) -> void:
 
 func step_hero(h, dt: float) -> void:
 	if h.is_player:
+		# 技能最高优先级：先消费技能输入，再处理移动，保证一边跑一边放技能不丢输入，
+		# 位移技能也能用当帧的摇杆方向。
+		for i in range(3):
+			if skill_pressed[i]:
+				skill_pressed[i] = false
+				try_cast(h, i)
 		var dir: Vector2 = player_move
 		h.moving = dir.length() > 0.1
 		if h.moving:
@@ -706,10 +714,6 @@ func step_hero(h, dt: float) -> void:
 			var speed_k := 0.55 if h.slow_t > 0.0 else 1.0
 			move_to(h, h.pos + dir * (h.move_speed * speed_k * dt))
 			h.walk_t += dt
-		for i in range(3):
-			if skill_pressed[i]:
-				skill_pressed[i] = false
-				try_cast(h, i)
 	else:
 		step_hero_ai(h, dt)
 
@@ -1097,7 +1101,7 @@ func hit_with_fx(target, amount: float, src, stun := 0.0, col = null) -> void:
 	if src != null and src.kind == HERO:
 		hit_key = "hit_" + src.hero_id
 	sfx.emit(hit_key)
-	if src != null and src.is_player and amount >= hitstop_threshold:
+	if src != null and src.is_player and src.dash_t <= 0.0 and amount >= hitstop_threshold:
 		hitstop.emit(hitstop_duration)
 
 
@@ -1481,6 +1485,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 				dash_to = clamp_to_front(h, dash_to)
 			move_to(h, dash_to)
 			h.invuln_t = maxf(h.invuln_t, 0.12)
+			# 位移期间不触发顿帧，否则瞬移瞬间会明显卡一下。
+			h.dash_t = maxf(h.dash_t, 0.25)
 			fx.emit("burst", Vector3(dash_from.x, 24.0, dash_from.y), color, 0.0)
 			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
 			fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
