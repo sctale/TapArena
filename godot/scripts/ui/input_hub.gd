@@ -4,6 +4,8 @@ extends Node
 # 触屏摇杆 + 三技能键 + 键盘调试。触屏用原生多点事件，摇杆和技能可以同时按。
 signal pause_toggle
 signal restart_requested
+signal home_requested
+signal sound_toggle
 
 var sim = null
 var hud = null
@@ -39,12 +41,18 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		if sim.over:
 			if hud.result_restart_rect().has_point(pos):
 				restart_requested.emit()
+			elif hud.result_home_rect().has_point(pos):
+				home_requested.emit()
 			return
 		if hud.paused:
 			if hud.resume_rect().has_point(pos):
 				pause_toggle.emit()
 			elif hud.restart_rect().has_point(pos):
 				restart_requested.emit()
+			elif hud.home_rect().has_point(pos):
+				home_requested.emit()
+			elif hud.sound_rect().has_point(pos):
+				sound_toggle.emit()
 			return
 		if hud.pause_rect().has_point(pos):
 			pause_toggle.emit()
@@ -73,16 +81,25 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 	if d.length() > joy_radius:
 		d = d.normalized() * joy_radius
 	joy_knob = joy_center + d
-	move = Vector2(d.x, -d.y) / joy_radius
+	# 相机在角色南侧朝北看：屏幕向上 = 世界 -Z，屏幕向右 = 世界 +X。
+	move = d / joy_radius
 
 
 func _handle_key(keycode: int) -> void:
 	if sim.over:
 		if keycode == KEY_ENTER or keycode == KEY_KP_ENTER:
 			restart_requested.emit()
+		elif keycode == KEY_H:
+			home_requested.emit()
 		return
 	if keycode == KEY_ESCAPE:
 		pause_toggle.emit()
+		return
+	if keycode == KEY_H and hud.paused:
+		home_requested.emit()
+		return
+	if keycode == KEY_M and hud.paused:
+		sound_toggle.emit()
 		return
 	if hud.paused:
 		return
@@ -108,9 +125,9 @@ func _process(_delta: float) -> void:
 		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 			kb.x += 1.0
 		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-			kb.y += 1.0
-		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
 			kb.y -= 1.0
+		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+			kb.y += 1.0
 		if kb.length_squared() > 0.01:
 			move = kb.normalized()
 		else:

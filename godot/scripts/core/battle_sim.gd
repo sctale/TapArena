@@ -241,8 +241,9 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 
 	base_blue = make_base(BLUE, Vector2(230, 800))
 	base_red = make_base(RED, Vector2(2770, 800))
-	towers_blue.append(make_tower(BLUE, 0, Vector2(760, 800)))
-	towers_blue.append(make_tower(BLUE, 1, Vector2(1180, 800)))
+	# 外塔 = 更靠近敌方的一侧，必须先拆；内塔在水晶旁，受外塔保护。
+	towers_blue.append(make_tower(BLUE, 0, Vector2(1180, 800)))
+	towers_blue.append(make_tower(BLUE, 1, Vector2(760, 800)))
 	towers_red.append(make_tower(RED, 0, Vector2(1900, 800)))
 	towers_red.append(make_tower(RED, 1, Vector2(2320, 800)))
 
@@ -524,6 +525,13 @@ func step_hero_ai(h, dt: float) -> void:
 	if h.ai_target == null or not h.ai_target.is_alive():
 		h.ai_target = ai_target(h)
 	var t = h.ai_target
+	var front = front_structure(h.team)
+	# 锁定目标后仍可能一路追到塔后；追击途中也要受前塔限制。
+	if t != null and t != front and front != null and front.kind == TOWER and front.is_alive():
+		if (h.team == BLUE and t.pos.x > front.pos.x + 20.0) or \
+				(h.team == RED and t.pos.x < front.pos.x - 20.0):
+			h.ai_target = null
+			t = null
 
 	if think:
 		step_hero_skills(h, hp_p, retreat)
@@ -539,8 +547,11 @@ func step_hero_ai(h, dt: float) -> void:
 		return
 
 	if t == null:
-		var goal: Vector2 = lane[lane.size() - 1] if h.team == BLUE else lane[0]
-		move_ai(h, goal - h.pos, dt, 0.9)
+		# 没有近处目标时，走向「最靠前的敌方建筑」，不要直接奔向水晶。
+		if front != null and front.is_alive():
+			move_ai(h, front.pos - h.pos, dt, 0.9)
+		else:
+			h.moving = false
 		return
 
 	var to_t: Vector2 = t.pos - h.pos
@@ -548,10 +559,14 @@ func step_hero_ai(h, dt: float) -> void:
 	h.facing = 1.0 if to_t.x >= 0.0 else -1.0
 
 	if h.attack_range > 250.0:
+		var structure: bool = t.kind == TOWER or t.kind == BASE
 		if dist < h.attack_range * 0.55:
 			move_ai(h, -to_t, dt, 1.0)
 		elif dist > h.attack_range * 0.86:
 			move_ai(h, to_t, dt, 0.9)
+		elif structure:
+			# 拆塔时站定输出，别绕圈绕到水晶背后。
+			h.moving = false
 		else:
 			var side := Vector2(-to_t.y, to_t.x) * (1.0 if (h.uid % 2) == 0 else -1.0)
 			move_ai(h, side, dt, 0.35)
@@ -649,7 +664,27 @@ func count_enemies_around(h, radius: float, dot_min: float) -> int:
 	return n
 
 
+func front_structure(team: int):
+	# 敌方最靠前（离我方最近）的存活塔；两座塔都拆掉后才轮到水晶。
+	var list: Array = towers_red if team == BLUE else towers_blue
+	var best = null
+	for t in list:
+		if not t.is_alive():
+			continue
+		if best == null:
+			best = t
+		elif team == BLUE and t.pos.x < best.pos.x:
+			best = t
+		elif team == RED and t.pos.x > best.pos.x:
+			best = t
+	if best != null:
+		return best
+	return base_red if team == BLUE else base_blue
+
+
 func ai_target(h):
+	var front = front_structure(h.team)
+	var tower_alive: bool = front != null and front.kind == TOWER and front.is_alive()
 	var best = null
 	var bd := 900.0
 	for o in units:
@@ -659,8 +694,16 @@ func ai_target(h):
 			continue
 		if o.kind == BASE and is_base_protected(o):
 			continue
+		# 前塔还活着时不越过它去追英雄/小兵，否则会从塔边溜过去直扑水晶。
+		if tower_alive and o != front and (o.kind == HERO or o.kind == MINION):
+			if h.team == BLUE and o.pos.x > front.pos.x + 20.0:
+				continue
+			if h.team == RED and o.pos.x < front.pos.x - 20.0:
+				continue
 		var d: float = h.pos.distance_to(o.pos)
 		var w := d + (-40.0 if o.kind == HERO else 0.0)
+		if o == front:
+			w -= 160.0
 		if sudden_death and o.kind == BASE:
 			w -= 1200.0
 		if w < bd:
@@ -889,6 +932,8 @@ func kill(target, killer) -> void:
 	elif target.kind == TOWER:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
 		sfx.emit("boom")
+		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
+			_team_color(target.team), target.radius)
 		for a in heroes:
 			if a.is_alive() and a.team != target.team:
 				add_xp(a, xp_tower)
@@ -903,6 +948,12 @@ func kill(target, killer) -> void:
 
 	elif target.kind == BASE:
 		sfx.emit("boom")
+		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
+			_team_color(target.team), target.radius * 1.2)
+
+
+func _team_color(team: int) -> Color:
+	return Color(0.42, 0.72, 0.95) if team == BLUE else Color(0.92, 0.44, 0.38)
 
 
 func add_xp(h, add: float) -> void:
@@ -1150,6 +1201,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 		"dash":
 			var dash_from: Vector2 = h.pos
 			var dash_to: Vector2 = h.pos + aim_dir * float(s.get("range", 230.0))
+			if not h.is_player:
+				dash_to = clamp_to_front(h, dash_to)
 			move_to(h, dash_to)
 			h.invuln_t = maxf(h.invuln_t, 0.12)
 			fx.emit("burst", Vector3(dash_from.x, 24.0, dash_from.y), color, 0.0)
@@ -1215,6 +1268,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 		"leap":
 			var leap_target = nearest_hero(h, float(s.get("range", 360.0)))
 			var dest: Vector2 = leap_target.pos if leap_target != null else h.pos + aim_dir * 220.0
+			if not h.is_player:
+				dest = clamp_to_front(h, dest)
 			move_to(h, dest)
 			leap_land(h, dest, s)
 		"multi":
@@ -1236,6 +1291,19 @@ func cast(h, s: Dictionary, index: int) -> void:
 					"heal_pct": float(s.get("heal_pct", 0.0)),
 					"color": color,
 				})
+
+
+func clamp_to_front(h, dest: Vector2) -> Vector2:
+	# AI 的位移技能不能把它送过敌方前塔，否则会绕过塔直扑水晶。
+	var front = front_structure(h.team)
+	if front == null or front.kind != TOWER or not front.is_alive():
+		return dest
+	var keep: float = float(h.radius) + 18.0
+	if h.team == BLUE:
+		dest.x = minf(dest.x, front.pos.x - keep)
+	else:
+		dest.x = maxf(dest.x, front.pos.x + keep)
+	return dest
 
 
 func make_zone(pos: Vector2, radius: float, life: float, slow: float, team: int, color: Color):

@@ -23,10 +23,39 @@ func _init() -> void:
 
 		var elapsed := 0.0
 		var steps := 0
+		var red_outer_down := false
+		var red_inner_down := false
+		var bypass := ""
+		var lane_check := 0.0
 		while not sim.over and elapsed < MAX_SIM_SECONDS:
 			sim.step(DT)
 			elapsed += DT
 			steps += 1
+
+			# 建筑顺序：外塔 → 内塔 → 水晶。终极对决会主动解除保护，不在此列。
+			if not sim.sudden_death:
+				if not sim.towers_red[0].is_alive():
+					red_outer_down = true
+				if not sim.towers_red[1].is_alive():
+					if not red_outer_down:
+						bypass = "红方内塔先于外塔被拆"
+					red_inner_down = true
+				if sim.base_red.hp < sim.base_red.max_hp and not red_inner_down and bypass == "":
+					bypass = "红方双塔未拆完水晶就掉血"
+
+			# 前塔存活时，AI 英雄不能跑到敌方水晶脚下罚站。
+			lane_check += DT
+			if lane_check >= 1.0:
+				lane_check = 0.0
+				for h in sim.heroes:
+					if not h.is_alive() or h.is_player or bypass != "":
+						continue
+					if h.team == BattleSimScript.BLUE and sim.is_base_protected(sim.base_red):
+						if h.pos.distance_to(sim.base_red.pos) < 260.0:
+							bypass = "蓝方英雄在水晶护盾期贴脸 x=%.0f" % h.pos.x
+					if h.team == BattleSimScript.RED and sim.is_base_protected(sim.base_blue):
+						if h.pos.distance_to(sim.base_blue.pos) < 260.0:
+							bypass = "红方英雄在水晶护盾期贴脸 x=%.0f" % h.pos.x
 
 		var issues: Array = []
 		if not sim.over:
@@ -49,6 +78,9 @@ func _init() -> void:
 			if is_nan(u.pos.x) or is_nan(u.pos.y) or is_nan(u.hp):
 				issues.append("英雄数值 NaN uid=%d" % u.uid)
 				break
+
+		if bypass != "":
+			issues.append(bypass)
 
 		# 非终极对决阶段：水晶被打碎前，必须已经拆掉对方两座塔
 		if sim.clock < sim.sudden_death_time:
@@ -106,6 +138,11 @@ func _rule_checks() -> Array:
 	var issues: Array = []
 	var sim = BattleSimScript.new()
 	sim.setup("tiger", 0, 777)
+
+	if sim.front_structure(sim.BLUE) != sim.towers_red[0]:
+		issues.append("蓝方推进目标不是红方外塔")
+	if sim.front_structure(sim.RED) != sim.towers_blue[0]:
+		issues.append("红方推进目标不是蓝方外塔")
 
 	var base_hp: float = sim.base_red.hp
 	sim.deal_damage(sim.base_red, 9999.0, sim.player)

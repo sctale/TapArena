@@ -19,6 +19,7 @@ var shot_nodes: Dictionary = {}
 var shot_free: Array = []
 var zone_nodes: Array = []
 var fx_items: Array = []
+var debris_items: Array = []
 var shot_mats: Dictionary = {}
 var alpha_mats: Dictionary = {}
 var model_cache: Dictionary = {}
@@ -248,10 +249,22 @@ func _add_hero(u) -> void:
 	root.name = "Hero_%d" % u.uid
 	add_child(root)
 
-	var mesh = _model("hero_" + u.hero_id, func(): return BlockModels.hero(
+	var parts: Dictionary = _model("hero_parts_" + u.hero_id, func(): return BlockModels.hero_parts(
 		u.hero_id, atlas, u.fur, u.def.get("cream_c", u.fur), u.def.get("dark_c", u.fur), u.accent))
-	var body := _make_instance(mesh)
+	var meshes: Dictionary = parts["mesh"]
+	var pivots: Dictionary = parts["pivots"]
+
+	var body := _make_instance(meshes["body"])
 	root.add_child(body)
+
+	var limbs := {}
+	for key in ["head", "arm_l", "arm_r", "leg_l", "leg_r", "tail"]:
+		var pivot := Node3D.new()
+		pivot.name = key
+		pivot.position = pivots[key]
+		pivot.add_child(_make_instance(meshes[key]))
+		root.add_child(pivot)
+		limbs[key] = pivot
 
 	var ring = _model("ring_%d_%d" % [int(u.radius), u.team], func(): return BlockModels.ground_ring(
 		atlas, u.radius * 1.18, _team_color(u.team)))
@@ -260,7 +273,7 @@ func _add_hero(u) -> void:
 
 	var s := _hero_scale(u)
 	root.scale = Vector3(s, s, s)
-	hero_nodes[u.uid] = {"root": root, "body": body, "scale": s}
+	hero_nodes[u.uid] = {"root": root, "body": body, "limbs": limbs, "scale": s}
 
 
 func _add_minion(u) -> void:
@@ -307,6 +320,7 @@ func _process(delta: float) -> void:
 	_sync_shots()
 	_sync_zones()
 	_step_fx(delta)
+	_step_debris(delta)
 	sync_us_total += Time.get_ticks_usec() - t0
 	sync_frames += 1
 	if sync_frames >= 300:
@@ -361,17 +375,79 @@ func _sync_hero(u) -> void:
 	# 侧视相机下给 20° 偏航，露出动物脸和涂装。
 	var yaw := PI * 0.5 - 0.34
 	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
-	var bob := absf(sin(u.walk_t * 7.0)) * (4.0 if u.moving else 0.0)
+	var bob := absf(sin(u.walk_t * 9.0)) * (4.0 if u.moving else 0.0)
 	root.position.y = bob
 	var sxz := 1.0
 	var sy := 1.0
 	if u.atk_anim > 0.0:
 		var k: float = 1.0 - u.atk_anim / 0.34
-		sxz = 1.0 + sin(k * PI) * 0.10
-		sy = 1.0 - sin(k * PI) * 0.07
+		sxz = 1.0 + sin(k * PI) * 0.08
+		sy = 1.0 - sin(k * PI) * 0.06
 	if u.hurt_anim > 0.0:
-		sxz = 0.92
+		sxz = 0.94
 	root.scale = Vector3(s * sxz, s * sy, s * sxz)
+
+	var limbs: Dictionary = item["limbs"]
+	var now := Time.get_ticks_msec() * 0.001
+	var phase := now + float(u.uid) * 0.7
+	var swing := sin(u.walk_t * 9.0) if u.moving else 0.0
+
+	# 腿：走路前后摆；待机时轻微屈膝。
+	var leg_l: Node3D = limbs["leg_l"]
+	var leg_r: Node3D = limbs["leg_r"]
+	leg_l.rotation.x = swing * 0.72
+	leg_r.rotation.x = -swing * 0.72
+
+	# 手臂：先铺走路摆臂 + 待机呼吸，再叠加攻击/施法姿势。
+	var idle := sin(phase * 2.2) * 0.05
+	var arm_l: Node3D = limbs["arm_l"]
+	var arm_r: Node3D = limbs["arm_r"]
+	var arm_l_x := -swing * 0.58 + idle
+	var arm_r_x := swing * 0.58 - idle
+	var arm_l_z := 0.06 + sin(phase * 1.7) * 0.03
+	var arm_r_z := -arm_l_z
+
+	if u.atk_anim > 0.0:
+		var k: float = 1.0 - u.atk_anim / 0.34
+		var punch := sin(k * PI)
+		if u.attack_range > 250.0:
+			# 远程：双手前推。
+			arm_l_x = -1.25 * punch
+			arm_r_x = -1.25 * punch
+		else:
+			# 近战：右手抡爪，左手后撤。
+			arm_r_x = -2.15 * punch
+			arm_r_z = -0.35 * punch
+			arm_l_x = 0.35 * punch
+
+	if u.cast_anim > 0.0:
+		var ck: float = 1.0 - u.cast_anim / 0.5
+		var raise := sin(ck * PI)
+		arm_l_x = -2.35 * raise
+		arm_r_x = -2.35 * raise
+		arm_l_z = 0.3 * raise
+		arm_r_z = -0.3 * raise
+
+	arm_l.rotation.x = arm_l_x
+	arm_r.rotation.x = arm_r_x
+	arm_l.rotation.z = arm_l_z
+	arm_r.rotation.z = arm_r_z
+
+	# 头：走路点头 + 受击后仰 + 施法抬下巴。
+	var head: Node3D = limbs["head"]
+	var head_x := sin(u.walk_t * 9.0) * 0.045 * (1.0 if u.moving else 0.0)
+	head_x += sin(phase * 2.0) * 0.02
+	if u.hurt_anim > 0.0:
+		head_x -= 0.28
+	if u.cast_anim > 0.0:
+		head_x += 0.18
+	head.rotation.x = head_x
+	head.rotation.y = sin(phase * 0.9) * 0.10
+
+	# 尾巴：左右甩 + 走路时上下颤。
+	var tail: Node3D = limbs["tail"]
+	tail.rotation.y = sin(phase * 4.2) * (0.38 + (0.18 if u.moving else 0.0))
+	tail.rotation.x = sin(phase * 3.1) * 0.12 - swing * 0.10
 
 
 func _sync_minion(u) -> void:
@@ -490,6 +566,8 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 			_spawn_slash(pos, color)
 		"muzzle":
 			_spawn_burst(pos, color, 0.14)
+		"debris":
+			_spawn_debris(pos, color, maxi(6, int(radius / 16.0)))
 
 
 func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void:
@@ -530,6 +608,51 @@ func _spawn_slash(pos: Vector3, color: Color) -> void:
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node)
 	fx_items.append({"node": node, "t": 0.0, "life": 0.13, "start": 0.6, "end": 1.1})
+
+
+func _spawn_debris(pos: Vector3, color: Color, count: int) -> void:
+	# 建筑倒塌：方块碎块四散、落地弹跳，纯表现不影响逻辑。
+	var tint := Color(minf(1.0, color.r * 0.7 + 0.3), minf(1.0, color.g * 0.7 + 0.3),
+		minf(1.0, color.b * 0.7 + 0.3), 0.95)
+	var mat := _alpha_material(tint)
+	for i in range(count):
+		var node := MeshInstance3D.new()
+		var cube := BoxMesh.new()
+		var sz := rng.randf_range(9.0, 20.0)
+		cube.size = Vector3(sz, sz, sz)
+		node.mesh = cube
+		node.material_override = mat
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.position = pos + Vector3(rng.randf_range(-42, 42), rng.randf_range(-24, 42), rng.randf_range(-42, 42))
+		add_child(node)
+		debris_items.append({
+			"node": node,
+			"vel": Vector3(rng.randf_range(-160, 160), rng.randf_range(150, 340), rng.randf_range(-160, 160)),
+			"spin": Vector3(rng.randf_range(-7, 7), rng.randf_range(-7, 7), rng.randf_range(-7, 7)),
+			"t": 0.0,
+			"life": rng.randf_range(0.75, 1.25),
+		})
+
+
+func _step_debris(delta: float) -> void:
+	for i in range(debris_items.size() - 1, -1, -1):
+		var item: Dictionary = debris_items[i]
+		item["t"] = float(item["t"]) + delta
+		var node: MeshInstance3D = item["node"]
+		if float(item["t"]) >= float(item["life"]):
+			node.queue_free()
+			debris_items.remove_at(i)
+			continue
+		var vel: Vector3 = item["vel"]
+		vel.y -= 900.0 * delta
+		node.position += vel * delta
+		if node.position.y < 5.0:
+			node.position.y = 5.0
+			vel.y = absf(vel.y) * 0.32
+			vel.x *= 0.68
+			vel.z *= 0.68
+		item["vel"] = vel
+		node.rotation += (item["spin"] as Vector3) * delta
 
 
 func _step_fx(delta: float) -> void:

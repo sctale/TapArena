@@ -1,11 +1,13 @@
 ﻿extends Node3D
 
-# 垂直切片入口：直接进入战斗；首页/选人在 P4 接回。
+# 入口状态机：首页选人 → 战斗 → 暂停/结算 → 回首页。
 const BattleSimScript = preload("res://scripts/core/battle_sim.gd")
 const BattleViewScript = preload("res://scripts/view/battle_view.gd")
 const CameraRigScript = preload("res://scripts/view/camera_rig.gd")
 const HudScript = preload("res://scripts/ui/hud.gd")
 const InputHubScript = preload("res://scripts/ui/input_hub.gd")
+const HomeScript = preload("res://scripts/ui/home.gd")
+const SfxScript = preload("res://scripts/core/sfx.gd")
 
 const SIM_DT := 1.0 / 30.0
 
@@ -14,6 +16,9 @@ var view = null
 var cam = null
 var hud = null
 var input_hub = null
+var home = null
+var sfx = null
+var match_active := false
 
 var paused := false
 var hitstop_until_ms := 0
@@ -27,11 +32,12 @@ var sim_us_total := 0
 var sim_frames := 0
 var sim_acc := 0.0
 var camera_follow := true
+var auto_run := false
 
 
 func _ready() -> void:
 	Engine.max_fps = 60
-	DisplayServer.window_set_title("萌兽峡谷 TapArena · Godot 垂直切片")
+	DisplayServer.window_set_title("萌兽峡谷 TapArena · Godot")
 	if OS.get_name() == "Android":
 		# 3D 用 65% 分辨率渲染，HUD 仍按原生分辨率绘制；低端机优先保帧率。
 		get_viewport().scaling_3d_scale = 0.65
@@ -39,7 +45,52 @@ func _ready() -> void:
 	if win.has_signal("go_back_requested"):
 		win.go_back_requested.connect(_on_go_back_requested)
 	fps_start_ms = Time.get_ticks_msec()
-	_start_match(current_hero, current_difficulty, current_seed)
+
+	sfx = SfxScript.new()
+	sfx.name = "Sfx"
+	add_child(sfx)
+
+	var args := OS.get_cmdline_user_args()
+	if "--skip-home" in args or "--top" in args or "--no-hud" in args:
+		_start_match(current_hero, current_difficulty, current_seed)
+	else:
+		_show_home()
+
+
+func _clear_scene() -> void:
+	for child in get_children():
+		if child == sfx:
+			continue
+		remove_child(child)
+		child.queue_free()
+	sim = null
+	view = null
+	cam = null
+	hud = null
+	input_hub = null
+	home = null
+
+
+func _show_home() -> void:
+	_clear_scene()
+	match_active = false
+	paused = false
+	Engine.time_scale = 1.0
+	hitstop_until_ms = 0
+	sim_acc = 0.0
+	home = HomeScript.new()
+	add_child(home)
+	home.start_requested.connect(_on_home_start)
+	home.ui_click.connect(_on_ui_click)
+
+
+func _on_home_start(hero_id: String, difficulty: int) -> void:
+	_start_match(hero_id, difficulty, int(Time.get_ticks_msec() % 1000000))
+
+
+func _on_ui_click() -> void:
+	if sfx != null:
+		sfx.play("click")
 
 
 func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
@@ -47,17 +98,13 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	current_difficulty = difficulty
 	current_seed = seed_value
 
-	for child in get_children():
-		if child is Control:
-			child.visible = false
-		if child is Camera3D:
-			child.current = false
-		child.queue_free()
+	_clear_scene()
 
 	Engine.time_scale = 1.0
 	paused = false
 	hitstop_until_ms = 0
 	sim_acc = 0.0
+	match_active = true
 
 	sim = BattleSimScript.new()
 	sim.setup(hero_id, difficulty, seed_value)
@@ -74,6 +121,7 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 
 	# 调试：`-- --look-base` 把镜头固定在蓝方基地，用于核对素材颜色。
 	camera_follow = true
+	auto_run = "--auto-run" in OS.get_cmdline_user_args()
 	if "--look-base" in OS.get_cmdline_user_args():
 		camera_follow = false
 		cam.set_target(Vector3(230, 0, 800))
@@ -99,8 +147,12 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	input_hub.attach(sim, hud)
 	input_hub.pause_toggle.connect(_toggle_pause)
 	input_hub.restart_requested.connect(_restart)
+	input_hub.home_requested.connect(_show_home)
+	input_hub.sound_toggle.connect(_toggle_sound)
+	hud.sound_on = sfx.enabled if sfx != null else true
 
 	sim.fx.connect(_on_fx)
+	sim.sfx.connect(_on_sfx)
 	sim.hitstop.connect(_on_hitstop)
 	sim.match_ended.connect(_on_match_ended)
 	sim.banner.connect(_on_banner)
@@ -130,6 +182,8 @@ func _process(delta: float) -> void:
 		sim_frames = 0
 
 	if not paused:
+		if auto_run and sim.player != null:
+			sim.player_move = Vector2(1, 0)
 		var t0 := Time.get_ticks_usec()
 		sim_acc += delta
 		var steps := 0
@@ -192,12 +246,35 @@ func _on_fx(kind: String, _pos: Vector3, _color: Color, radius: float) -> void:
 		cam.add_shake(3.0)
 
 
+func _on_sfx(key: String) -> void:
+	if sfx != null:
+		sfx.play(key)
+	if key == "boom" and cam != null:
+		cam.add_shake(9.0)
+
+
+func _toggle_sound() -> void:
+	if sfx == null:
+		return
+	sfx.set_enabled(not sfx.enabled)
+	if hud != null:
+		hud.sound_on = sfx.enabled
+		hud.queue_redraw()
+	sfx.play("click")
+
+
 func _on_go_back_requested() -> void:
 	# 通知和 Window 信号可能同时到达，250ms 内只处理一次。
 	var now := Time.get_ticks_msec()
 	if now - last_back_ms < 250:
 		return
 	last_back_ms = now
+	if not match_active or sim == null:
+		get_tree().quit()
+		return
+	if sim.over:
+		_show_home()
+		return
 	_toggle_pause()
 
 
@@ -205,6 +282,6 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_on_go_back_requested()
 	elif what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		if sim != null and not sim.over and not paused:
+		if match_active and sim != null and not sim.over and not paused:
 			_toggle_pause()
 

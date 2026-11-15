@@ -8,6 +8,7 @@ var sim = null
 var cam: Camera3D = null
 var input_hub = null
 var paused := false
+var sound_on := true
 var font: Font = null
 var icons = null
 
@@ -34,12 +35,15 @@ var lbl_pause_title: Label
 var lbl_pause_goal: Label
 var lbl_pause_btn1: Label
 var lbl_pause_btn2: Label
+var lbl_pause_btn3: Label
+var lbl_pause_sound: Label
 var lbl_pause_foot: Label
 var lbl_res_title: Label
 var lbl_res_hero: Label
 var lbl_res_stats: Label
 var lbl_res_stats2: Label
 var lbl_res_btn: Label
+var lbl_res_home: Label
 var hero_labels: Dictionary = {}
 
 const PANEL_FILL := Color("2b3531")
@@ -126,22 +130,45 @@ func _result_panel() -> Rect2:
 func resume_rect() -> Rect2:
 	var safe := _safe()
 	var p := _pause_panel()
-	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.17,
+	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.15,
 		p.size.x * 0.68, safe.size.y * 0.095)
 
 
 func restart_rect() -> Rect2:
 	var safe := _safe()
 	var p := _pause_panel()
-	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.32,
+	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.28,
 		p.size.x * 0.68, safe.size.y * 0.085)
+
+
+func home_rect() -> Rect2:
+	var safe := _safe()
+	var p := _pause_panel()
+	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.39,
+		p.size.x * 0.68, safe.size.y * 0.085)
+
+
+func sound_rect() -> Rect2:
+	var safe := _safe()
+	var p := _pause_panel()
+	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.505,
+		p.size.x * 0.68, safe.size.y * 0.075)
 
 
 func result_restart_rect() -> Rect2:
 	var safe := _safe()
 	var p := _result_panel()
-	return Rect2(p.position.x + p.size.x * 0.16, p.position.y + p.size.y * 0.70,
-		p.size.x * 0.68, safe.size.y * 0.10)
+	var bw := p.size.x * 0.36
+	return Rect2(p.position.x + p.size.x * 0.12, p.position.y + p.size.y * 0.70,
+		bw, safe.size.y * 0.10)
+
+
+func result_home_rect() -> Rect2:
+	var safe := _safe()
+	var p := _result_panel()
+	var bw := p.size.x * 0.36
+	return Rect2(p.end.x - p.size.x * 0.12 - bw, p.position.y + p.size.y * 0.70,
+		bw, safe.size.y * 0.10)
 
 
 # ---- 形状批 ----
@@ -299,6 +326,8 @@ func _make_labels() -> void:
 	lbl_pause_title = _mk_label(int(h * 0.048), GOLD)
 	lbl_pause_btn1 = _mk_label(int(h * 0.030), INK)
 	lbl_pause_btn2 = _mk_label(int(h * 0.028), CREAM)
+	lbl_pause_btn3 = _mk_label(int(h * 0.028), CREAM)
+	lbl_pause_sound = _mk_label(int(h * 0.024), CREAM)
 	lbl_pause_goal = _mk_label(int(h * 0.019), Color(1, 0.96, 0.85, 0.8))
 	lbl_pause_foot = _mk_label(int(h * 0.017), Color(1, 1, 1, 0.55))
 	lbl_res_title = _mk_label(int(h * 0.050), GOLD)
@@ -306,6 +335,7 @@ func _make_labels() -> void:
 	lbl_res_stats = _mk_label(int(h * 0.023), Color(1, 0.96, 0.86, 0.92))
 	lbl_res_stats2 = _mk_label(int(h * 0.023), Color(0.86, 0.96, 0.88, 0.85))
 	lbl_res_btn = _mk_label(int(h * 0.030), INK)
+	lbl_res_home = _mk_label(int(h * 0.028), CREAM)
 
 
 func _set_label(l: Label, text: String) -> void:
@@ -431,22 +461,28 @@ func _update_panel_labels() -> void:
 	var h := _safe().size.y
 	var show_pause: bool = paused and sim != null and not sim.over
 	var show_result: bool = sim != null and sim.over
-	for l in [lbl_pause_title, lbl_pause_goal, lbl_pause_btn1, lbl_pause_btn2, lbl_pause_foot,
-			lbl_res_title, lbl_res_hero, lbl_res_stats, lbl_res_stats2, lbl_res_btn]:
+	for l in [lbl_pause_title, lbl_pause_goal, lbl_pause_btn1, lbl_pause_btn2, lbl_pause_btn3,
+			lbl_pause_sound, lbl_pause_foot, lbl_res_title, lbl_res_hero, lbl_res_stats,
+			lbl_res_stats2, lbl_res_btn, lbl_res_home]:
 		(l as Label).visible = false
 
 	if show_pause:
 		var p := _pause_panel()
-		_place(lbl_pause_title, Rect2(p.position.x, p.position.y + p.size.y * 0.05, p.size.x, h * 0.085))
+		_place(lbl_pause_title, Rect2(p.position.x, p.position.y + p.size.y * 0.045, p.size.x, h * 0.085))
 		_set_label(lbl_pause_title, "暂停一下")
 		_place(lbl_pause_btn1, resume_rect())
 		_set_label(lbl_pause_btn1, "继续")
 		_place(lbl_pause_btn2, restart_rect())
 		_set_label(lbl_pause_btn2, "重新开始")
-		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.56, p.size.x, h * 0.05))
-		_set_label(lbl_pause_goal, "往右走 → 拆两座蘑菇塔，再点亮水晶")
+		_place(lbl_pause_btn3, home_rect())
+		_set_label(lbl_pause_btn3, "回首页")
+		_place(lbl_pause_sound, sound_rect())
+		_set_label(lbl_pause_sound, "音效：开" if sound_on else "音效：关")
+		lbl_pause_sound.add_theme_color_override("font_color", CREAM if sound_on else Color(1, 1, 1, 0.55))
+		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.66, p.size.x, h * 0.045))
+		_set_label(lbl_pause_goal, "往右走 → 拆外塔、拆内塔，再点亮水晶")
 		_place(lbl_pause_foot, Rect2(p.position.x, p.end.y - h * 0.08, p.size.x, h * 0.04))
-		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.1.0")
+		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.2.0")
 	elif show_result:
 		var p := _result_panel()
 		var win: bool = sim.winner == sim.BLUE
@@ -464,6 +500,8 @@ func _update_panel_labels() -> void:
 			_set_label(lbl_res_stats2, "你击败了 %d 位，倒下 %d 次" % [pdata.kills, pdata.deaths])
 		_place(lbl_res_btn, result_restart_rect())
 		_set_label(lbl_res_btn, "再来一局")
+		_place(lbl_res_home, result_home_rect())
+		_set_label(lbl_res_home, "回首页")
 
 
 func _time_text(t: float) -> String:
@@ -516,6 +554,29 @@ func _draw_battle_icons(safe: Rect2) -> void:
 		draw_texture_rect(portrait, av_rect, false)
 	_draw_score_icons(safe, h)
 	_draw_skill_icons(safe, h)
+	_draw_objective(safe, h)
+
+
+func _draw_objective(safe: Rect2, h: float) -> void:
+	# 在当前要拆的敌方建筑头顶挂一颗跳动的星星，提示「先打这里」。
+	if cam == null or sim == null or sim.player == null:
+		return
+	var front = sim.front_structure(sim.BLUE)
+	if front == null or not front.is_alive():
+		return
+	var wp := Vector3(front.pos.x, front.height + 78.0, front.pos.y)
+	if cam.is_position_behind(wp):
+		return
+	var sp := cam.unproject_position(wp)
+	var s := h * 0.030
+	var pulse := 0.65 + sin(Time.get_ticks_msec() * 0.005) * 0.25
+	var diamond := PackedVector2Array([
+		sp + Vector2(0, -s), sp + Vector2(s, 0), sp + Vector2(0, s), sp + Vector2(-s, 0),
+	])
+	draw_colored_polygon(diamond, Color(0.06, 0.08, 0.07, 0.75))
+	var icon: Texture2D = icons.tex("ui_star")
+	draw_texture_rect(icon, Rect2(sp - Vector2(s, s) * 0.86, Vector2(s, s) * 1.72), false,
+		Color(1, 1, 1, pulse))
 
 
 func _draw_battle_fg(safe: Rect2) -> void:
@@ -800,12 +861,12 @@ func _draw_pause(safe: Rect2) -> void:
 	_add_rect(Rect2(Vector2.ZERO, viewport_size()), Color(0.03, 0.07, 0.06, 0.72))
 	var p := _pause_panel()
 	_panel(p, PANEL_FILL)
-	var r1 := resume_rect()
-	_button(r1, GOLD)
-	var r2 := restart_rect()
-	_button(r2, Color("4a5a50"))
-	_digit_center(_time_text(sim.clock), Rect2(p.position.x, p.position.y + p.size.y * 0.46, p.size.x, safe.size.y * 0.06),
-		maxf(2.0, safe.size.y * 0.0042), CREAM)
+	_button(resume_rect(), GOLD)
+	_button(restart_rect(), Color("4a5a50"))
+	_button(home_rect(), Color("4a5a50"))
+	_button(sound_rect(), Color("3a4a40"))
+	_digit_center(_time_text(sim.clock), Rect2(p.position.x, p.position.y + p.size.y * 0.595,
+		p.size.x, safe.size.y * 0.05), maxf(2.0, safe.size.y * 0.0042), CREAM)
 
 
 func _draw_result_bg(safe: Rect2) -> void:
@@ -821,6 +882,7 @@ func _draw_result_bg(safe: Rect2) -> void:
 
 	var r := result_restart_rect()
 	_button(r, GOLD)
+	_button(result_home_rect(), Color("4a5a50"))
 
 
 func _draw_result_icons(safe: Rect2) -> void:

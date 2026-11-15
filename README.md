@@ -8,7 +8,7 @@
 
 | 版本 | 位置 | 状态 |
 | --- | --- | --- |
-| **Godot 版（4.1.0-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：方块像素风 + 人形动物英雄 + 纯逻辑 BattleSim + 触屏双摇杆/技能 + 像素 HUD，出 Android APK |
+| **Godot 版（4.2.0-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：方块像素风 + 人形动物英雄 + 纯逻辑 BattleSim + 首页选人 + 触屏摇杆/技能 + 像素 HUD + 程序合成音效，出 Android APK |
 | Unity 版（3.2.0，冻结） | `unity/` | 历史存档，保留用于对照旧玩法与旧美术，不再维护 |
 | Web 版（1.3，冻结） | `www/`、`android/` | 历史存档，封存在 git 标签 `web-v1.3.0` |
 
@@ -86,26 +86,34 @@ unity/Assets/Shaders/
 - **动画/内存**：18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB（Idle 保留完整循环，导入 `Optimal` 压缩）；主路径不再生成 1280×683 地面贴图。
 - **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；`unity/ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 在 `.gitignore` 中，构建前用 Blender 脚本拉取。
 
-## Godot 版（4.1.0-dev.1，唯一主线）
+## Godot 版（4.2.0-dev.1，唯一主线）
 
-Godot 4.7.2 工程在 `godot/`。这一版把美术整体重做成**方块像素风**：16×16 像素图集、体素盒子模型、像素数字与像素图标；6 位英雄从四足兽改成**人形动物**，用耳朵、尾巴、面部涂装、围巾/背心/靴子体现动物特色。首页/选人、音频仍待后续阶段。
+Godot 4.7.2 工程在 `godot/`。这一版把美术整体重做成**方块像素风**：16×16 像素图集、体素盒子模型、像素数字与像素图标；6 位英雄从四足兽改成**人形动物**，用耳朵、尾巴、面部涂装、围巾/背心/靴子体现动物特色。首页选人、难度选择、程序合成音效与英雄肢体动画已接入。
 
 已实现：
 
 - **纯逻辑 `BattleSim`**（`godot/scripts/core/battle_sim.gd`）：3v3、兵线、小兵、两座塔、水晶保护、18 个技能、AI、难度、复活、经验/2 级大招、3:00 终极对决（建筑变脆）、4:45 兜底。规则不引用任何节点，可无头跑。
+- **推进路线**：外塔 → 内塔 → 水晶。AI 无目标时走向最靠前的敌方塔，追击与冲刺/跳跃不会越过前塔；前塔存活时后方建筑免疫伤害，远程英雄拆塔时站定输出而不是绕圈。
+- **首页/选人**（`scripts/ui/home.gd`）：标题、6 张英雄卡（头像/名字/定位/简介）、轻松/挑战难度、开始按钮；选人与难度会传进战斗。
+- **英雄肢体动画**：`BlockModels.hero_parts()` 把英雄拆成躯干/头/双臂/双腿/尾巴，`battle_view.gd` 按行走、攻击、施法、受击分别摆动部件；死亡/复活沿用原逻辑。
+- **程序合成音频**（`scripts/core/sfx.gd`）：不依赖音频文件，运行时合成命中/施法/爆破/大招/胜负/点击音效与一条原创芯片 BGM 循环；暂停页可开关音效。
+- **战斗反馈**：塔与水晶倒塌时方块碎块四散、镜头震屏；敌方最前塔头顶有金色星星目标标记；暂停与结算都能回首页。
 - **数据外置**：`godot/data/heroes.json`、`godot/data/rules.json`。
 - **方块美术**：`scripts/art/pixel_atlas.gd`（20 个 16×16 瓦片）、`voxel_model.gd`（盒子合并成单网格）、`block_models.gd`（人形英雄/塔/水晶/树/石头/蘑菇/路牌）。
 - **跨平台颜色方案**：模型颜色不写顶点色，而是写入每个模型自己的 1×64 调色板纹理，顶点用 UV2 索引（`shaders/voxel.gdshader`）。这样规避了 Android GLES/ANGLE 下顶点色 G/B 通道互换的问题。
 - **像素图标**：`pixel_icons.gd` 用掩膜拼形状 + 自动 1px 描边，生成 6 个人形英雄头像、11 个技能图标、6 个 UI 图标；HUD 数字用 5×7 像素字。
 - **HUD**：粗边像素面板、头像血条/经验/大招充能、比分/计时、塔位、小地图、技能方格与冷却、方块摇杆、播报、暂停、结算；安全区适配，暂停键 ≥64px。
-- **输入**：左下摇杆 + 右下三技能，支持多点触控；桌面 WASD + Q/E/R；安卓返回键与右上暂停键都能暂停。
+- **输入**：左下摇杆 + 右下三技能，支持多点触控；摇杆/键盘方向与相机一致（屏幕上 = 世界 -Z）；桌面 WASD + Q/E/R；安卓返回键与右上暂停键都能暂停。
 - **构建**：`tools/godot-build.ps1` 本地一键导入、无头回归、导出 release APK、aapt2/apksigner 校验并复制到根目录。
 
 运行与验证：
 
 ```powershell
-# 无头 10 局 + 水晶保护规则
+# 无头 10 局 + 水晶保护规则 + 建筑顺序/不越塔断言
 godot --headless --path godot --script res://tests/sim_headless.gd
+
+# 首页 → 选人 → 开战 → 暂停/音效 → 回首页 的状态机回归
+godot --headless --path godot --script res://tests/flow_headless.gd
 
 # 图标/图集预览、应用图标生成
 godot --headless --path godot --script res://tests/icon_sheet.gd
@@ -114,26 +122,30 @@ godot --headless --path godot --script res://tests/make_icon.gd
 # 桌面运行
 godot --path godot
 
+# 调试参数（写在 -- 之后）
+# --skip-home 跳过首页；--auto-run 自动向右推进（录制用）
+# --top / --look-base / --no-hud / --pause / --result 画面检查
+
 # Android release（会读取 keystore.properties，不打印密码）
 powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 ```
 
-产物：`TapArena-v4.1.0-dev.1.apk`（26,880,195 字节，versionCode 28，arm64-v8a，签名 `CN=TapArena`，SHA-256 `E162C5B8F555923C7D4F6B5F1A3DEE9C194514B568C2D46B70476CE142B940EC`，与 3.2.0 同一把 keystore，可覆盖升级）。
+产物：`TapArena-v4.2.0-dev.1.apk`（26,909,167 字节，versionCode 29，arm64-v8a，签名 `CN=TapArena`，SHA-256 `6B2FAC5E2695A86852C33D6E366798F988756DC62B322E869E25CE081B5A61B4`，与 3.2.0 同一把 keystore，可覆盖升级）。
 
-调试参数（写在 `--` 之后）：`--top` 全图俯瞰、`--look-base` 看蓝方基地、`--no-hud` 隐藏 HUD、`--pause` 直接打开暂停、`--result` 直接看结算。
+调试参数（写在 `--` 之后）：`--skip-home` 跳过首页、`--auto-run` 自动向右推进（录制用）、`--top` 全图俯瞰、`--look-base` 看蓝方基地、`--no-hud` 隐藏 HUD、`--pause` 直接打开暂停、`--result` 直接看结算。
 
 已验证：
 
-- 10 局固定种子无头对局全部在 4:45 内结束；水晶保护规则单测通过（外塔/内塔存活时水晶不掉血，双塔拆除后可破，终极对决绕过保护）；大招解锁时间 59–180 秒。
-- Android 16 模拟器（1080×1920 横屏）：安装覆盖成功，摇杆移动、技能点击/冷却、暂停/继续、返回键暂停逐项通过；Godot 日志无脚本异常。
-- 帧率：同机预热后稳定 56–60fps（`sim_ms` 约 1–3ms）；方块模型是单网格单材质，无实时阴影/雾。
+- 10 局固定种子无头对局全部在 4:45 内结束；新增“外塔先于内塔”“双塔未拆完水晶不掉血”“护盾期 AI 不贴脸水晶”断言，全部通过；水晶保护规则单测通过。
+- 首页 → 选人 → 开战 → 暂停 → 音效开关 → 回首页的状态机回归（`tests/flow_headless.gd`）通过。
+- 桌面录像逐帧检查：首页 6 卡布局、跑步摆臂摆腿、前塔头顶金色星标、暂停面板、结算“再来一局/回首页”。
+- Android 16 模拟器（2400×1080 横屏，逻辑 1600×720）：覆盖安装 versionCode 29 成功；首页显示、点击卡片选中灵灵、切换到挑战、开始冒险后进入 `hero=fox difficulty=challenge`；上拖摇杆后角色向画面上方（世界 -Z）移动；暂停面板可回首页；60fps 预热后稳定。
 - 颜色：Android 端与桌面端一致（水晶蓝、老虎橙、队环蓝），调色板着色器已规避顶点色通道问题。
-- 相机：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右；角色带 20° 偏航，侧视也能看到脸和涂装。
+- 相机：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右、向上 = 画面上方；角色带 20° 偏航，侧视也能看到脸和涂装。
 
 已知边界：
 
-- 首页、选人、换英雄未迁入；结算页“再来一局”可用。
-- 音频未接入；暂无描边/泛光等后处理。
+- 程序合成的芯片音频不是正式配乐；暂无描边/泛光等后处理。
 - `godot/export_presets.cfg` 含签名密码，已 gitignore；首次构建由脚本生成。
 
 ## 素材授权
@@ -170,16 +182,17 @@ Godot 版的方块模型、像素图集、图标与应用图标均为本项目�
 | 难度 | 首页“轻松/挑战” | 默认轻松；挑战提高 AI 主动性与敌方伤害 |
 | 暂停 | 右上角暂停键或 P / Esc | 暂停面板里可开关音效、重开、回首页 |
 
-## 安卓版
+## 安卓版（Godot 主线）
 
-安装 `TapArena-v3.2.0.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 3.2.0（versionCode 26），最低 Android 7.1（API 25），targetSdk 37。
+安装 `TapArena-v4.2.0-dev.1.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 4.2.0-dev.1（versionCode 29），最低 Android 7.0（API 24），targetSdk 36。
 
-- 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与 1.3.0 同一把 release keystore，可直接覆盖安装）
-- SHA-256：`DE656CF14DA794FC061C3F58A5552E0B1A297866E9EC4C3B222226316238711A`
-- 体积：30,409,196 字节（29.0MiB）
+- 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与历史版本同一把 release keystore，可直接覆盖安装）
+- SHA-256：`6B2FAC5E2695A86852C33D6E366798F988756DC62B322E869E25CE081B5A61B4`
+- 体积：26,909,167 字节（25.7MiB）
+- 历史存档：Unity 3.2.0 的 `TapArena-v3.2.0.apk` 仍保留在根目录，不会覆盖（versionCode 26 < 29）。
 
 - 横屏锁定；支持刘海屏；全屏沉浸式。
-- 返回键：在战斗中按下会打开暂停面板，不会直接退出；切后台/失去焦点自动暂停。
+- 返回键：战斗中按下打开暂停面板；结算页按下回首页；首页按下退出应用。
 - 数据只保存在本机（音效偏好），不联网、不上传。
 
 ## Web 存档：开发 / 构建

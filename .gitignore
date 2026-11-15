@@ -38,6 +38,7 @@ unity/walk_sheet*.jpg
 unity/frames*/
 unity/emu.log
 unity/adbtmp/
+.adbtmp/
 
 # Godot 工程：缓存、产物、含签名密码的导出预设、keystore
 godot/.godot/

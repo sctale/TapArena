@@ -17,7 +17,59 @@ static func _lighter(c: Color, k := 0.14) -> Color:
 	return Color(minf(1.0, c.r + k), minf(1.0, c.g + k), minf(1.0, c.b + k), c.a)
 
 
+const HEAD_PIVOT := Vector3(0, 56, 0)
+const ARM_L_PIVOT := Vector3(-20, 52, 0)
+const ARM_R_PIVOT := Vector3(20, 52, 0)
+const LEG_L_PIVOT := Vector3(-8, 26, 0)
+const LEG_R_PIVOT := Vector3(8, 26, 0)
+const TAIL_PIVOT := Vector3(0, 34, -12)
+
+
 static func hero(id: String, atlas: PixelAtlas, fur: Color, cream: Color, dark: Color, accent: Color) -> ArrayMesh:
+	return VoxelModel.mesh(atlas, _hero_boxes(id, fur, cream, dark, accent))
+
+
+static func hero_parts(id: String, atlas: PixelAtlas, fur: Color, cream: Color, dark: Color, accent: Color) -> Dictionary:
+	# 把英雄拆成可独立旋转的部件，供战斗表现层摆动四肢。
+	var pivots := {
+		"body": Vector3.ZERO,
+		"head": HEAD_PIVOT,
+		"arm_l": ARM_L_PIVOT,
+		"arm_r": ARM_R_PIVOT,
+		"leg_l": LEG_L_PIVOT,
+		"leg_r": LEG_R_PIVOT,
+		"tail": TAIL_PIVOT,
+	}
+	var buckets := {
+		"body": [], "head": [], "arm_l": [], "arm_r": [], "leg_l": [], "leg_r": [], "tail": [],
+	}
+	for b in _hero_boxes(id, fur, cream, dark, accent):
+		var part := _part_of(b)
+		var pivot: Vector3 = pivots[part]
+		var nb: Dictionary = b.duplicate()
+		nb["pos"] = (b["pos"] as Vector3) - pivot
+		buckets[part].append(nb)
+	var meshes := {}
+	for part in buckets:
+		meshes[part] = VoxelModel.mesh(atlas, buckets[part])
+	return {"mesh": meshes, "pivots": pivots}
+
+
+static func _part_of(b: Dictionary) -> String:
+	var pos: Vector3 = b.get("pos", Vector3.ZERO)
+	var size: Vector3 = b.get("size", Vector3.ONE)
+	if pos.z + size.z * 0.5 <= 0.0 and pos.y < 56.0:
+		return "tail"
+	if pos.y + size.y <= 27.0 and absf(pos.x) >= 1.0:
+		return "leg_l" if pos.x < 0.0 else "leg_r"
+	if absf(pos.x) >= 15.0 and pos.y < 56.0:
+		return "arm_l" if pos.x < 0.0 else "arm_r"
+	if pos.y >= 56.0:
+		return "head"
+	return "body"
+
+
+static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accent: Color) -> Array:
 	var boxes: Array = []
 	_humanoid_base(boxes, fur, cream, dark, accent)
 	match id:
@@ -62,7 +114,7 @@ static func hero(id: String, atlas: PixelAtlas, fur: Color, cream: Color, dark: 
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(9.5 * sx, 74, 0), Vector3(10, 10, 9), "fur", _darker(fur, 0.9))
 				_b(boxes, Vector3(9.5 * sx, 76, 3.8), Vector3(5, 5, 2), "flat", cream)
-				_b(boxes, Vector3(8.5 * sx, 62, 10.4), Vector3(7, 18, 2), "flat", accent)
+				_b(boxes, Vector3(8.5 * sx, 39, 10.4), Vector3(7, 18, 2), "flat", accent)
 				_b(boxes, Vector3(6.5 * sx, 68, 12.7), Vector3(5, 5, 2), "flat", dark)
 			_b(boxes, Vector3(0, 58, 12.6), Vector3(20, 11, 2), "flat", cream)
 			_b(boxes, Vector3(0, 61, 13.2), Vector3(7, 4, 2), "flat", dark)
@@ -91,7 +143,7 @@ static func hero(id: String, atlas: PixelAtlas, fur: Color, cream: Color, dark: 
 			_b(boxes, Vector3(9, 40, -26), Vector3(5, 6, 12), "fur", _darker(fur, 0.7))
 		_:
 			pass
-	return VoxelModel.mesh(atlas, boxes)
+	return boxes
 
 
 # 人形骨架：腿 / 靴 / 躯干 / 腰带 / 手臂 / 手套 / 头 / 眼 / 嘴

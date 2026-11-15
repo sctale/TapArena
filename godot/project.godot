@@ -1,12 +1,12 @@
-; 萌兽峡谷 TapArena — Godot 4.7 垂直切片工程
-; 版本号单一数据源：application/config/version；Android versionCode 在 export_presets.cfg 中固定为 27
+; 萌兽峡谷 TapArena — Godot 4.7 工程
+; 版本号单一数据源：application/config/version；Android versionCode 在 tools/godot-build.ps1 中固定为 29
 
 config_version=5
 
 [application]
 
 config/name="萌兽峡谷 TapArena"
-config/version="4.1.0-dev.1"
+config/version="4.2.0-dev.1"
 config/quit_on_go_back=false
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")

@@ -3,7 +3,7 @@
 # 流程：生成导出预设 -> 导入资产 -> 无头规则回归 -> 导出 Android release -> aapt/apksigner 校验 -> 复制根目录 APK
 
 param(
-    [int]$VersionCode = 28,
+    [int]$VersionCode = 29,
     [switch]$SkipSim
 )
 
@@ -192,6 +192,11 @@ if (-not $SkipSim) {
     $simOut = Invoke-Godot @("--headless", "--path", $Proj, "--script", "res://tests/sim_headless.gd")
     if ($simOut -notmatch "SIM_OK" -or $simOut -notmatch "RULE_OK") {
         throw "无头回归未通过：缺少 SIM_OK / RULE_OK"
+    }
+    Write-Host "==> 首页/战斗流程回归" -ForegroundColor Cyan
+    $flowOut = Invoke-Godot @("--headless", "--path", $Proj, "--script", "res://tests/flow_headless.gd")
+    if ($flowOut -notmatch "FLOW_OK") {
+        throw "首页/战斗流程回归未通过：缺少 FLOW_OK"
     }
 }
 
