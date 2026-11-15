@@ -34,8 +34,8 @@ var rng := RandomNumberGenerator.new()
 var sync_us_total := 0
 var sync_frames := 0
 
-const C_BLUE := Color(0.42, 0.72, 0.95)
-const C_RED := Color(0.92, 0.44, 0.38)
+const C_BLUE := Color("4fc3e8")
+const C_RED := Color("f0845c")
 
 
 func attach(s) -> void:
@@ -109,11 +109,20 @@ func _mesh_fade_material(mesh: ArrayMesh) -> ShaderMaterial:
 func _build_world() -> void:
 	var env_node := WorldEnvironment.new()
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("8ec9f0")
+	# 参考图的粉彩天空：顶部青蓝、地平线近白，远景不再是单一色块。
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color("79c8ec")
+	sky_mat.sky_horizon_color = Color("e6f7fd")
+	sky_mat.sky_curve = 0.15
+	sky_mat.ground_bottom_color = Color("cfeaf8")
+	sky_mat.ground_horizon_color = Color("e6f7fd")
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_energy = 1.0
-	env.ambient_light_color = Color.WHITE
+	env.ambient_light_color = Color("fff8ec")
 	env.fog_enabled = false
 	env_node.environment = env
 	add_child(env_node)
@@ -146,7 +155,7 @@ func _build_world() -> void:
 func _build_lane_curb() -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(46, 22, 46)
-	var mat := _tile_material("stone", Color(0.92, 0.92, 0.92))
+	var mat := _tile_material("stone", Color(1, 1, 1))
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
@@ -190,7 +199,7 @@ func _build_hills() -> void:
 
 
 func _build_scatter() -> void:
-	var leaf_tints := [Color("4f8f3f"), Color("3f7a33"), Color("5d9c3f")]
+	var leaf_tints := [Color("63b44a"), Color("559f3e"), Color("75c75b")]
 	for v in range(3):
 		var mesh = _model("tree_%d" % v, func(): return BlockModels.tree(atlas, v, leaf_tints[v]))
 		var mm := MultiMesh.new()

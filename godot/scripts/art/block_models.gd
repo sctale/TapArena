@@ -205,16 +205,16 @@ static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) ->
 			_b(boxes, Vector3(sx, bh + 2.0 + sh, 0), Vector3(6, 4, 6), "glow", Color("ffb36b"))
 		for sx in [-1, 1]:
 			_b(boxes, Vector3(sx * radius * 1.08, 8.0, 0), Vector3(6, radius * 0.9, radius * 1.25),
-				"stone", Color("5a3a32"))
+				"stone", Color(0.42, 0.30, 0.26))
 		# 双爪 + 脚
 		for sx in [-1, 1]:
 			_b(boxes, Vector3(sx * body * 0.62, 12, 2), Vector3(7, 14, 7), "flat", _darker(tint, 0.82))
-			_b(boxes, Vector3(sx * body * 0.66, 9, 5), Vector3(8, 4, 8), "stone", Color("3a2a26"))
-			_b(boxes, Vector3(sx * body * 0.30, 0, body * 0.24), Vector3(9, 4, 9), "stone", Color("3a2a26"))
+			_b(boxes, Vector3(sx * body * 0.66, 9, 5), Vector3(8, 4, 8), "stone", Color(0.30, 0.22, 0.20))
+			_b(boxes, Vector3(sx * body * 0.30, 0, body * 0.24), Vector3(9, 4, 9), "stone", Color(0.30, 0.22, 0.20))
 		# 背部尖刺 + 胸口熔岩核心
 		for i in range(3):
 			_b(boxes, Vector3(float(i - 1) * 9.0, 18.0 + float(i % 2) * 8.0, -body * 0.55),
-				Vector3(7, 12, 7), "stone", Color("4a2a26"))
+				Vector3(7, 12, 7), "stone", Color(0.36, 0.24, 0.22))
 		_b(boxes, Vector3(0, 9, body * 0.5 + 0.8), Vector3(9, 8, 2), "glow", Color("ff9a4a"))
 	else:
 		var body := radius * 1.85
@@ -237,8 +237,8 @@ static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) ->
 static func boss(atlas: PixelAtlas, color: Color, team: int) -> ArrayMesh:
 	# 3 分钟后出场的峡谷巨兽：石甲、金角、胸口团队色核心。
 	var boxes: Array = []
-	var stone := Color("5b5b66")
-	var dark := Color("33333c")
+	var stone := Color("8f8f9c")
+	var dark := Color("5c5c6a")
 	var glow := Color("ffd76a") if team == 0 else Color("ff8a5a")
 	for sx in [-1, 1]:
 		_b(boxes, Vector3(20.0 * sx, 4, 0), Vector3(30, 10, 36), "stone", dark)
@@ -261,8 +261,8 @@ static func boss(atlas: PixelAtlas, color: Color, team: int) -> ArrayMesh:
 	_b(boxes, Vector3(0, 94, 14.4), Vector3(18, 5, 2), "flat", dark)
 	for sx in [-1, 1]:
 		_b(boxes, Vector3(7.0 * sx, 100, 14.8), Vector3(5, 5, 2), "glow", glow)
-		_b(boxes, Vector3(12.0 * sx, 117, 0), Vector3(7, 14, 7), "gold", Color("f0c04a"))
-	_b(boxes, Vector3(0, 114, 0), Vector3(10, 10, 5), "gold", Color("f0c04a"))
+		_b(boxes, Vector3(12.0 * sx, 117, 0), Vector3(7, 14, 7), "gold", Color("f5cb55"))
+	_b(boxes, Vector3(0, 114, 0), Vector3(10, 10, 5), "gold", Color("f5cb55"))
 	# 背部尖刺
 	for i in range(3):
 		_b(boxes, Vector3(float(i - 1) * 16.0, 78.0 + float(i % 2) * 10.0, -21.0),
@@ -274,16 +274,17 @@ static func boss(atlas: PixelAtlas, color: Color, team: int) -> ArrayMesh:
 
 static func tower(atlas: PixelAtlas, color: Color, radius: float, height: float, team: int) -> ArrayMesh:
 	# 卡通蘑菇塔：粗菌柄 + 多层菌盖，蓝方月光菇、红方熔岩菇。
+	# 配色参考概念图：奶油石底座 + 阵营色菌盖 + 绿植点缀。
 	var boxes: Array = []
 	var cap_tile := "mushroom_blue" if team == 0 else "mushroom"
-	var cap_tint := Color(0.92, 1.0, 1.0) if team == 0 else Color(1, 0.96, 0.9)
+	var cap_tint := Color(0.98, 1.0, 1.0) if team == 0 else Color(1, 0.96, 0.9)
 	var stalk_tile := "ice" if team == 0 else "log_side"
-	var stalk_tint := Color(0.92, 0.98, 1.0) if team == 0 else Color(0.55, 0.34, 0.30)
-	var gill_tint := Color(0.98, 0.96, 0.86) if team == 0 else Color(0.72, 0.46, 0.38)
+	var stalk_tint := Color(0.97, 0.96, 0.92) if team == 0 else Color(0.82, 0.64, 0.48)
+	var gill_tint := Color(0.99, 0.96, 0.86) if team == 0 else Color(0.95, 0.80, 0.66)
 
-	# 草地/火山岩底座
+	# 奶油石底座 + 四角阵营色晶石 + 绿植点缀
 	_b(boxes, Vector3(0, 0, 0), Vector3(radius * 2.35, 10, radius * 2.35), "stone",
-		Color(0.78, 0.86, 0.88) if team == 0 else Color(0.42, 0.34, 0.32))
+		Color(0.96, 0.94, 0.87) if team == 0 else Color(0.92, 0.85, 0.74))
 	for i in range(4):
 		var ang := float(i) * PI * 0.5 + 0.4
 		var px := cos(ang) * radius * 1.15
@@ -292,6 +293,10 @@ static func tower(atlas: PixelAtlas, color: Color, radius: float, height: float,
 			_b(boxes, Vector3(px, 10, pz), Vector3(12, 10, 12), "ice", Color(0.85, 0.98, 1.0))
 		else:
 			_b(boxes, Vector3(px, 10, pz), Vector3(13, 8, 13), "lava", Color(0.95, 0.6, 0.35))
+	for i in range(3):
+		var a := 0.9 + float(i) * 2.0
+		_b(boxes, Vector3(cos(a) * radius * 1.38, 10, sin(a) * radius * 1.38),
+			Vector3(10, 7, 10), "leaves", Color("6fbf4a"))
 
 	# 菌柄：三段，越往上越细
 	var stalk_y := 10.0
@@ -327,10 +332,10 @@ static func tower(atlas: PixelAtlas, color: Color, radius: float, height: float,
 
 
 static func base_pedestal(atlas: PixelAtlas, radius: float, team: int) -> ArrayMesh:
-	# 蓝方：月光石台 + 冰晶柱 + 浅冰环；红方：暗石台 + 岩浆裂缝 + 尖石柱。
+	# 参考图的奶油石祭坛：三层砖台 + 四角阵营色晶柱 + 阵营色能量环。
 	var boxes: Array = []
-	var stone := Color(0.82, 0.90, 0.96) if team == 0 else Color(0.52, 0.44, 0.42)
-	var tile := "stone" if team == 0 else "stone_brick"
+	var stone := Color(0.95, 0.93, 0.86) if team == 0 else Color(0.93, 0.86, 0.75)
+	var tile := "stone_brick"
 	var widths := [radius * 2.7, radius * 2.2, radius * 1.7]
 	var heights := [14.0, 14.0, 12.0]
 	var tops := [0.0, 14.0, 28.0]
@@ -382,7 +387,7 @@ static func base_crystal(atlas: PixelAtlas, color: Color, radius: float, height:
 				"crystal", _lighter(gem, 0.05))
 			_b(boxes, Vector3(radius * 0.42 * sx, height * 0.30, radius * 0.1),
 				Vector3(radius * 0.20, height * 0.12, radius * 0.20), "glow", Color(0.9, 0.98, 1.0))
-		_b(boxes, Vector3(0, height * 1.02, 0), Vector3(10, 10, 10), "glow", Color(1, 1, 0.95))
+		_b(boxes, Vector3(0, height * 1.02, 0), Vector3(10, 10, 10), "glow", Color(0.9, 1.0, 1.0))
 	else:
 		# 宽底熔岩水晶，三根高低尖刺 + 暗色熔岩底座。
 		_b(boxes, Vector3(0, 0, 0), Vector3(radius * 1.18, height * 0.16, radius * 1.18), "lava", Color(0.9, 0.5, 0.28))

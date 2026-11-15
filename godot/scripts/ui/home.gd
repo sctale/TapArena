@@ -15,8 +15,8 @@ const PANEL_LIGHT := Color("e8e0cf")
 const PANEL_DARK := Color("0f1512")
 const INK := Color("221a12")
 const GREEN := Color("5aa83c")
-const SKY := Color("8ec9f0")
-const GRASS := Color("6fae4e")
+const SKY := Color("9fd9f2")
+const GRASS := Color("7fc45c")
 
 var heroes: Array = []
 var sel_index := 0
@@ -207,10 +207,13 @@ func _refresh_labels() -> void:
 
 func _draw() -> void:
 	var vp := viewport_size()
-	draw_rect(Rect2(Vector2.ZERO, vp), SKY)
 	var horizon := vp.y * 0.70
+	# 粉彩渐变天空：顶部青蓝 → 地平线近白，贴合参考图的柔和背景。
+	for i in range(6):
+		var t := float(i) / 5.0
+		draw_rect(Rect2(0, horizon * t, vp.x, horizon / 5.0 + 1.0), SKY.lerp(Color("e6f7fd"), t))
 	draw_rect(Rect2(0, horizon, vp.x, vp.y - horizon), GRASS)
-	draw_rect(Rect2(0, horizon - 8.0, vp.x, 8.0), Color("5d9a42"))
+	draw_rect(Rect2(0, horizon - 8.0, vp.x, 8.0), Color("5f9e45"))
 	for i in range(7):
 		var cx := vp.x * (0.06 + float(i) * 0.145)
 		var cy := vp.y * (0.10 + float(i % 3) * 0.035)
@@ -221,7 +224,7 @@ func _draw() -> void:
 	for i in range(10):
 		var bx := vp.x * (0.03 + float(i) * 0.10)
 		var by := horizon + vp.y * (0.03 + float(i % 2) * 0.04)
-		draw_rect(Rect2(bx, by, vp.x * 0.035, vp.y * 0.03), Color("4f8f3f"))
+		draw_rect(Rect2(bx, by, vp.x * 0.035, vp.y * 0.03), Color("6fb84f"))
 		draw_rect(Rect2(bx, by, vp.x * 0.035, vp.y * 0.008), Color("7fbf5a"))
 
 	var safe := _safe()

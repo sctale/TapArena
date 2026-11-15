@@ -22,3 +22,6 @@ godot/export_presets.cfg
 godot/keystore/
 godot/*.log
 
+# 美术参考图：只在本机用于对照，不提交
+reference/
+

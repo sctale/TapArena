@@ -64,12 +64,12 @@ static func _shade_for(face: String) -> float:
 		"top":
 			return 1.0
 		"bottom":
-			return 0.55
+			return 0.62
 		"front", "back":
-			return 0.88
+			return 0.94
 		"right", "left":
-			return 0.78
-	return 0.86
+			return 0.86
+	return 0.92
 
 
 static func _palette_index(palette: PackedColorArray, c: Color) -> int:

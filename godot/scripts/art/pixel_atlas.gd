@@ -86,79 +86,79 @@ func _paint(tile: String, i: int) -> void:
 	var oy := (i / COLS) * TILE
 	match tile:
 		"grass_top":
-			_noise(ox, oy, Color("5d9c3f"), [Color("6fae4a"), Color("4f8a36"), Color("7cbb55")], 11)
+			_noise(ox, oy, Color("6fb84f"), [Color("7cc95a"), Color("5fa845"), Color("8ad468")], 11)
 		"grass_side":
-			_noise(ox, oy, Color("8a5a3b"), [Color("7a4d31"), Color("9a6744")], 12, 0.5)
+			_noise(ox, oy, Color("a97b52"), [Color("96694a"), Color("b98a5f")], 12, 0.5)
 			for x in range(TILE):
 				var drop := 3 + int(_h(x, 0, 13) * 3.0)
 				for y in range(drop):
-					var c := Color("5d9c3f")
+					var c := Color("6fb84f")
 					if _h(x, y, 14) < 0.3:
-						c = Color("4f8a36")
+						c = Color("5fa845")
 					_px(ox, oy, x, y, c)
 		"dirt":
-			_noise(ox, oy, Color("8a5a3b"), [Color("75492d"), Color("9c6a45"), Color("6b4227")], 15)
+			_noise(ox, oy, Color("a97b52"), [Color("96694a"), Color("b98a5f"), Color("8a5d40")], 15)
 		"stone":
-			_noise(ox, oy, Color("8c8c8c"), [Color("7c7c7c"), Color("9c9c9c"), Color("707070")], 16, 0.55)
+			_noise(ox, oy, Color("d8d2c2"), [Color("c6c0b0"), Color("e4ded0"), Color("b8b2a2")], 16, 0.55)
 			for k in range(5):
-				_px(ox, oy, 2 + k, 8 + int(_h(k, 1, 17) * 3.0), Color("6a6a6a"))
+				_px(ox, oy, 2 + k, 8 + int(_h(k, 1, 17) * 3.0), Color("b2ac9c"))
 		"stone_brick":
-			_fill(ox, oy, Color("6f6f6f"))
+			_fill(ox, oy, Color("b7b0a0"))
 			for row in range(4):
 				for col in range(2):
 					var bx := col * 8 + (4 if row % 2 == 1 else 0)
 					for y in range(4):
 						for x in range(7):
 							var xx := (bx + x) % TILE
-							var c := Color("8e8e8e")
+							var c := Color("dcd5c5")
 							if _h(xx, row * 4 + y, 18) < 0.16:
-								c = Color("808080")
+								c = Color("ccc5b5")
 							if y == 0 or x == 0:
-								c = Color("a2a2a2") if y == 0 else c
+								c = Color("e8e1d1") if y == 0 else c
 							_px(ox, oy, xx, row * 4 + y, c)
 		"sand":
-			_noise(ox, oy, Color("dbc98a"), [Color("cbb877"), Color("ecd99b")], 19, 0.4)
+			_noise(ox, oy, Color("e8d9b0"), [Color("dccba0"), Color("f2e6c6")], 19, 0.4)
 		"log_side":
-			_noise(ox, oy, Color("6b4a2a"), [Color("5c3f23"), Color("7c5734")], 20, 0.3)
+			_noise(ox, oy, Color("a9794c"), [Color("96693f"), Color("b98a5e")], 20, 0.3)
 			for x in range(TILE):
 				if _h(x, 0, 21) < 0.22:
 					for y in range(TILE):
-						_px(ox, oy, x, y, Color("573a20"))
+						_px(ox, oy, x, y, Color("8c6039"))
 		"log_top":
-			_fill(ox, oy, Color("8a6038"))
+			_fill(ox, oy, Color("b98a5e"))
 			for y in range(TILE):
 				for x in range(TILE):
 					var dx := float(x) - 7.5
 					var dy := float(y) - 7.5
 					var d := sqrt(dx * dx + dy * dy)
 					if int(d) % 2 == 0:
-						_px(ox, oy, x, y, Color("6f4a29"))
+						_px(ox, oy, x, y, Color("9b6f45"))
 					if d < 1.6:
-						_px(ox, oy, x, y, Color("a87a48"))
+						_px(ox, oy, x, y, Color("d0a374"))
 		"leaves":
-			_noise(ox, oy, Color("3f7a33"), [Color("2f6b2a"), Color("4f8f3f"), Color("356f2c")], 22, 0.55)
+			_noise(ox, oy, Color("5fad4a"), [Color("4f9a3d"), Color("72c25a"), Color("559f40")], 22, 0.55)
 			for k in range(6):
-				_px(ox, oy, int(_h(k, 2, 23) * 16.0), int(_h(k, 3, 24) * 16.0), Color("244f21"))
+				_px(ox, oy, int(_h(k, 2, 23) * 16.0), int(_h(k, 3, 24) * 16.0), Color("3e8433"))
 		"planks":
-			_fill(ox, oy, Color("a8794b"))
+			_fill(ox, oy, Color("c08f5e"))
 			for y in range(TILE):
 				if y % 4 == 3:
 					for x in range(TILE):
-						_px(ox, oy, x, y, Color("7a5433"))
+						_px(ox, oy, x, y, Color("a0764a"))
 			for k in range(8):
-				_px(ox, oy, int(_h(k, 4, 25) * 16.0), int(_h(k, 5, 26) * 15.0), Color("9a6c41"))
+				_px(ox, oy, int(_h(k, 4, 25) * 16.0), int(_h(k, 5, 26) * 15.0), Color("cd9d6c"))
 		"path":
-			_noise(ox, oy, Color("c2a878"), [Color("b09464"), Color("d2b98a"), Color("a4875a")], 27, 0.5)
+			_noise(ox, oy, Color("dcc9a4"), [Color("cdb98f"), Color("e8d8b6"), Color("bfa97e")], 27, 0.5)
 		"crystal":
-			_fill(ox, oy, Color("eaf6ff"))
+			_fill(ox, oy, Color("d9faff"))
 			for y in range(TILE):
 				for x in range(TILE):
 					if (x + y) % 6 == 0:
-						_px(ox, oy, x, y, Color("b8dff5"))
+						_px(ox, oy, x, y, Color("9debf7"))
 					elif (x + y) % 6 == 3:
 						_px(ox, oy, x, y, Color("ffffff"))
 		"fur":
-			_noise(ox, oy, Color("e6dfd2"), [Color("d8cfc0"), Color("f2ece0")], 28, 0.45)
+			_noise(ox, oy, Color("efe8d9"), [Color("e0d7c8"), Color("faf4e8")], 28, 0.45)
 		"flat":
 			_fill(ox, oy, Color("ffffff"))
 		"face_slime":
@@ -186,34 +186,34 @@ func _paint(tile: String, i: int) -> void:
 		"cloud":
 			_noise(ox, oy, Color("f4f8fa"), [Color("e6edf0"), Color("ffffff")], 29, 0.35)
 		"mushroom":
-			_fill(ox, oy, Color("c8402f"))
+			_fill(ox, oy, Color("e2644a"))
 			for k in range(7):
 				var cx := 2 + int(_h(k, 6, 30) * 12.0)
 				var cy := 2 + int(_h(k, 7, 31) * 12.0)
 				for y in range(2):
 					for x in range(2):
-						_px(ox, oy, cx + x, cy + y, Color("f4efe0"))
+						_px(ox, oy, cx + x, cy + y, Color("fff2de"))
 		"gold":
-			_noise(ox, oy, Color("f0b93c"), [Color("d99f28"), Color("ffd96a")], 32, 0.45)
+			_noise(ox, oy, Color("f2c14e"), [Color("dca832"), Color("ffd970")], 32, 0.45)
 		"ice":
-			_fill(ox, oy, Color("dff6ff"))
+			_fill(ox, oy, Color("e4faff"))
 			for y in range(TILE):
 				for x in range(TILE):
 					if (x + y * 2) % 9 == 0:
-						_px(ox, oy, x, y, Color("b8e8ff"))
+						_px(ox, oy, x, y, Color("bcefff"))
 					elif (x * 2 + y) % 13 == 0:
 						_px(ox, oy, x, y, Color("ffffff"))
 		"lava":
-			_fill(ox, oy, Color("3a1c16"))
+			_fill(ox, oy, Color("4a221a"))
 			for y in range(TILE):
 				for x in range(TILE):
 					var r := _h(x, y, 33)
 					if r < 0.16:
-						_px(ox, oy, x, y, Color("f0702a"))
+						_px(ox, oy, x, y, Color("f27a32"))
 					elif r < 0.24:
-						_px(ox, oy, x, y, Color("ffb347"))
+						_px(ox, oy, x, y, Color("ffc05c"))
 					elif r < 0.34:
-						_px(ox, oy, x, y, Color("5a2a1e"))
+						_px(ox, oy, x, y, Color("6a3224"))
 		"face_angry":
 			_fill(ox, oy, Color("ffffff"))
 			# 斜挑的怒眉
@@ -232,12 +232,12 @@ func _paint(tile: String, i: int) -> void:
 				else:
 					_px(ox, oy, x, 12, Color("232323"))
 		"mushroom_blue":
-			_fill(ox, oy, Color("4f9fc0"))
+			_fill(ox, oy, Color("34a9c2"))
 			for k in range(8):
 				var cx := 2 + int(_h(k, 8, 34) * 12.0)
 				var cy := 2 + int(_h(k, 9, 35) * 12.0)
 				for y in range(2):
 					for x in range(2):
-						_px(ox, oy, cx + x, cy + y, Color("e8f8ff"))
+						_px(ox, oy, cx + x, cy + y, Color("eafbff"))
 		_:
 			_fill(ox, oy, Color("ff00ff"))

@@ -1033,7 +1033,7 @@ func shoot(src, dir: Vector2, dmg: float, color: Color, speed: float,
 	p.style = style
 	shots.append(p)
 	if src != null and src.kind == HERO and src.attack_range > 250.0:
-		sfx.emit("shoot_" + src.hero_id, -5.0)
+		sfx.emit("shoot_" + src.hero_id)
 	fx.emit("muzzle", Vector3(p.pos.x, src.height * 0.45, p.pos.y), color, 0.0)
 
 
