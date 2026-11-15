@@ -6,6 +6,9 @@ var focus := Vector3(1500, 0, 800)
 var target := Vector3(1500, 0, 800)
 var punch := 0.0
 var shake := 0.0
+var zoom := 1.0
+var zoom_target := 1.0
+var frozen := false
 
 
 func _ready() -> void:
@@ -35,14 +38,22 @@ func add_shake(v: float) -> void:
 	shake = maxf(shake, v)
 
 
+func set_zoom(z: float) -> void:
+	zoom_target = z
+
+
 func _offset(punch_k: float) -> Vector3:
-	return Vector3(0, 290.0 / punch_k, 430.0 / punch_k)
+	var k := zoom * punch_k
+	return Vector3(0, 290.0 / k, 430.0 / k)
 
 
 func _process(delta: float) -> void:
+	if frozen:
+		return
 	focus = focus.lerp(target, 1.0 - exp(-7.0 * delta))
 	punch = lerp(punch, 0.0, 1.0 - exp(-6.0 * delta))
 	shake = lerp(shake, 0.0, 1.0 - exp(-8.0 * delta))
+	zoom = lerp(zoom, zoom_target, 1.0 - exp(-3.0 * delta))
 
 	var want := focus + _offset(1.0 + punch * 0.05)
 	position = position.lerp(want, 1.0 - exp(-9.0 * delta))

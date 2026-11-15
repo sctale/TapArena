@@ -1,19 +1,19 @@
 {
   "map_w": 3000,
   "map_h": 1600,
-  "sudden_death_time": 240,
-  "match_cap": 300,
+  "sudden_death_time": 180,
+  "match_cap": 285,
   "respawn_time": 5.5,
   "wave_interval": 18,
-  "xp_to_level2": 260,
-  "xp_passive_per_sec": 2,
-  "xp_hero_kill": 140,
-  "xp_hero_assist": 60,
-  "xp_tower": 80,
-  "xp_minion": 14,
-  "xp_minion_assist": 7,
+  "xp_to_level2": 180,
+  "xp_passive_per_sec": 1,
+  "xp_hero_kill": 120,
+  "xp_hero_assist": 45,
+  "xp_tower": 70,
+  "xp_minion": 10,
+  "xp_minion_assist": 5,
   "base": {
-    "hp": 4200,
+    "hp": 3000,
     "radius": 90,
     "height": 150,
     "range": 400,
@@ -37,7 +37,7 @@
     "atk_interval": 0.9,
     "move_speed": 176,
     "count": 3,
-    "structure_damage_mul": 2.0
+    "structure_damage_mul": 2.4
   },
   "lane": [
     [300, 800],
@@ -68,6 +68,7 @@
   "comeback": {
     "max_tiers": 3,
     "respawn_cut": 0.55,
-    "min_respawn": 3.8
+    "min_respawn": 3.8,
+    "sudden_death_structure_mul": 1.8
   }
 }

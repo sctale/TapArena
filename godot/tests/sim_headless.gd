@@ -31,14 +31,19 @@ func _init() -> void:
 		var issues: Array = []
 		if not sim.over:
 			issues.append("对局没有结束")
-		if sim.clock > 300.0 + 0.02:
-			issues.append("超过 5 分钟上限 clock=%.2f" % sim.clock)
+		if sim.clock > sim.match_cap + 0.05:
+			issues.append("超过对局上限 clock=%.2f cap=%.1f" % [sim.clock, sim.match_cap])
 		if sim.winner != BattleSimScript.BLUE and sim.winner != BattleSimScript.RED:
 			issues.append("胜者无效 winner=%d" % sim.winner)
 		if sim.heroes.size() != 6:
 			issues.append("英雄数量不是 6，实际 %d" % sim.heroes.size())
 		if sim.player == null:
 			issues.append("玩家英雄缺失")
+		if sim.player != null:
+			if sim.player.level2_time <= 0.0:
+				issues.append("玩家整局没解锁大招")
+			elif sim.player.level2_time > 288.0:
+				issues.append("大招解锁过晚 %.1fs" % sim.player.level2_time)
 
 		for u in sim.heroes:
 			if is_nan(u.pos.x) or is_nan(u.pos.y) or is_nan(u.hp):
@@ -62,9 +67,10 @@ func _init() -> void:
 		if not issues.is_empty():
 			failures += 1
 
-		var line := "match %02d %s hero=%s diff=%d seed=%d winner=%d clock=%.1f score=%d:%d steps=%d towers_b=%d/%d,%d/%d towers_r=%d/%d,%d/%d base=%d/%d minions=%d" % [
+		var line := "match %02d %s hero=%s diff=%d seed=%d winner=%d clock=%.1f score=%d:%d steps=%d lv2=%.1f towers_b=%d/%d,%d/%d towers_r=%d/%d,%d/%d base=%d/%d minions=%d" % [
 			i + 1, status, hero_id, difficulty, seed_value, sim.winner, sim.clock,
 			sim.score_blue, sim.score_red, steps,
+			sim.player.level2_time if sim.player != null else -1.0,
 			sim.towers_blue[0].hp, sim.towers_blue[0].max_hp,
 			sim.towers_blue[1].hp, sim.towers_blue[1].max_hp,
 			sim.towers_red[0].hp, sim.towers_red[0].max_hp,

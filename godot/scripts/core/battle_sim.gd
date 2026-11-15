@@ -41,6 +41,7 @@ class Unit:
 	var height: float = 74.0
 	var level: int = 1
 	var xp: float = 0.0
+	var level2_time: float = -1.0
 	var kills: int = 0
 	var deaths: int = 0
 
@@ -137,17 +138,17 @@ var rng := RandomNumberGenerator.new()
 
 var map_w: float = 3000.0
 var map_h: float = 1600.0
-var sudden_death_time: float = 240.0
-var match_cap: float = 300.0
+var sudden_death_time: float = 180.0
+var match_cap: float = 285.0
 var respawn_time: float = 5.5
 var wave_interval: float = 18.0
-var xp_to_level2: float = 260.0
-var xp_passive_per_sec: float = 2.0
-var xp_hero_kill: float = 140.0
-var xp_hero_assist: float = 60.0
-var xp_tower: float = 80.0
-var xp_minion: float = 14.0
-var xp_minion_assist: float = 7.0
+var xp_to_level2: float = 180.0
+var xp_passive_per_sec: float = 1.0
+var xp_hero_kill: float = 120.0
+var xp_hero_assist: float = 45.0
+var xp_tower: float = 70.0
+var xp_minion: float = 10.0
+var xp_minion_assist: float = 5.0
 
 var base_cfg: Dictionary = {}
 var tower_cfg: Dictionary = {}
@@ -199,17 +200,17 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 
 	map_w = float(rules.get("map_w", 3000))
 	map_h = float(rules.get("map_h", 1600))
-	sudden_death_time = float(rules.get("sudden_death_time", 240))
-	match_cap = float(rules.get("match_cap", 300))
+	sudden_death_time = float(rules.get("sudden_death_time", 180))
+	match_cap = float(rules.get("match_cap", 285))
 	respawn_time = float(rules.get("respawn_time", 5.5))
 	wave_interval = float(rules.get("wave_interval", 18))
-	xp_to_level2 = float(rules.get("xp_to_level2", 260))
-	xp_passive_per_sec = float(rules.get("xp_passive_per_sec", 2))
-	xp_hero_kill = float(rules.get("xp_hero_kill", 140))
-	xp_hero_assist = float(rules.get("xp_hero_assist", 60))
-	xp_tower = float(rules.get("xp_tower", 80))
-	xp_minion = float(rules.get("xp_minion", 14))
-	xp_minion_assist = float(rules.get("xp_minion_assist", 7))
+	xp_to_level2 = float(rules.get("xp_to_level2", 180))
+	xp_passive_per_sec = float(rules.get("xp_passive_per_sec", 1))
+	xp_hero_kill = float(rules.get("xp_hero_kill", 120))
+	xp_hero_assist = float(rules.get("xp_hero_assist", 45))
+	xp_tower = float(rules.get("xp_tower", 70))
+	xp_minion = float(rules.get("xp_minion", 10))
+	xp_minion_assist = float(rules.get("xp_minion_assist", 5))
 	base_cfg = rules.get("base", {})
 	tower_cfg = rules.get("tower", {})
 	minion_cfg = rules.get("minion", {})
@@ -267,7 +268,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 
 	started = true
 	wave_t = 3.0
-	banner.emit("先拆掉两座蘑菇塔，再点亮敌方水晶！", 3.4)
+	banner.emit("往右走 → 先拆两座蘑菇塔，再点亮敌方水晶！", 3.6)
 	print("[SIM] seed=%d player=%s difficulty=%s" % [seed_value, player_hero, diff_name])
 
 
@@ -320,7 +321,7 @@ func new_unit(kind: int, team: int, display_name: String, pos: Vector2):
 
 func make_base(team: int, pos: Vector2):
 	var u = new_unit(BASE, team, "清清水晶" if team == BLUE else "红红水晶", pos)
-	u.hp = float(base_cfg.get("hp", 4200))
+	u.hp = float(base_cfg.get("hp", 3000))
 	u.max_hp = u.hp
 	u.radius = float(base_cfg.get("radius", 90))
 	u.height = float(base_cfg.get("height", 150))
@@ -676,7 +677,7 @@ func step_minion(m, dt: float) -> void:
 		if m.atk_timer <= 0.0:
 			m.atk_timer = m.atk_interval
 			m.atk_anim = 0.22
-			var mul := float(minion_cfg.get("structure_damage_mul", 2.0))
+			var mul := float(minion_cfg.get("structure_damage_mul", 2.4))
 			var dmg: float = m.dmg * mul if (foe.kind == TOWER or foe.kind == BASE) else m.dmg
 			hit_with_fx(foe, dmg, m, 0.0)
 		return
@@ -834,6 +835,10 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 	if src != null and src.team == RED and target.team == BLUE:
 		amount *= enemy_dmg_mul
 
+	# 终极对决：建筑变脆，保证 3 分钟内能打出结果。
+	if sudden_death and (target.kind == TOWER or target.kind == BASE):
+		amount *= float(comeback_cfg.get("sudden_death_structure_mul", 1.8))
+
 	if reflect and target.thorn_t > 0.0 and src != null and src != target and src.is_alive() and src.kind == HERO:
 		deal_damage(src, 24.0 + target.level * 5.0, target, false)
 		fx.emit("hit", Vector3(src.pos.x, 40.0, src.pos.y), Color(1, 0.85, 0.66), 0.0)
@@ -906,6 +911,7 @@ func add_xp(h, add: float) -> void:
 	h.xp += add
 	if h.xp >= xp_to_level2:
 		h.level = 2
+		h.level2_time = clock
 		float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "二级解锁大招！", Color(1, 0.95, 0.6))
 		if h.is_player:
 			banner.emit("大招解锁！按右上的技能键放出来", 1.8)

@@ -2,13 +2,15 @@
 
 一个给 6–12 岁孩子玩的 **3v3 森林推塔小游戏**：清兵线、拆塔、推水晶。英雄使用 [Polyfork](https://polyfork.dev) 的免费低多边形动物（可商用、无需署名），没有抽卡、内购、广告，也不联网。
 
-## 三个版本
+## 版本与引擎
 
-| 版本 | 位置 | 说明 |
+**本项目只使用 Godot 引擎。** Unity 版和 Web 版已冻结为历史参考，不再接收功能更新。
+
+| 版本 | 位置 | 状态 |
 | --- | --- | --- |
-| **Unity 版（3.2.0，主线）** | `unity/` | Unity 6000.3 工程：Polyfork 四足动物英雄 + Blender 服装配件 + Polyfork 森林场景道具 + 自制地形/塔/水晶/小兵 + 2D 选人立绘 + 应用图标，出 Android APK |
-| Godot 垂直切片（4.0.0-dev.1，开发中） | `godot/` | Godot 4.7.2 并行工程：纯逻辑 BattleSim + 基础几何体战场 + 触屏摇杆/技能 + 最小 HUD，验证引擎与出包链路 |
-| Web 版（1.3，存档） | 仓库根目录 `www/`、`android/` | Three.js 3D 战场 + Android WebView 壳，已封存在 git 标签 `web-v1.3.0` |
+| **Godot 版（4.1.0-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：方块像素风 + 人形动物英雄 + 纯逻辑 BattleSim + 触屏双摇杆/技能 + 像素 HUD，出 Android APK |
+| Unity 版（3.2.0，冻结） | `unity/` | 历史存档，保留用于对照旧玩法与旧美术，不再维护 |
+| Web 版（1.3，冻结） | `www/`、`android/` | 历史存档，封存在 git 标签 `web-v1.3.0` |
 
 备份：`D:/V-Coding/TapArena-web-v1.3.0-backup.zip`（含全部源码与素材，2.6MB）。
 
@@ -84,15 +86,18 @@ unity/Assets/Shaders/
 - **动画/内存**：18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB（Idle 保留完整循环，导入 `Optimal` 压缩）；主路径不再生成 1280×683 地面贴图。
 - **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；`unity/ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 在 `.gitignore` 中，构建前用 Blender 脚本拉取。
 
-## Godot 版（4.0.0-dev.1 垂直切片）
+## Godot 版（4.1.0-dev.1，唯一主线）
 
-Godot 4.7.2 的并行工程在 `godot/`。目前只迁移了**战斗垂直切片**，用来验证引擎可行性、触控手感和 Android 出包链路；Unity 3.2.0 仍是可发布主线，首页/选人、Polyfork 模型、音频与后处理尚未迁入。
+Godot 4.7.2 工程在 `godot/`。这一版把美术整体重做成**方块像素风**：16×16 像素图集、体素盒子模型、像素数字与像素图标；6 位英雄从四足兽改成**人形动物**，用耳朵、尾巴、面部涂装、围巾/背心/靴子体现动物特色。首页/选人、音频仍待后续阶段。
 
 已实现：
 
-- **纯逻辑 `BattleSim`**（`godot/scripts/core/battle_sim.gd`）：3v3、兵线、小兵、两座塔、水晶保护、18 个技能、AI、难度、复活、经验/2 级大招、4:00 终极对决、5:00 兜底。规则不引用任何节点，可无头跑。
+- **纯逻辑 `BattleSim`**（`godot/scripts/core/battle_sim.gd`）：3v3、兵线、小兵、两座塔、水晶保护、18 个技能、AI、难度、复活、经验/2 级大招、3:00 终极对决（建筑变脆）、4:45 兜底。规则不引用任何节点，可无头跑。
 - **数据外置**：`godot/data/heroes.json`、`godot/data/rules.json`。
-- **表现层**：基础几何体战场 + 相机跟随/震屏 + 最小 HUD（头像血条、比分计时、塔位、小地图、技能冷却、摇杆、播报、暂停、结算）。
+- **方块美术**：`scripts/art/pixel_atlas.gd`（20 个 16×16 瓦片）、`voxel_model.gd`（盒子合并成单网格）、`block_models.gd`（人形英雄/塔/水晶/树/石头/蘑菇/路牌）。
+- **跨平台颜色方案**：模型颜色不写顶点色，而是写入每个模型自己的 1×64 调色板纹理，顶点用 UV2 索引（`shaders/voxel.gdshader`）。这样规避了 Android GLES/ANGLE 下顶点色 G/B 通道互换的问题。
+- **像素图标**：`pixel_icons.gd` 用掩膜拼形状 + 自动 1px 描边，生成 6 个人形英雄头像、11 个技能图标、6 个 UI 图标；HUD 数字用 5×7 像素字。
+- **HUD**：粗边像素面板、头像血条/经验/大招充能、比分/计时、塔位、小地图、技能方格与冷却、方块摇杆、播报、暂停、结算；安全区适配，暂停键 ≥64px。
 - **输入**：左下摇杆 + 右下三技能，支持多点触控；桌面 WASD + Q/E/R；安卓返回键与右上暂停键都能暂停。
 - **构建**：`tools/godot-build.ps1` 本地一键导入、无头回归、导出 release APK、aapt2/apksigner 校验并复制到根目录。
 
@@ -102,6 +107,10 @@ Godot 4.7.2 的并行工程在 `godot/`。目前只迁移了**战斗垂直切片
 # 无头 10 局 + 水晶保护规则
 godot --headless --path godot --script res://tests/sim_headless.gd
 
+# 图标/图集预览、应用图标生成
+godot --headless --path godot --script res://tests/icon_sheet.gd
+godot --headless --path godot --script res://tests/make_icon.gd
+
 # 桌面运行
 godot --path godot
 
@@ -109,24 +118,27 @@ godot --path godot
 powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 ```
 
-产物：`TapArena-v4.0.0-dev.1.apk`（27,710,946 字节，versionCode 27，arm64-v8a，签名 `CN=TapArena`，与 3.2.0 同一把 keystore，可直接覆盖升级）。
+产物：`TapArena-v4.1.0-dev.1.apk`（26,880,195 字节，versionCode 28，arm64-v8a，签名 `CN=TapArena`，SHA-256 `E162C5B8F555923C7D4F6B5F1A3DEE9C194514B568C2D46B70476CE142B940EC`，与 3.2.0 同一把 keystore，可覆盖升级）。
+
+调试参数（写在 `--` 之后）：`--top` 全图俯瞰、`--look-base` 看蓝方基地、`--no-hud` 隐藏 HUD、`--pause` 直接打开暂停、`--result` 直接看结算。
 
 已验证：
 
-- 10 局固定种子无头对局全部在 5:00 内结束；水晶保护规则单测通过（外塔/内塔存活时水晶不掉血，双塔拆除后可破，终极对决绕过保护）。
-- Android 16 模拟器（1080×1920 横屏）：摇杆移动、技能点击/冷却、暂停/继续、返回键暂停逐项通过；Godot 侧无脚本异常。
-- 帧率：本次 Android 16 模拟器约 15–21fps（3D 以 0.65 分辨率渲染 + HUD 用 MultiMesh 合批到约 3ms + 30Hz 固定步长模拟 + 关闭植被阴影/雾）；同机数值受模拟器 ANGLE/GL 翻译影响较大，真实设备待补测。
-- 相机方向：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右，和 Unity/Web 版一致。
+- 10 局固定种子无头对局全部在 4:45 内结束；水晶保护规则单测通过（外塔/内塔存活时水晶不掉血，双塔拆除后可破，终极对决绕过保护）；大招解锁时间 59–180 秒。
+- Android 16 模拟器（1080×1920 横屏）：安装覆盖成功，摇杆移动、技能点击/冷却、暂停/继续、返回键暂停逐项通过；Godot 日志无脚本异常。
+- 帧率：同机预热后稳定 56–60fps（`sim_ms` 约 1–3ms）；方块模型是单网格单材质，无实时阴影/雾。
+- 颜色：Android 端与桌面端一致（水晶蓝、老虎橙、队环蓝），调色板着色器已规避顶点色通道问题。
+- 相机：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右；角色带 20° 偏航，侧视也能看到脸和涂装。
 
 已知边界：
 
-- 角色/场景是几何体占位，尚未接 Polyfork 模型与自制 GameArt；首页/选人/换英雄未迁移，结算页的“再来一局”已可用。
-- 音频未迁入；LowPoly 描边 Shader、后处理、2D 立绘待后续阶段。
+- 首页、选人、换英雄未迁入；结算页“再来一局”可用。
+- 音频未接入；暂无描边/泛光等后处理。
 - `godot/export_presets.cfg` 含签名密码，已 gitignore；首次构建由脚本生成。
 
 ## 素材授权
 
-英雄模型来自 [Polyfork](https://polyfork.dev)，按其 [Licensing](https://polyfork.dev/licensing) 条款使用：可商用、可修改、无需署名；模型可以随游戏 APK 一起发布，但不能把 GLB/FBX 文件本体重新上传到仓库、素材站或文件分享服务。仓库因此只保留下载/转换脚本与游戏内渲染产物，原始 3D 文件不入库。
+Godot 版的方块模型、像素图集、图标与应用图标均为本项目自制，不包含 Minecraft 或 Polyfork 的原始素材；风格参考方块游戏的通用视觉语言（16px 贴图、体素比例、像素描边），未复制任何现成贴图或模型。
 
 ---
 

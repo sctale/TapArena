@@ -26,6 +26,7 @@ var last_back_ms := 0
 var sim_us_total := 0
 var sim_frames := 0
 var sim_acc := 0.0
+var camera_follow := true
 
 
 func _ready() -> void:
@@ -71,11 +72,26 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	cam.set_target(Vector3(sim.player.pos.x, 0, sim.player.pos.y))
 	cam.snap()
 
+	# 调试：`-- --look-base` 把镜头固定在蓝方基地，用于核对素材颜色。
+	camera_follow = true
+	if "--look-base" in OS.get_cmdline_user_args():
+		camera_follow = false
+		cam.set_target(Vector3(230, 0, 800))
+		cam.snap()
+	if "--top" in OS.get_cmdline_user_args():
+		camera_follow = false
+		cam.frozen = true
+		cam.fov = 58.0
+		cam.position = Vector3(1500, 1450, 2500)
+		cam.look_at(Vector3(1500, 0, 820), Vector3.UP)
+
 	hud = HudScript.new()
 	hud.process_priority = 10
 	add_child(hud)
 	hud.attach(sim, cam)
 	hud.paused = false
+	if "--no-hud" in OS.get_cmdline_user_args():
+		hud.visible = false
 
 	input_hub = InputHubScript.new()
 	input_hub.process_priority = -10
@@ -87,6 +103,14 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	sim.fx.connect(_on_fx)
 	sim.hitstop.connect(_on_hitstop)
 	sim.match_ended.connect(_on_match_ended)
+	sim.banner.connect(_on_banner)
+
+	# 开发用：直接查看暂停/结算界面。
+	if "--pause" in OS.get_cmdline_user_args():
+		_toggle_pause()
+	if "--result" in OS.get_cmdline_user_args():
+		sim.end_match(sim.BLUE)
+		hud.queue_redraw()
 
 	print("[MATCH] hero=%s difficulty=%d seed=%d" % [hero_id, difficulty, seed_value])
 
@@ -115,7 +139,7 @@ func _process(delta: float) -> void:
 			steps += 1
 		sim_us_total += Time.get_ticks_usec() - t0
 		sim_frames += steps
-		if sim.player != null:
+		if sim.player != null and camera_follow:
 			cam.set_target(Vector3(sim.player.pos.x, 0, sim.player.pos.y))
 
 	if hitstop_until_ms > 0 and Time.get_ticks_msec() >= hitstop_until_ms:
@@ -137,7 +161,8 @@ func _toggle_pause() -> void:
 		return
 	paused = not paused
 	hud.paused = paused
-	Engine.time_scale = 0.0 if paused else 1.0
+	# 不用 time_scale=0，否则 HUD 的 delta 变 0，暂停面板文字不会刷新。
+	Engine.time_scale = 1.0
 	if paused:
 		input_hub._zero_move()
 	hud.queue_redraw()
@@ -150,6 +175,11 @@ func _restart() -> void:
 func _on_match_ended(_winner: int) -> void:
 	if hud != null:
 		hud.queue_redraw()
+
+
+func _on_banner(text: String, _duration: float) -> void:
+	if cam != null and text.begins_with("终极对决"):
+		cam.set_zoom(0.82)
 
 
 func _on_fx(kind: String, _pos: Vector3, _color: Color, radius: float) -> void:
