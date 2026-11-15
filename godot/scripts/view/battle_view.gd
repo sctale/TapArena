@@ -16,11 +16,14 @@ var hero_nodes: Dictionary = {}
 var minion_nodes: Dictionary = {}
 var structure_nodes: Dictionary = {}
 var shot_nodes: Dictionary = {}
+var zone_mesh: CylinderMesh = null
+var potion_nodes: Dictionary = {}
 var shot_free: Array = []
 var zone_nodes: Array = []
 var fx_items: Array = []
 var debris_items: Array = []
 var shot_mats: Dictionary = {}
+var shot_meshes: Dictionary = {}
 var alpha_mats: Dictionary = {}
 var model_cache: Dictionary = {}
 var mesh_mats: Dictionary = {}
@@ -412,6 +415,80 @@ func _sync_units(delta: float) -> void:
 	for uid in dead_minions:
 		minion_nodes.erase(uid)
 
+	_sync_potions()
+
+
+func _sync_potions() -> void:
+	# 一塔后的回血药剂：绿色小药瓶 + 地面光圈，喝掉后隐藏，30 秒后重新出现。
+	for p in sim.potions:
+		var node: Node3D = potion_nodes.get(p.view_id)
+		if node == null:
+			node = _make_potion_node()
+			add_child(node)
+			potion_nodes[p.view_id] = node
+		node.visible = p.active
+		if not p.active:
+			continue
+		var bob := sin(Time.get_ticks_msec() * 0.003 + float(p.view_id) * 1.7) * 4.0
+		node.position = Vector3(p.pos.x, 2.0 + bob, p.pos.y)
+		node.rotation.y += 0.02
+
+
+func _make_potion_node() -> Node3D:
+	var root := Node3D.new()
+	var glass := _alpha_material(Color(0.36, 0.86, 0.48, 0.95))
+	var light := _alpha_material(Color(0.72, 1.0, 0.76, 0.95))
+	var cork := _alpha_material(Color(0.52, 0.34, 0.20, 0.95))
+	var body := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(20, 24, 20)
+	body.mesh = bm
+	body.position.y = 14.0
+	body.material_override = glass
+	root.add_child(body)
+	var neck := MeshInstance3D.new()
+	var nm := BoxMesh.new()
+	nm.size = Vector3(10, 10, 10)
+	neck.mesh = nm
+	neck.position.y = 31.0
+	neck.material_override = light
+	root.add_child(neck)
+	var cap := MeshInstance3D.new()
+	var cm := BoxMesh.new()
+	cm.size = Vector3(13, 4, 13)
+	cap.mesh = cm
+	cap.position.y = 38.0
+	cap.material_override = cork
+	root.add_child(cap)
+	# 白色十字，远处也能看出是回血药剂。
+	var cross_mat := _alpha_material(Color(1, 1, 1, 0.92))
+	var cv := MeshInstance3D.new()
+	var cvm := BoxMesh.new()
+	cvm.size = Vector3(5, 15, 3)
+	cv.mesh = cvm
+	cv.position = Vector3(0, 15, 10.6)
+	cv.material_override = cross_mat
+	root.add_child(cv)
+	var ch := MeshInstance3D.new()
+	var chm := BoxMesh.new()
+	chm.size = Vector3(15, 5, 3)
+	ch.mesh = chm
+	ch.position = Vector3(0, 15, 10.6)
+	ch.material_override = cross_mat
+	root.add_child(ch)
+	var glow := MeshInstance3D.new()
+	var gm := CylinderMesh.new()
+	gm.top_radius = 30.0
+	gm.bottom_radius = 30.0
+	gm.height = 0.6
+	gm.radial_segments = 28
+	glow.mesh = gm
+	glow.position.y = 1.0
+	glow.material_override = _alpha_material(Color(0.45, 1.0, 0.6, 0.22))
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(glow)
+	return root
+
 
 func _sync_hero(u) -> void:
 	var item = hero_nodes.get(u.uid)
@@ -555,10 +632,30 @@ func _sync_shots() -> void:
 		node.visible = true
 		var rp: Vector2 = p.prev_pos.lerp(p.pos, sim.interp_alpha)
 		node.position = Vector3(rp.x, 34.0, rp.y)
+		node.mesh = _shot_mesh(p.style)
 		node.material_override = _shot_material(Color(p.color.r, p.color.g, p.color.b, 0.95))
 		var sz: float = maxf(0.7, p.size / 7.0)
 		node.scale = Vector3(sz, sz, sz)
-		node.rotation.y += 0.25
+		# 箭矢沿飞行方向，其他弹道自旋，让不同英雄的普攻一眼能区分。
+		match p.style:
+			"arrow":
+				node.rotation.y = atan2(p.dir.x, p.dir.y)
+				node.rotation.z = 0.0
+			"leaf":
+				node.rotation.y += 0.16
+				node.rotation.z = 0.55
+			"star":
+				node.rotation.y += 0.30
+				node.rotation.z = 0.78
+			"moon":
+				node.rotation.y += 0.35
+				node.rotation.z = 0.2
+			"bubble":
+				node.rotation.y += 0.06
+				node.rotation.z = 0.0
+			_:
+				node.rotation.y += 0.25
+				node.rotation.z = 0.0
 
 	var dead: Array = []
 	for vid in shot_nodes:
@@ -573,19 +670,66 @@ func _sync_shots() -> void:
 
 func _make_shot_node() -> MeshInstance3D:
 	var node := MeshInstance3D.new()
-	var cube := BoxMesh.new()
-	cube.size = Vector3(13, 13, 13)
-	node.mesh = cube
+	node.mesh = _shot_mesh("cube")
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return node
 
 
+func _shot_mesh(style: String) -> Mesh:
+	if shot_meshes.has(style):
+		return shot_meshes[style]
+	var mesh: Mesh
+	match style:
+		"arrow":
+			var b := BoxMesh.new()
+			b.size = Vector3(5, 5, 26)
+			mesh = b
+		"leaf":
+			var b := BoxMesh.new()
+			b.size = Vector3(9, 3, 18)
+			mesh = b
+		"claw":
+			var b := BoxMesh.new()
+			b.size = Vector3(7, 4, 20)
+			mesh = b
+		"star":
+			var b := BoxMesh.new()
+			b.size = Vector3(16, 5, 16)
+			mesh = b
+		"bubble":
+			var s := SphereMesh.new()
+			s.radius = 9.0
+			s.height = 18.0
+			s.radial_segments = 10
+			s.rings = 5
+			mesh = s
+		"moon":
+			var t := TorusMesh.new()
+			t.inner_radius = 4.0
+			t.outer_radius = 9.0
+			t.rings = 10
+			t.ring_segments = 4
+			mesh = t
+		_:
+			var b := BoxMesh.new()
+			b.size = Vector3(13, 13, 13)
+			mesh = b
+	shot_meshes[style] = mesh
+	return mesh
+
+
 func _sync_zones() -> void:
+	if zone_mesh == null:
+		# 用扁平圆柱做圆形范围指示，避免方块缩放后变成方形。
+		zone_mesh = CylinderMesh.new()
+		zone_mesh.top_radius = 1.0
+		zone_mesh.bottom_radius = 1.0
+		zone_mesh.height = 0.8
+		zone_mesh.radial_segments = 32
+		zone_mesh.rings = 1
 	while zone_nodes.size() < sim.zones.size():
 		var node := MeshInstance3D.new()
-		var cube := BoxMesh.new()
-		cube.size = Vector3(2, 0.8, 2)
-		node.mesh = cube
+		node.mesh = zone_mesh
 		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(node)
 		zone_nodes.append(node)
@@ -615,6 +759,9 @@ func _alpha_material(c: Color, unshaded := true) -> StandardMaterial3D:
 
 
 func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
+	if kind.begins_with("cast_"):
+		_spawn_style(kind.substr(5), pos, color, radius)
+		return
 	match kind:
 		"ring":
 			_spawn_ring(pos, color, maxf(radius, 30.0), 0.42)
@@ -628,6 +775,11 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 			_spawn_burst(pos, color, 0.14)
 		"debris":
 			_spawn_debris(pos, color, maxi(6, int(radius / 16.0)))
+		"potion_spawn":
+			_spawn_style("leafheal", pos, color, 110.0)
+		"potion_pick":
+			_spawn_style("leafheal", pos, color, 90.0)
+			_spawn_burst(pos, color, 0.30)
 
 
 func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void:
@@ -635,8 +787,8 @@ func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void
 	var torus := TorusMesh.new()
 	torus.inner_radius = radius * 0.90
 	torus.outer_radius = radius
-	torus.rings = 12
-	torus.ring_segments = 4
+	torus.rings = 32
+	torus.ring_segments = 6
 	node.mesh = torus
 	node.position = Vector3(pos.x, 1.6, pos.z)
 	node.material_override = _alpha_material(Color(color.r, color.g, color.b, 0.85))
@@ -668,6 +820,186 @@ func _spawn_slash(pos: Vector3, color: Color) -> void:
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node)
 	fx_items.append({"node": node, "t": 0.0, "life": 0.13, "start": 0.6, "end": 1.1})
+
+
+func _fx_mat(c: Color, a := 0.9) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(c.r, c.g, c.b, a)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return m
+
+
+func _add_fx_mesh(mesh: Mesh, mat: Material, at: Vector3, life: float, start: float, end: float,
+		vel := Vector3.ZERO, spin := Vector3.ZERO, rot := Vector3.ZERO) -> void:
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = at
+	node.rotation = rot
+	node.material_override = mat
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	var item: Dictionary = {"node": node, "t": 0.0, "life": life, "start": start, "end": end}
+	if vel != Vector3.ZERO:
+		item["vel"] = vel
+	if spin != Vector3.ZERO:
+		item["spin"] = spin
+	fx_items.append(item)
+
+
+func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> void:
+	# 每个英雄的施法形状不同：爪痕 / 星星 / 叶子 / 竹子 / 水泡 / 月光 / 羽刃…
+	match style:
+		"claw", "clawstorm":
+			_spawn_slashes(pos, color, 6 if style == "clawstorm" else 3, maxf(radius, 120.0))
+		"roll":
+			_spawn_slashes(pos, color, 4, maxf(radius, 100.0))
+		"star", "starfall", "blink":
+			_spawn_stars(pos, color, 8 if style == "starfall" else 5, radius)
+		"leaf", "leafheal":
+			_spawn_leaves(pos, color, maxf(radius, 130.0))
+		"leafsmash", "quake", "bamboo", "spikes":
+			_spawn_ground(pos, color, maxf(radius, 150.0), style)
+		"moon", "nightfall":
+			_spawn_moon(pos, color, maxf(radius, 150.0))
+		"bubble", "waterfall", "wave":
+			_spawn_bubbles(pos, color, maxf(radius, 110.0))
+		"feather":
+			_spawn_feathers(pos, color, maxf(radius, 140.0))
+		"heart":
+			_spawn_heart(pos, color)
+		"roar":
+			_spawn_roar(pos, color, maxf(radius, 160.0))
+		_:
+			_spawn_burst(pos, color, 0.30)
+
+
+func _spawn_slashes(pos: Vector3, color: Color, count: int, radius: float) -> void:
+	var mat := _fx_mat(color, 0.92)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(maxf(46.0, radius * 0.50), 6, 10)
+	for i in range(count):
+		var a := -0.95 + (1.9 * float(i) / maxf(1.0, float(count - 1)))
+		_add_fx_mesh(mesh, mat, pos + Vector3(0, 30.0, 0), 0.34, 0.55, 1.35,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, a, 0.55))
+
+
+func _spawn_stars(pos: Vector3, color: Color, count: int, radius: float) -> void:
+	var mat := _fx_mat(color, 0.95)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(15, 15, 4)
+	for i in range(count):
+		var ang := TAU * float(i) / float(count)
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (18.0 + radius * 0.18)
+		at.y = 26.0 + float(i % 3) * 10.0
+		_add_fx_mesh(mesh, mat, at, 0.70, 0.5, 1.25,
+			Vector3(0, 50, 0), Vector3(0, 3.0, 4.0), Vector3(0, ang, PI * 0.25))
+
+
+func _spawn_leaves(pos: Vector3, color: Color, radius: float) -> void:
+	var mat := _fx_mat(color, 0.90)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(11, 3, 19)
+	for i in range(7):
+		var ang := TAU * float(i) / 7.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.45)
+		at.y = 12.0
+		_add_fx_mesh(mesh, mat, at, 0.85, 0.4, 1.2,
+			Vector3(0, 70, 0), Vector3(0, 5, 0), Vector3(0.2, ang, 0.55))
+
+
+func _spawn_ground(pos: Vector3, color: Color, radius: float, style: String) -> void:
+	var torus := TorusMesh.new()
+	torus.inner_radius = radius * 0.82
+	torus.outer_radius = radius * 0.92
+	torus.rings = 32
+	torus.ring_segments = 4
+	_add_fx_mesh(torus, _fx_mat(color, 0.70), Vector3(pos.x, 6.0, pos.z), 0.70, 0.7, 1.2)
+	if style == "quake":
+		_spawn_debris(pos, color, 10)
+	elif style == "leafsmash":
+		_spawn_leaves(pos, color, radius)
+	else:
+		var mat := _fx_mat(color, 0.90)
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(11, 62, 11)
+		for i in range(8):
+			var ang := TAU * float(i) / 8.0
+			var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.55)
+			at.y = 18.0
+			_add_fx_mesh(mesh, mat, at, 0.75, 0.15, 1.25,
+				Vector3.ZERO, Vector3.ZERO, Vector3(0.2, ang, 0.15))
+
+
+func _spawn_moon(pos: Vector3, color: Color, radius: float) -> void:
+	var mat := _fx_mat(color, 0.55)
+	var torus := TorusMesh.new()
+	torus.inner_radius = radius * 0.58
+	torus.outer_radius = radius * 0.66
+	torus.rings = 32
+	torus.ring_segments = 4
+	_add_fx_mesh(torus, mat, Vector3(pos.x, 30.0, pos.z), 0.95, 0.5, 1.25)
+	var orb_mat := _fx_mat(color, 0.55)
+	var orb := SphereMesh.new()
+	orb.radius = 8.0
+	orb.height = 16.0
+	orb.radial_segments = 8
+	orb.rings = 4
+	for i in range(5):
+		var ang := TAU * float(i) / 5.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.50)
+		at.y = 36.0 + float(i % 3) * 14.0
+		_add_fx_mesh(orb, orb_mat, at, 0.95, 0.4, 1.1,
+			Vector3(0, 30, 0), Vector3(0, 2, 0))
+
+
+func _spawn_bubbles(pos: Vector3, color: Color, radius: float) -> void:
+	var mat := _fx_mat(color, 0.50)
+	var sphere := SphereMesh.new()
+	sphere.radius = 10.0
+	sphere.height = 20.0
+	sphere.radial_segments = 10
+	sphere.rings = 5
+	for i in range(7):
+		var ang := TAU * float(i) / 7.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.18 + float(i % 3) * 18.0)
+		at.y = 16.0
+		_add_fx_mesh(sphere, mat, at, 0.85, 0.5, 1.25,
+			Vector3(0, 80 + float(i % 4) * 14, 0))
+
+
+func _spawn_feathers(pos: Vector3, color: Color, radius: float) -> void:
+	var mat := _fx_mat(color, 0.85)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(5, 2, 26)
+	for i in range(8):
+		var ang := TAU * float(i) / 8.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.52)
+		at.y = 36.0
+		_add_fx_mesh(mesh, mat, at, 0.75, 0.5, 1.3,
+			Vector3(0, 20, 0), Vector3(0, 7, 0), Vector3(0.4, ang, 0))
+
+
+func _spawn_heart(pos: Vector3, color: Color) -> void:
+	var mat := _fx_mat(Color(1.0, 0.55, 0.70), 0.92)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(16, 16, 5)
+	for i in range(2):
+		_add_fx_mesh(mesh, mat, pos + Vector3(-7.0 + 14.0 * float(i), 42.0, 0.0),
+			0.85, 0.4, 1.2, Vector3(0, 45, 0), Vector3(0, 2, 0), Vector3(0, 0, PI * 0.25))
+	_spawn_roar(pos, color, 90.0)
+
+
+func _spawn_roar(pos: Vector3, color: Color, radius: float) -> void:
+	for i in range(3):
+		var torus := TorusMesh.new()
+		torus.inner_radius = radius * (0.55 + 0.22 * float(i)) * 0.90
+		torus.outer_radius = radius * (0.55 + 0.22 * float(i))
+		torus.rings = 32
+		torus.ring_segments = 4
+		_add_fx_mesh(torus, _fx_mat(color, 0.55), Vector3(pos.x, 6.0, pos.z),
+			0.55 + 0.15 * float(i), 0.55, 1.45)
 
 
 func play_victory(base, color: Color) -> void:
@@ -739,6 +1071,10 @@ func _step_fx(delta: float) -> void:
 			continue
 		var s: float = lerp(float(item["start"]), float(item["end"]), k)
 		node.scale = Vector3.ONE * s
+		if item.has("vel"):
+			node.position += (item["vel"] as Vector3) * delta
+		if item.has("spin"):
+			node.rotation += (item["spin"] as Vector3) * delta
 		var m := node.material_override as StandardMaterial3D
 		if m != null:
 			m.albedo_color.a = 1.0 - k

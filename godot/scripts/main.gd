@@ -54,6 +54,11 @@ func _ready() -> void:
 	add_child(sfx)
 
 	var args := OS.get_cmdline_user_args()
+	# 调试：--hero=frog 指定英雄，便于逐个检查技能特效。
+	for a in args:
+		if str(a).begins_with("--hero="):
+			current_hero = str(a).substr(7)
+			break
 	if "--skip-home" in args or "--top" in args or "--no-hud" in args:
 		_start_match(current_hero, current_difficulty, current_seed)
 	else:
@@ -198,12 +203,18 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	if "--pause" in OS.get_cmdline_user_args():
 		_toggle_pause()
 	if "--result" in OS.get_cmdline_user_args():
-		sim.end_match(sim.BLUE)
+		sim.end_match(sim.BLUE, "调试结算")
 	# 开发用：直接摧毁红方水晶，检查结束动画与结算页。
-	if "--victory" in OS.get_cmdline_user_args():
+	var vargs := OS.get_cmdline_user_args()
+	if "--victory" in vargs or "--victory-minion" in vargs:
 		sim.towers_red[0].hp = 0.0
 		sim.towers_red[1].hp = 0.0
-		sim.deal_damage(sim.base_red, 99999.0, sim.player)
+		var killer = sim.player
+		if "--victory-minion" in vargs:
+			sim.spawn_wave(sim.BLUE)
+			if not sim.minions.is_empty():
+				killer = sim.minions[0]
+		sim.deal_damage(sim.base_red, 99999.0, killer)
 		sim.step(0.016)
 		hud.queue_redraw()
 
@@ -284,7 +295,8 @@ func _on_match_ended(winner: int) -> void:
 	if hud == null or sim == null:
 		return
 	var loser_base = sim.base_red if winner == sim.BLUE else sim.base_blue
-	if loser_base != null and not loser_base.is_alive():
+	# 不论最后一击来自玩家、AI 英雄还是小兵，只要水晶被摧毁就播结束动画。
+	if loser_base != null and sim.end_reason == "水晶被摧毁":
 		var now := Time.get_ticks_msec()
 		cinematic = true
 		cinematic_until_ms = now + 2600

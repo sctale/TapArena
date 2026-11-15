@@ -40,6 +40,11 @@
     "count": 3,
     "structure_damage_mul": 2.4
   },
+  "potion": {
+    "heal_pct": 0.35,
+    "respawn": 30,
+    "radius": 30
+  },
   "lane": [
     [300, 800],
     [760, 800],

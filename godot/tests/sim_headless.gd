@@ -132,7 +132,7 @@ func _init() -> void:
 
 	var rule_issues := _rule_checks()
 	if rule_issues.is_empty():
-		print("RULE_OK base_protection/base_heal/ult_cd")
+		print("RULE_OK base_protection/base_heal/ult_cd/potion")
 	else:
 		failures += 1
 		for issue in rule_issues:
@@ -204,6 +204,32 @@ func _rule_checks() -> Array:
 		sim3.step(1.0 / 60.0)
 	if bh.hp > bh1 + 1.0:
 		issues.append("离开基地后仍在回血")
+
+	# 回血药剂：踩到回血、30 秒刷新。
+	var sim4 = BattleSimScript.new()
+	sim4.setup("tiger", 0, 781)
+	if sim4.potions.size() != 2:
+		issues.append("回血药剂数量不是 2")
+	else:
+		var pot = sim4.potions[0]
+		var ph = sim4.player
+		ph.pos = pot.pos
+		ph.prev_pos = ph.pos
+		ph.hp = ph.max_hp * 0.2
+		var ph0: float = ph.hp
+		sim4.step_potions(0.05)
+		if ph.hp <= ph0 + 1.0:
+			issues.append("回血药剂未回血")
+		if pot.active:
+			issues.append("回血药剂未消失")
+		ph.pos = Vector2(1500, 800)
+		ph.prev_pos = ph.pos
+		sim4.step_potions(29.0)
+		if pot.active:
+			issues.append("回血药剂提前刷新")
+		sim4.step_potions(1.5)
+		if not pot.active:
+			issues.append("回血药剂 30 秒后未刷新")
 
 	# 所有英雄的大招都应立刻进入冷却。
 	for id in HERO_IDS:

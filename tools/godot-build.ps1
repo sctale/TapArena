@@ -3,7 +3,7 @@
 # 流程：生成导出预设 -> 导入资产 -> 无头规则回归 -> 导出 Android release -> aapt/apksigner 校验 -> 复制根目录 APK
 
 param(
-    [int]$VersionCode = 34,
+    [int]$VersionCode = 35,
     [switch]$SkipSim
 )
 

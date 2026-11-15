@@ -117,9 +117,10 @@ func pause_rect() -> Rect2:
 func skill_rect(i: int) -> Rect2:
 	var safe := _safe()
 	var h := safe.size.y
-	var bs: Array = [h * 0.150, h * 0.140, h * 0.165]
-	var cx: Array = [safe.end.x - h * 0.265, safe.end.x - h * 0.150, safe.end.x - h * 0.170]
-	var cy: Array = [safe.end.y - h * 0.190, safe.end.y - h * 0.375, safe.end.y - h * 0.565]
+	# 圆形技能钮：直径与冷却转盘一致，整体比上一版缩小，避免挡住战场。
+	var bs: Array = [h * 0.112, h * 0.104, h * 0.124]
+	var cx: Array = [safe.end.x - h * 0.250, safe.end.x - h * 0.145, safe.end.x - h * 0.155]
+	var cy: Array = [safe.end.y - h * 0.170, safe.end.y - h * 0.335, safe.end.y - h * 0.500]
 	return Rect2(cx[i] - bs[i] * 0.5, cy[i] - bs[i] * 0.5, bs[i], bs[i])
 
 
@@ -426,7 +427,7 @@ func _update_labels() -> void:
 		_place(lbl_plate_name, Rect2(text_x, plate.position.y + 4.0, name_w, plate.size.y * 0.30))
 		_set_label(lbl_plate_name, "%s · %s" % [str(p.def.get("name", "?")), str(p.def.get("role", ""))])
 		_place(lbl_plate_sub, Rect2(chip.end.x + 12.0, chip.position.y, plate.end.x - chip.end.x - 24.0, chip.size.y))
-		_set_label(lbl_plate_sub, "大招冷却 %d 秒" % ceili(p.cds[2]) if p.level >= 2 and p.cds[2] > 0.0
+		_set_label(lbl_plate_sub, "大招冷却中" if p.level >= 2 and p.cds[2] > 0.0
 			else ("2 级解锁大招" if p.level < 2 else "大招已就绪"))
 	else:
 		lbl_plate_name.visible = false
@@ -815,6 +816,15 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 		var s := 7.0 if u.kind == sim.BASE else 5.0
 		_add_rect(Rect2(px - s * 0.5, py - s * 0.5, s, s), PANEL_DARK)
 		_add_rect(Rect2(px - s * 0.5 + 1, py - s * 0.5 + 1, s - 2, s - 2), c)
+	# 回血药剂：小地图上的绿色十字点。
+	for pt in sim.potions:
+		if not pt.active:
+			continue
+		var ppx: float = inner.position.x + pt.pos.x / sim.map_w * inner.size.x
+		var ppy: float = inner.position.y + pt.pos.y / sim.map_h * inner.size.y
+		_add_rect(Rect2(ppx - 4, ppy - 4, 8, 8), PANEL_DARK)
+		_add_rect(Rect2(ppx - 3, ppy - 1, 6, 2), Color(0.55, 1.0, 0.65))
+		_add_rect(Rect2(ppx - 1, ppy - 3, 2, 6), Color(0.55, 1.0, 0.65))
 	if sim.player != null:
 		var prp: Vector2 = sim.render_pos(sim.player)
 		var pp := Vector2(inner.position.x + prp.x / sim.map_w * inner.size.x,
@@ -876,10 +886,12 @@ func _draw_skill_bg(safe: Rect2, h: float) -> void:
 		var r := skill_rect(i)
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
-		var square := _square_inside(r)
-		_add_rect(Rect2(square.position - Vector2(3, 3), square.size + Vector2(6, 6)), PANEL_DARK)
-		_add_rect(square, PANEL_DEEP if locked else Color("4a5a50"))
-		_add_box(square, PANEL_LIGHT if not locked else Color(0.55, 0.58, 0.55, 1.0), 2.0)
+		var c := r.get_center()
+		var rad := r.size.x * 0.5
+		# 外圈描边 + 内圈填充，做成和冷却转盘同尺寸的圆形按钮。
+		_add_disc(c, rad + 2.5, PANEL_LIGHT if not locked else Color(0.52, 0.55, 0.52, 1.0))
+		_add_disc(c, rad, PANEL_DEEP if locked else Color("3f4f46"))
+		_add_disc(c - Vector2(0, rad * 0.30), rad * 0.72, Color(1, 1, 1, 0.06))
 
 
 func _draw_skill_icons(safe: Rect2, h: float) -> void:
@@ -890,12 +902,12 @@ func _draw_skill_icons(safe: Rect2, h: float) -> void:
 		var r := skill_rect(i)
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
-		var square := _square_inside(r)
+		var c := r.get_center()
 		var icon_name := "skill_" + str(s.get("kind", "aoe"))
 		var icon: Texture2D = icons.tex(icon_name)
-		var pad := square.size.x * 0.14
-		var icon_rect := Rect2(square.position + Vector2(pad, pad), square.size - Vector2(pad * 2.0, pad * 2.0))
-		var tint := Color(1, 1, 1, 1) if not locked else Color(0.55, 0.55, 0.55, 0.9)
+		var isz := r.size.x * 0.62
+		var icon_rect := Rect2(c - Vector2(isz, isz) * 0.5, Vector2(isz, isz))
+		var tint := Color(1, 1, 1, 1) if not locked else Color(0.62, 0.64, 0.62, 0.9)
 		draw_texture_rect(icon, icon_rect, false, tint)
 
 
@@ -908,31 +920,27 @@ func _draw_skill_fg(safe: Rect2, h: float) -> void:
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
 		var cooling: bool = p.cds[i] > 0.0
-		var square := _square_inside(r)
+		var c := r.get_center()
+		var rad := r.size.x * 0.5 - 1.0
 
 		if cooling:
 			var total: float = maxf(0.01, float(s.get("cd", 1.0)))
 			var ratio := clampf(p.cds[i] / total, 0.0, 1.0)
-			# 成熟 MOBA 的做法：整个方格轻微压暗 + 剩余冷却的扇形遮罩，数字覆盖在中间。
-			# 扇形从 12 点方向顺时针缩短，玩家一眼能看出「还剩多少」。
-			var c := square.get_center()
-			var rad := square.size.x * 0.72
-			_add_rect(square, Color(0.02, 0.03, 0.03, 0.30))
+			# 扇形遮罩与圆形按钮同尺寸：整个圆盘轻压暗，剩余冷却再盖一层扇形。
+			draw_circle(c, rad, Color(0.02, 0.03, 0.03, 0.32))
 			_draw_cd_sweep(c, rad, ratio, Color(0.02, 0.03, 0.03, 0.66))
 			if ratio < 0.999:
 				var a_end := -PI * 0.5 + TAU * ratio
 				draw_line(c, c + Vector2(cos(a_end), sin(a_end)) * rad,
 					Color(1, 1, 1, 0.45), maxf(1.0, h * 0.0018))
-			_digit_center(str(ceili(p.cds[i])), square, maxf(2.0, h * 0.0046), Color(1, 1, 1, 1), true)
+			_digit_center(str(ceili(p.cds[i])), r, maxf(2.0, h * 0.0044), Color(1, 1, 1, 1), true)
 
 		if locked:
-			_digit_center("2", Rect2(square.position.x, square.position.y + square.size.y * 0.36,
-				square.size.x, square.size.y * 0.28), maxf(2.0, h * 0.0042), Color(1, 1, 1, 0.85), true)
+			_digit_center("2", r, maxf(2.0, h * 0.0048), Color(1, 1, 1, 0.85), true)
 
 		if i == 2 and not locked and not cooling:
 			var glow := 0.5 + sin(Time.get_ticks_msec() * 0.004) * 0.3
-			_add_box(Rect2(square.position - Vector2(5, 5), square.size + Vector2(10, 10)),
-				Color(1.0, 0.86, 0.35, glow), 2.0)
+			draw_arc(c, rad + 5.0, 0.0, TAU, 44, Color(1.0, 0.86, 0.35, glow), 2.5, true)
 
 
 func _draw_cd_sweep(center: Vector2, radius: float, ratio: float, color: Color) -> void:
@@ -949,11 +957,6 @@ func _draw_cd_sweep(center: Vector2, radius: float, ratio: float, color: Color) 
 		var a := start + TAU * ratio * float(k) / float(steps)
 		pts.append(center + Vector2(cos(a), sin(a)) * radius)
 	draw_colored_polygon(pts, color)
-
-
-func _square_inside(r: Rect2) -> Rect2:
-	var s := minf(r.size.x, r.size.y) * 0.82
-	return Rect2(r.get_center() - Vector2(s, s) * 0.5, Vector2(s, s))
 
 
 func _draw_joystick(safe: Rect2, h: float) -> void:

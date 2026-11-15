@@ -99,6 +99,7 @@ class Projectile:
 	var homing: bool = false
 	var target = null
 	var hit: Dictionary = {}
+	var style: String = "cube"
 
 class Zone:
 	var pos := Vector2.ZERO
@@ -109,6 +110,14 @@ class Zone:
 	var team: int = 0
 	var color := Color.WHITE
 
+class Potion:
+	var team: int = 0
+	var pos := Vector2.ZERO
+	var radius: float = 30.0
+	var active := true
+	var respawn_t := 0.0
+	var view_id: int = 0
+
 var rules: Dictionary = {}
 var heroes_data: Array = []
 var defs_by_id: Dictionary = {}
@@ -118,6 +127,7 @@ var heroes: Array = []
 var minions: Array = []
 var shots: Array = []
 var zones: Array = []
+var potions: Array = []
 var towers_blue: Array = []
 var towers_red: Array = []
 var base_blue = null
@@ -164,6 +174,7 @@ var base_cfg: Dictionary = {}
 var tower_cfg: Dictionary = {}
 var minion_cfg: Dictionary = {}
 var comeback_cfg: Dictionary = {}
+var potion_cfg: Dictionary = {}
 
 var ai_think_base: float = 0.22
 var ai_skill_mul: float = 1.0
@@ -173,6 +184,7 @@ var hitstop_duration: float = 0.045
 
 var _uid: int = 0
 var _shot_view: int = 0
+var _potion_view: int = 0
 var pending: Array = []
 
 
@@ -189,6 +201,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	minions.clear()
 	shots.clear()
 	zones.clear()
+	potions.clear()
 	towers_blue.clear()
 	towers_red.clear()
 	pending.clear()
@@ -197,6 +210,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	player = null
 	_uid = 0
 	_shot_view = 0
+	_potion_view = 0
 	clock = 0.0
 	wave_t = 0.0
 	over = false
@@ -230,6 +244,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	tower_cfg = rules.get("tower", {})
 	minion_cfg = rules.get("minion", {})
 	comeback_cfg = rules.get("comeback", {})
+	potion_cfg = rules.get("potion", {})
 	var hs: Dictionary = rules.get("hitstop", {})
 	hitstop_threshold = float(hs.get("threshold", 45))
 	hitstop_duration = float(hs.get("duration", 0.045))
@@ -261,6 +276,9 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	towers_blue.append(make_tower(BLUE, 1, Vector2(760, 800)))
 	towers_red.append(make_tower(RED, 0, Vector2(1900, 800)))
 	towers_red.append(make_tower(RED, 1, Vector2(2320, 800)))
+	# 双方一塔后方各放一瓶回血药剂，踩到即喝，30 秒后重新长出来。
+	make_potion(BLUE, Vector2(1050, 800))
+	make_potion(RED, Vector2(2030, 800))
 
 	var allies: Array = []
 	var player_front := player_hero == "tiger" or player_hero == "bear"
@@ -364,6 +382,47 @@ func make_tower(team: int, tier: int, pos: Vector2):
 	return u
 
 
+func make_potion(team: int, pos: Vector2):
+	var p = Potion.new()
+	p.team = team
+	p.pos = pos
+	p.radius = float(potion_cfg.get("radius", 30))
+	p.view_id = _potion_view
+	_potion_view += 1
+	potions.append(p)
+	return p
+
+
+func step_potions(dt: float) -> void:
+	# 回血药剂：踩到立刻回血并消失，30 秒后原地刷新；敌我双方都能喝。
+	var heal_pct := float(potion_cfg.get("heal_pct", 0.35))
+	var respawn := float(potion_cfg.get("respawn", 30.0))
+	for p in potions:
+		if not p.active:
+			p.respawn_t = maxf(0.0, p.respawn_t - dt)
+			if p.respawn_t <= 0.0:
+				p.active = true
+				fx.emit("potion_spawn", Vector3(p.pos.x, 8.0, p.pos.y),
+					Color(0.55, 1.0, 0.65), p.radius)
+			continue
+		for h in heroes:
+			if not h.is_alive():
+				continue
+			if h.pos.distance_to(p.pos) > p.radius + h.radius:
+				continue
+			p.active = false
+			p.respawn_t = respawn
+			var before: float = h.hp
+			h.hp = minf(h.max_hp, h.hp + h.max_hp * heal_pct)
+			var gained: float = h.hp - before
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y),
+				"+" + str(roundi(gained)), Color(0.55, 1.0, 0.65))
+			fx.emit("potion_pick", Vector3(p.pos.x, 12.0, p.pos.y),
+				Color(0.55, 1.0, 0.65), p.radius)
+			sfx.emit("cast")
+			break
+
+
 func make_hero(id: String, team: int, slot: int):
 	var d: Dictionary = defs_by_id.get(id, heroes_data[0])
 	var offset := Vector2(150.0 if team == BLUE else -150.0, float(slot - 1) * 70.0)
@@ -436,6 +495,7 @@ func step(dt: float) -> void:
 			add_xp(h, xp_passive_per_sec * dt)
 
 	step_pending(dt)
+	step_potions(dt)
 
 	if not over and clock >= match_cap:
 		var b: float = base_blue.hp / base_blue.max_hp
@@ -544,9 +604,26 @@ func step_hero(h, dt: float) -> void:
 		h.atk_anim = 0.34
 		h.facing = 1.0 if target.pos.x >= h.pos.x else -1.0
 		if h.attack_range > 250.0:
-			shoot(h, target.pos - h.pos, h.dmg, h.accent, 700.0, 0.0, 0.0, 0.0, 0)
+			shoot(h, target.pos - h.pos, h.dmg, h.accent, 700.0, 0.0, 0.0, 0.0, 0,
+				false, null, hero_shot_style(h.hero_id))
 		else:
 			hit_with_fx(target, h.dmg, h, 0.0)
+
+
+func hero_shot_style(id: String) -> String:
+	# 普攻弹道也带角色特色：星星、叶子、水泡、箭矢、月刃。
+	match id:
+		"fox":
+			return "star"
+		"rabbit":
+			return "leaf"
+		"frog":
+			return "bubble"
+		"cat":
+			return "arrow"
+		"owl":
+			return "moon"
+	return "cube"
 
 
 func step_hero_ai(h, dt: float) -> void:
@@ -810,7 +887,7 @@ func move_to(u, p: Vector2) -> void:
 
 func shoot(src, dir: Vector2, dmg: float, color: Color, speed: float,
 		slow: float, splash: float, splash_radius: float, pierce: int,
-		homing := false, target = null) -> void:
+		homing := false, target = null, style := "cube") -> void:
 	if dir.length_squared() < 0.001:
 		dir = Vector2.RIGHT
 	var p = Projectile.new()
@@ -833,6 +910,7 @@ func shoot(src, dir: Vector2, dmg: float, color: Color, speed: float,
 	_shot_view += 1
 	p.homing = homing
 	p.target = target
+	p.style = style
 	shots.append(p)
 	fx.emit("muzzle", Vector3(p.pos.x, src.height * 0.45, p.pos.y), color, 0.0)
 
@@ -1211,6 +1289,10 @@ func cast(h, s: Dictionary, index: int) -> void:
 	var color: Color = s.get("color_c", Color.WHITE)
 	var dmg := float(s.get("dmg", 0.0))
 	var radius := float(s.get("radius", 120.0))
+	var style := str(s.get("fx", "burst"))
+	if kind != "leap" and kind != "pull" and kind != "multi":
+		# 每个英雄的施法都有专属形状：爪痕、星星、叶子、水泡、箭雨、竹子、月光…
+		fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
 
 	match kind:
 		"projectile", "radial":
@@ -1224,7 +1306,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 					var angle_spread := atan2(aim_dir.y, aim_dir.x) + (float(k) - float(n - 1) * 0.5) * 0.16
 					dir = Vector2(cos(angle_spread), sin(angle_spread))
 				shoot(h, dir, dmg, color, float(s.get("speed", 620.0)),
-					float(s.get("slow", 0.0)), 0.0, 0.0, int(s.get("pierce", 0)))
+					float(s.get("slow", 0.0)), 0.0, 0.0, int(s.get("pierce", 0)),
+					false, null, style)
 		"splash":
 			var p = Projectile.new()
 			p.pos = h.pos
@@ -1240,6 +1323,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			p.splash = dmg
 			p.splash_radius = radius
 			p.bubble = true
+			p.style = style
 			p.view_id = _shot_view
 			_shot_view += 1
 			shots.append(p)
@@ -1253,6 +1337,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			h.invuln_t = maxf(h.invuln_t, 0.12)
 			fx.emit("burst", Vector3(dash_from.x, 24.0, dash_from.y), color, 0.0)
 			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
+			fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
 			if dmg > 0.0:
 				area_damage(h.pos, radius, dmg, h, h.team, float(s.get("slow", 0.0)), 0.0, float(s.get("knock", 0.0)))
 				fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
@@ -1310,6 +1395,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			deal_damage(pull_target, dmg, h)
 			h.shield = maxf(h.shield, h.max_hp * float(s.get("shield_pct", 0.0)))
 			h.shield_t = maxf(h.shield_t, 3.0)
+			fx.emit("cast_" + style, Vector3(pull_target.pos.x, 22.0, pull_target.pos.y), color, 80.0)
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "抱住了！", color)
 		"leap":
 			var leap_target = nearest_hero(h, float(s.get("range", 360.0)))
@@ -1336,6 +1422,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 					"slow": float(s.get("slow", 0.0)),
 					"heal_pct": float(s.get("heal_pct", 0.0)),
 					"color": color,
+					"style": style,
 				})
 
 
@@ -1368,6 +1455,7 @@ func leap_land(h, dest: Vector2, s: Dictionary) -> void:
 	var radius := float(s.get("radius", 235.0))
 	area_damage(dest, radius, float(s.get("dmg", 0.0)), h, h.team,
 		float(s.get("slow", 0.0)), float(s.get("stun", 0.0)), 26.0)
+	fx.emit("cast_" + str(s.get("fx", "quake")), Vector3(dest.x, 20.0, dest.y), color, radius)
 	fx.emit("ring", Vector3(dest.x, 6.0, dest.y), color, radius)
 	fx.emit("burst", Vector3(dest.x, 20.0, dest.y), color, 0.0)
 	if s.get("zone", false):
@@ -1388,6 +1476,7 @@ func step_pending(dt: float) -> void:
 		var radius := float(item["radius"])
 		var color: Color = item["color"]
 		area_damage(center, radius, float(item["dmg"]), src, src.team, float(item.get("slow", 0.0)), 0.0, 0.0)
+		fx.emit("cast_" + str(item.get("style", "burst")), Vector3(center.x, 20.0, center.y), color, radius)
 		fx.emit("ring", Vector3(center.x, 6.0, center.y), color, radius)
 		fx.emit("burst", Vector3(center.x, 20.0, center.y), color, 0.0)
 		var heal_pct := float(item.get("heal_pct", 0.0))
