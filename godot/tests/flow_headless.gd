@@ -35,6 +35,14 @@ func _process(_delta: float) -> bool:
 			failures.append("进入战斗后首页没有清理")
 		elif main.current_hero != "fox" or main.current_difficulty != 1:
 			failures.append("选人/难度没有传进战斗：%s/%d" % [main.current_hero, main.current_difficulty])
+		# 每个英雄都应该有独立的施法/命中/大招音色。
+		for id in ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl"]:
+			for prefix in ["cast_", "hit_", "ult_"]:
+				if not main.sfx._streams.has(prefix + id):
+					failures.append("缺少音效 " + prefix + id)
+		for id in ["fox", "rabbit", "frog", "cat", "owl"]:
+			if not main.sfx._streams.has("shoot_" + id):
+				failures.append("缺少普攻音效 shoot_" + id)
 	elif frame == 66:
 		if main.sim != null and main.sim.clock <= 0.0:
 			failures.append("战斗没有推进时钟")

@@ -132,7 +132,7 @@ func _init() -> void:
 
 	var rule_issues := _rule_checks()
 	if rule_issues.is_empty():
-		print("RULE_OK base_protection/base_heal/ult_cd/potion")
+		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash")
 	else:
 		failures += 1
 		for issue in rule_issues:
@@ -230,6 +230,39 @@ func _rule_checks() -> Array:
 		sim4.step_potions(1.5)
 		if not pot.active:
 			issues.append("回血药剂 30 秒后未刷新")
+
+	# 满血不喝；一塔被拆后不再刷新。
+	var sim5 = BattleSimScript.new()
+	sim5.setup("tiger", 0, 782)
+	var pot5 = sim5.potions[0]
+	var full = sim5.player
+	full.pos = pot5.pos
+	full.prev_pos = full.pos
+	sim5.step_potions(0.1)
+	if not pot5.active:
+		issues.append("满血英雄拿走了回血药剂")
+	sim5.towers_blue[0].hp = 0.0
+	sim5.step_potions(0.1)
+	if pot5.active:
+		issues.append("一塔被拆后回血药剂仍存在")
+	for i in range(31):
+		sim5.step_potions(1.0)
+	if pot5.active:
+		issues.append("一塔被拆后回血药剂仍刷新")
+
+	# 位移技能必须朝操作方向，不能自动扭头追最近敌人。
+	var sim6 = BattleSimScript.new()
+	sim6.setup("tiger", 0, 783)
+	var dash_hero = sim6.player
+	var bait = sim6.heroes[3]
+	bait.pos = dash_hero.pos + Vector2(120, 0)
+	bait.prev_pos = bait.pos
+	sim6.player_move = Vector2(-1, 0)
+	dash_hero.move_dir = Vector2(-1, 0)
+	var dash_x: float = dash_hero.pos.x
+	sim6.try_cast(dash_hero, 0)
+	if dash_hero.pos.x > dash_x - 40.0:
+		issues.append("位移技能没有朝移动方向")
 
 	# 所有英雄的大招都应立刻进入冷却。
 	for id in HERO_IDS:

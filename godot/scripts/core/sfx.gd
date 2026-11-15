@@ -6,6 +6,18 @@ extends Node
 
 const RATE := 16000
 
+# 8 位英雄的施法/命中/大招音色参数：波形、起止频率、噪声量、普攻音高。
+const HERO_AUDIO := {
+	"tiger": {"cast0": 320.0, "cast1": 820.0, "wave": "square", "hit0": 240.0, "hit1": 90.0, "noise": 0.55, "shoot": 0.0},
+	"fox": {"cast0": 520.0, "cast1": 1280.0, "wave": "triangle", "hit0": 460.0, "hit1": 300.0, "noise": 0.18, "shoot": 920.0},
+	"rabbit": {"cast0": 680.0, "cast1": 1180.0, "wave": "sine", "hit0": 620.0, "hit1": 880.0, "noise": 0.10, "shoot": 720.0},
+	"bear": {"cast0": 180.0, "cast1": 420.0, "wave": "square", "hit0": 150.0, "hit1": 55.0, "noise": 0.75, "shoot": 0.0},
+	"frog": {"cast0": 380.0, "cast1": 620.0, "wave": "triangle", "hit0": 340.0, "hit1": 180.0, "noise": 0.30, "shoot": 480.0},
+	"cat": {"cast0": 760.0, "cast1": 1500.0, "wave": "triangle", "hit0": 720.0, "hit1": 420.0, "noise": 0.16, "shoot": 1200.0},
+	"panda": {"cast0": 260.0, "cast1": 560.0, "wave": "triangle", "hit0": 210.0, "hit1": 95.0, "noise": 0.45, "shoot": 0.0},
+	"owl": {"cast0": 620.0, "cast1": 1600.0, "wave": "sine", "hit0": 700.0, "hit1": 1100.0, "noise": 0.08, "shoot": 1050.0},
+}
+
 var enabled := true
 var _streams: Dictionary = {}
 var _players: Array = []
@@ -35,7 +47,7 @@ func play(key: String, volume_db := 0.0) -> void:
 	if stream == null:
 		return
 	var now := Time.get_ticks_msec()
-	if key == "hit" and now - int(_last_ms.get(key, -999)) < 45:
+	if key.begins_with("hit") and now - int(_last_ms.get(key, -999)) < 45:
 		return
 	_last_ms[key] = now
 	var p: AudioStreamPlayer = _players[_next]
@@ -60,6 +72,14 @@ func _build() -> void:
 	_streams["win"] = _make_win()
 	_streams["lose"] = _make_lose()
 	_streams["click"] = _make_click()
+	_streams["pickup"] = _make_pickup()
+	# 每个英雄的施法 / 命中 / 大招 / 普攻音色都不同。
+	for id in HERO_AUDIO:
+		_streams["cast_" + id] = _make_cast_variant(id)
+		_streams["hit_" + id] = _make_hit_variant(id)
+		_streams["ult_" + id] = _make_ult_variant(id)
+		if float(HERO_AUDIO[id]["shoot"]) > 0.0:
+			_streams["shoot_" + id] = _make_shoot_variant(id)
 
 
 func _wav(samples: PackedFloat32Array, loop := false, rate := RATE) -> AudioStreamWAV:
@@ -172,6 +192,48 @@ func _make_lose() -> AudioStreamWAV:
 func _make_click() -> AudioStreamWAV:
 	var b := _buf(0.07)
 	_tone(b, 0.0, 0.055, 900.0, 620.0, 0.30, "square")
+	return _wav(b)
+
+
+func _make_pickup() -> AudioStreamWAV:
+	var b := _buf(0.20)
+	_tone(b, 0.0, 0.08, 660.0, 880.0, 0.26, "sine")
+	_tone(b, 0.07, 0.11, 880.0, 1320.0, 0.22, "sine")
+	return _wav(b)
+
+
+func _make_cast_variant(id: String) -> AudioStreamWAV:
+	var p: Dictionary = HERO_AUDIO[id]
+	var b := _buf(0.24)
+	_tone(b, 0.0, 0.20, float(p["cast0"]), float(p["cast1"]), 0.40, str(p["wave"]))
+	_tone(b, 0.03, 0.16, float(p["cast1"]) * 0.75, float(p["cast1"]) * 1.2, 0.12, "sine")
+	return _wav(b)
+
+
+func _make_hit_variant(id: String) -> AudioStreamWAV:
+	var p: Dictionary = HERO_AUDIO[id]
+	var b := _buf(0.13)
+	_noise(b, 0.0, 0.09, float(p["noise"]), 3.0)
+	_tone(b, 0.0, 0.10, float(p["hit0"]), float(p["hit1"]), 0.32, str(p["wave"]))
+	return _wav(b)
+
+
+func _make_ult_variant(id: String) -> AudioStreamWAV:
+	var p: Dictionary = HERO_AUDIO[id]
+	var b := _buf(0.55)
+	var f := float(p["cast1"])
+	_tone(b, 0.0, 0.28, f * 0.5, f, 0.34, str(p["wave"]))
+	_tone(b, 0.12, 0.34, f * 0.8, f * 1.5, 0.18, "sine")
+	_tone(b, 0.28, 0.22, f, f * 1.8, 0.12, "triangle")
+	return _wav(b)
+
+
+func _make_shoot_variant(id: String) -> AudioStreamWAV:
+	var p: Dictionary = HERO_AUDIO[id]
+	var f := float(p["shoot"])
+	var b := _buf(0.09)
+	_tone(b, 0.0, 0.07, f, f * 1.4, 0.16, str(p["wave"]))
+	_tone(b, 0.0, 0.05, f * 0.5, f * 0.5, 0.06, "sine")
 	return _wav(b)
 
 

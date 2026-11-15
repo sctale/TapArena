@@ -394,10 +394,15 @@ func make_potion(team: int, pos: Vector2):
 
 
 func step_potions(dt: float) -> void:
-	# 回血药剂：踩到立刻回血并消失，30 秒后原地刷新；敌我双方都能喝。
+	# 回血药剂：一塔被拆后不再刷新；满血英雄路过不会拿走。
 	var heal_pct := float(potion_cfg.get("heal_pct", 0.35))
 	var respawn := float(potion_cfg.get("respawn", 30.0))
 	for p in potions:
+		var guard = towers_blue[0] if p.team == BLUE else towers_red[0]
+		if guard == null or not guard.is_alive():
+			p.active = false
+			p.respawn_t = 0.0
+			continue
 		if not p.active:
 			p.respawn_t = maxf(0.0, p.respawn_t - dt)
 			if p.respawn_t <= 0.0:
@@ -407,6 +412,8 @@ func step_potions(dt: float) -> void:
 			continue
 		for h in heroes:
 			if not h.is_alive():
+				continue
+			if h.hp >= h.max_hp - 0.5:
 				continue
 			if h.pos.distance_to(p.pos) > p.radius + h.radius:
 				continue
@@ -419,7 +426,7 @@ func step_potions(dt: float) -> void:
 				"+" + str(roundi(gained)), Color(0.55, 1.0, 0.65))
 			fx.emit("potion_pick", Vector3(p.pos.x, 12.0, p.pos.y),
 				Color(0.55, 1.0, 0.65), p.radius)
-			sfx.emit("cast")
+			sfx.emit("pickup")
 			break
 
 
@@ -912,6 +919,8 @@ func shoot(src, dir: Vector2, dmg: float, color: Color, speed: float,
 	p.target = target
 	p.style = style
 	shots.append(p)
+	if src != null and src.kind == HERO and src.attack_range > 250.0:
+		sfx.emit("shoot_" + src.hero_id, -5.0)
 	fx.emit("muzzle", Vector3(p.pos.x, src.height * 0.45, p.pos.y), color, 0.0)
 
 
@@ -976,7 +985,10 @@ func hit_with_fx(target, amount: float, src, stun := 0.0, col = null) -> void:
 	if src != null and src.kind == HERO and src.attack_range <= 260.0:
 		fx.emit("slash", Vector3(src.pos.x + src.facing * 46.0, 24.0, src.pos.y), src.accent, 132.0)
 	fx.emit("hit", Vector3(target.pos.x, target.height * 0.55, target.pos.y), fx_color, 0.0)
-	sfx.emit("hit")
+	var hit_key := "hit"
+	if src != null and src.kind == HERO:
+		hit_key = "hit_" + src.hero_id
+	sfx.emit(hit_key)
 	if src != null and src.is_player and amount >= hitstop_threshold:
 		hitstop.emit(hitstop_duration)
 
@@ -1269,23 +1281,40 @@ func try_cast(h, index: int) -> void:
 		return
 	h.cds[index] = float(s.get("cd", 6.0))
 	h.cast_anim = 0.5
-	sfx.emit("cast")
+	sfx.emit(("ult_" if index == 2 else "cast_") + h.hero_id)
 	if h.is_player and index == 2:
 		fx.emit("punch", Vector3(h.pos.x, 40.0, h.pos.y), Color.WHITE, 0.0)
 	cast(h, s, index)
 
 
 func cast(h, s: Dictionary, index: int) -> void:
+	var kind := str(s.get("kind", "projectile"))
 	var forward: Vector2 = h.move_dir.normalized() if h.move_dir.length_squared() > 0.01 else Vector2(h.facing, 0.0)
-	var aim = nearest_enemy(h, maxf(float(s.get("range", 260.0)), 260.0))
+	var aim = null
+	if kind != "dash" or not h.is_player:
+		aim = nearest_enemy(h, maxf(float(s.get("range", 260.0)), 260.0))
 	var aim_dir := forward
 	if aim != null:
 		aim_dir = (aim.pos - h.pos).normalized()
 		h.facing = 1.0 if aim.pos.x >= h.pos.x else -1.0
+	if kind == "dash":
+		# 位移技能只认玩家/英雄当前的移动方向，不自动扭头追最近敌人。
+		# 否则逃跑时按瞬移会被拽回敌人身边。
+		if h.is_player:
+			if player_move.length_squared() > 0.01:
+				aim_dir = player_move.normalized()
+			else:
+				aim_dir = Vector2(h.facing, 0.0)
+		elif h.move_dir.length_squared() > 0.01:
+			aim_dir = h.move_dir.normalized()
+		elif aim != null:
+			aim_dir = (aim.pos - h.pos).normalized()
+		else:
+			aim_dir = Vector2(h.facing, 0.0)
+		h.facing = 1.0 if aim_dir.x >= 0.0 else -1.0
 	if aim_dir.length_squared() < 0.001:
 		aim_dir = Vector2.RIGHT
 
-	var kind := str(s.get("kind", "projectile"))
 	var color: Color = s.get("color_c", Color.WHITE)
 	var dmg := float(s.get("dmg", 0.0))
 	var radius := float(s.get("radius", 120.0))
