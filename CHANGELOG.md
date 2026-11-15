@@ -2,7 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
 
-> 项目自此只使用 Godot 引擎。Unity 版冻结在 3.2.0，Web 版冻结在 1.3，均不再更新。
+> 项目只使用 Godot 引擎；原 Unity 3.2.0 存档已从仓库移除，Web 版冻结在 1.3，不再更新。
+
+## [Unreleased]
+
+### 仓库
+
+- 移除已冻结的 Unity 3.2.0 存档（`unity/`）、`打开Unity工程.cmd`、Unity 构建与 Polyfork/Blender 美术脚本、v3.2 预览图及对应 `.gitignore` 规则；仓库只保留 Godot 主线与 Web 存档。
 
 ## [4.6.1-dev.1] - 2026-11-15
 

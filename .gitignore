@@ -13,31 +13,6 @@ keystore/
 keystore.properties
 *.apk
 
-# Unity 工程缓存与产物（工程本体在 unity/）
-unity/Library/
-unity/Temp/
-unity/Logs/
-unity/Obj/
-unity/Builds/
-unity/UserSettings/
-unity/*.log
-unity/artgen/
-unity/il2cpp-tmp/
-unity/shot-*.png
-unity/crop-*.png
-unity/sheet.png
-unity/*.mp4
-unity/preview*.png
-unity/preview*.log
-unity/face_*.png
-unity/face_sheet*.png
-unity/artref/
-unity/pose_*.png
-unity/walk*.mp4
-unity/walk_sheet*.jpg
-unity/frames*/
-unity/emu.log
-unity/adbtmp/
 .adbtmp/
 
 # Godot 工程：缓存、产物、含签名密码的导出预设、keystore
@@ -47,13 +22,3 @@ godot/export_presets.cfg
 godot/keystore/
 godot/*.log
 
-
-# Polyfork 的原始 GLB / 转出的 FBX / 动画片段：
-# 授权允许模型随游戏 APK 一起发布，但不允许把文件本体再分发到仓库或素材站。
-unity/ArtSource/
-unity/Assets/Resources/Polyfork/
-unity/Assets/Resources/Polyfork.meta
-unity/Assets/Resources/PolyforkProps/
-unity/Assets/Resources/PolyforkProps.meta
-unity/Assets/Resources/Heroes/
-unity/Assets/Resources/Heroes.meta

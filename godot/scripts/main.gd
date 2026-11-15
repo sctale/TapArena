@@ -291,7 +291,7 @@ func _process(delta: float) -> void:
 
 
 func _on_hitstop(seconds: float) -> void:
-	# 重入保护：Unity 版就是因为两段顿帧重叠把 timeScale 卡在 0.18。
+	# 重入保护：两段顿帧重叠会把 time_scale 卡在 0.18。
 	if hitstop_until_ms > Time.get_ticks_msec():
 		return
 	Engine.time_scale = 0.18

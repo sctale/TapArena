@@ -1,90 +1,17 @@
 # 萌兽峡谷 TapArena
 
-一个给 6–12 岁孩子玩的 **3v3 森林推塔小游戏**：清兵线、拆塔、推水晶。英雄使用 [Polyfork](https://polyfork.dev) 的免费低多边形动物（可商用、无需署名），没有抽卡、内购、广告，也不联网。
+一个给 6–12 岁孩子玩的 **3v3 森林推塔小游戏**：清兵线、拆塔、推水晶。8 位自制像素动物英雄（阿狮、灵灵、朵朵、阿岳、泡泡、尖尖、团团、咕咕），没有抽卡、内购、广告，也不联网。
 
 ## 版本与引擎
 
-**本项目只使用 Godot 引擎。** Unity 版和 Web 版已冻结为历史参考，不再接收功能更新。
+**本项目只使用 Godot 引擎。** 原 Unity 3.2.0 存档已移除；仅 Web 版（1.3）作为历史参考保留在 `www/` 与 git 标签 `web-v1.3.0` 中，不再接收更新。
 
 | 版本 | 位置 | 状态 |
 | --- | --- | --- |
 | **Godot 版（4.6.1-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：方块像素风 + 8 位人形动物英雄 + 纯逻辑 BattleSim + 首页选人 + 固定圆形摇杆/技能 + 60Hz 模拟 + 像素 HUD + 圆形范围指示 + 建筑遮挡抖动挖空 + 一塔回血药剂 + 3 分钟峡谷巨兽 + 英雄专属音色 + 8 英雄独立大招演出 + 胜利演出 + 6 人全员结算 + 固定俯角/高度相机，1920×1080 UI 基准，出 Android APK |
-| Unity 版（3.2.0，冻结） | `unity/` | 历史存档，保留用于对照旧玩法与旧美术，不再维护 |
 | Web 版（1.3，冻结） | `www/`、`android/` | 历史存档，封存在 git 标签 `web-v1.3.0` |
 
 备份：`D:/V-Coding/TapArena-web-v1.3.0-backup.zip`（含全部源码与素材，2.6MB）。
-
-## Unity 版怎么跑
-
-1. 双击 `打开Unity工程.cmd`（或 Unity Hub 打开 `unity/` 目录），Unity 6000.3.10f1。
-2. 直接点 Play：场景是空的，`Boot.cs` 会在运行时把相机、灯光、地形、英雄全部建起来（工程里没有美术资源依赖）。
-3. 出包：`bash tools/unity-build.sh`（先导出 Gradle 工程，再用外部 gradlew 构建；headless 下 Unity 会把 Gradle 堆算成 `-Xmx0m`，必须绕开），产物自动拷到根目录 `TapArena-v3.2.0.apk`。
-
-操作：左下拖动摇杆移动（桌面 WASD/方向键），右下三个圆形按钮放技能（桌面 Q / E / R），Esc 或安卓返回键暂停。
-
-美术资产重建（Blender 4.5 LTS，headless）：
-
-```powershell
-blender -b -P tools/polyfork_props.py       # 森林 kit 道具 -> Resources/PolyforkProps
-blender -b -P tools/polyfork_to_fbx.py      # 六只动物 + Blender 服装 -> Resources/Heroes
-blender -b -P tools/blender_game_art.py     # 地形/塔/水晶/小兵/首页地台 -> Resources/GameArt
-Unity.exe -batchmode -quit -projectPath unity -executeMethod TapArena.EditorTools.ArtImport.Run
-```
-
-`ArtImport.Run` 会统一 FBX 导入设置、导出 `.anim`、重渲染 2D 立绘与图标，并打印 `[ART] RESULT=PASS`。**原始 GLB/FBX 不提交仓库**（Polyfork 授权只允许随游戏发布，不允许再分发文件本体）；`ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 均在 `.gitignore` 中。
-
-旧的 Blender 程序化英雄管线仍保留：`blender -b -P tools/blender_lowpoly.py` 会重写 `Resources/LowPoly/*.json`；当新英雄 FBX 缺失时 `PolyforkHero` 会依次回退到旧 Polyfork FBX、LowPoly JSON，保证工程仍能启动。
-
-## Unity 版的结构
-
-```
-unity/Assets/Scripts/
-  Core/Boot.cs        启动器：运行时建相机、灯光、氛围、UI、世界
-  Core/Arena.cs       战斗规则：3v3、兵线、塔与水晶保护、18 个技能、AI、4:00 终极对决
-  Core/HeroDefs.cs    六位英雄的属性与技能表（按 10–15 秒 TTK 重排，见 CHANGELOG 2.2.0）
-  Visuals/PolyforkHero.cs  新英雄 FBX（含服装）→ 材质/骨骼/缩放/施法点，保留作者动画
-  Visuals/PolyHeroView.cs  四足英雄视图：Idle/Walk 采样 + 咬击/施法/受击/阵亡叠加
-  Visuals/ArtPropLibrary.cs 运行时加载 GameArt / PolyforkProps，缺失时回退程序化道具
-  Visuals/Art.cs      程序化场景与回退：树/灌木/蘑菇、塔/水晶、小兵、地图贴图
-  Visuals/Views.cs    表现层：地图/道具/结构/弹道/减速区/英雄视图
-  Visuals/Fx.cs       火花、法阵、拖影、飘字、播报 + 3 个动态网格粒子批次 + 程序合成音效
-  Systems/            InputHub（摇杆/键盘）、CameraRig（跟随/震屏/推镜）
-  UI/Hud.cs           IMGUI：首页（含难度）、2D 选人、战斗 HUD、暂停、结算
-tools/polyfork_props.py    Polyfork 森林 kit 道具下载 + 顶点色/接触阴影 + FBX
-tools/polyfork_to_fbx.py   六只动物 + Blender 服装 + Idle/Walk/Run + hero_meta.json
-tools/polyfork_costumes.py 六套低模服装/配件的生成器
-tools/blender_game_art.py  自制地形/蘑菇塔/水晶/小兵/首页地台
-tools/polyfork_manifest.json 批准使用的 Polyfork 资产清单
-unity/Assets/Resources/GameArt/*      原创资产（入库）
-unity/Assets/Resources/PolyforkProps/* Polyfork 派生道具（gitignore）
-unity/Assets/Resources/Heroes/*        Polyfork 派生英雄 + 服装（gitignore）
-unity/Assets/Resources/Splash/*.png   2D 选人卡与详情立绘
-```
-
-```
-unity/Assets/Shaders/
-  LowPoly.shader      Low Poly：顶点色 / 顶点 AO / 三段明暗 / 边缘光 / 描边 / 受击闪白 / GPU instancing
-  LowPolyFlat.shader  场景无描边版：地形与植被，省掉描边 pass
-  Toon.shader         旧场景卡通渲染（程序化回退用）
-  Sky.shader          天空穹顶（512×128 运行时渐变全景）
-  Glow.shader         廉价泛光 + 暗角 + 调色（掉帧自动关）
-```
-
-**画面**：英雄是 Polyfork 的平直着色 Low Poly 四足动物 + Blender 服装配件（帽子/披风/盾/背甲/箭袋/浮空物），自带 Idle/Walk/Run，战斗中的咬击、施法抬身、受击挤压和阵亡侧倒由 `PolyHeroView` 叠加；场景由 Polyfork Nature & Forest kit 的树/灌木/蘑菇/石头/木桥/灯笼，加上自制地形、蘑菇塔、水晶祭坛和小兵组成；2D 选人页用游戏内模型离屏渲染的 splash/bust，游戏内仍是 3D 模型。首页改成林间空地的苔藓土丘陈列，战场有兵线、河桥、树线、木屋/瞭望塔/石井地标。
-
-设计约束：卡片、血条、名字都用 IMGUI 画（uGUI 在 shader 剥离后会变品红）；中文字体随包带 Noto Sans CJK SC 子集；`PlayerSettings.stripEngineCode = false`（否则原生 MonoBehaviour 被裁，IMGUI 每帧抛异常）；Toon/Sky/LowPoly 通过 `Resources/TapArenaToon.mat` / `TapArenaSky.mat` / `TapArenaLowPoly.mat` 带进包，避免被 shader 剥离；Android 图标由 `PlayerSettings.SetIconsForTargetGroup` 写入 6 个槽。
-
-## Unity 版已验证（3.2.0）
-
-- **阵容与服装**：阿狮（狮，战士，木盾/苔藓披肩）、灵灵（赤狐，法师，尖帽/浮空星）、朵朵（林兔，辅助，花环/挎包）、阿岳（黑熊，坦克，苔藓背甲/木肩片）、泡泡（青蛙，控制，水泡/芦苇披风）、尖尖（猫，射手，箭袋/护腕）。服装按骨骼权重 1 合并进同一张 SkinnedMesh，仍是一次绘制。
-- **模型**：6 个 FBX 各带 22–26 根骨骼、Idle/Walk/Run 动画，合计约 2.0–4.1k 三角面/人；`hero_meta.json` 记录不含服装的 `bodyHeight`，缩放不再被帽子影响；`PolyHeroView` 按步态采样再叠加咬击/施法/受击/阵亡。
-- **场景**：27 个 Polyfork 森林 kit 道具（树/灌木/蘑菇/石头/木桥/栅栏/灯笼/木屋/瞭望塔/石井）+ 自制 3000×1600 顶点色地形/河道、蘑菇塔、水晶祭坛、果冻小兵；植被按象限静态合批，植被不投射实时阴影。
-- **2D 选人**：卡片 512×512 bust、详情 768×1152 splash、HUD/结算 256×256 透明头像，全部用新服装模型重渲染；首页/战斗都从同一套 3D 资产出发。
-- **实机**：Android 16 模拟器（1080×1920 转横屏），v3.1.0/versionCode 25 → v3.2.0/versionCode 26 覆盖安装成功；首页、选人、战斗、移动、技能冷却、暂停、切后台自动暂停、结算“差一点点/再来一局”逐项检查；默认轻松 + 挑战各完整跑完一局（挑战 5:00 结算 17:20），logcat 无 Unity 异常。
-- **帧率**：同一台软件渲染模拟器上 v3.2.0 约 35–38fps（v3.1.0 同机约 20–29fps）；场景 Renderer 从 294 降到 49（按材质合并静态批次）。冷启动到首页 `am start -W` TotalTime 2.03s。真实设备帧率待补测，模拟器数值只用于同机对比。
-- **包体**：`TapArena-v3.2.0.apk` 30,409,196 字节（29.0MiB），versionCode 26，minSdk 25/targetSdk 37；签名 `CN=TapArena, OU=Games, O=sctale, C=CN`；SHA-256 `DE656CF14DA794FC061C3F58A5552E0B1A297866E9EC4C3B222226316238711A`（最终构建后如有变动以根目录 APK 为准）。
-- **动画/内存**：18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB（Idle 保留完整循环，导入 `Optimal` 压缩）；主路径不再生成 1280×683 地面贴图。
-- **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；`unity/ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 在 `.gitignore` 中，构建前用 Blender 脚本拉取。
 
 ## Godot 版（4.6.1-dev.1，唯一主线）
 
@@ -147,7 +74,7 @@ godot --path godot
 powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 ```
 
-产物：`TapArena-v4.6.1-dev.1.apk`（26,954,303 字节，versionCode 40，arm64-v8a，签名 `CN=TapArena`，SHA-256 `87E3C526E45AC66FC646B798980B5FA89D482ABEC58D9F41EBCCDA655FF87983`，与 3.2.0 同一把 keystore，可覆盖升级）。
+产物：`TapArena-v4.6.1-dev.1.apk`（26,954,303 字节，versionCode 40，arm64-v8a，签名 `CN=TapArena`，SHA-256 `87E3C526E45AC66FC646B798980B5FA89D482ABEC58D9F41EBCCDA655FF87983`，与历史版本同一把 release keystore，可覆盖升级）。
 
 调试参数（写在 `--` 之后）：`--skip-home` 跳过首页、`--hero=frog` 指定英雄、`--auto-run` 自动向右推进（录制用）、`--dash` 配合 `--auto-run` 在移动中反复放 1 技能检查位移手感、`--top` 全图俯瞰、`--look-base` 看蓝方基地、`--look-red` 看红方基地、`--look-lane` 看兵线、`--look-tower` 看红方外塔、`--ruins` 拆掉双方外塔看废墟、`--boss` 直接触发 3 分钟峡谷巨兽、`--victory` 直接摧毁红方水晶看胜利演出、`--victory-minion` 用小兵最后一击验证结束动画、`--behind` 检查建筑半透明、`--ult` 检查大招冷却、`--fx` 把当前英雄大招定在屏幕中心播放、`--no-hud` 隐藏 HUD、`--pause` 直接打开暂停、`--result` 直接看结算。
 
@@ -170,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 
 ## 素材授权
 
-Godot 版的方块模型、像素图集、图标与应用图标均为本项目自制，不包含 Minecraft 或 Polyfork 的原始素材；风格参考方块游戏的通用视觉语言（16px 贴图、体素比例、像素描边），未复制任何现成贴图或模型。
+Godot 版的方块模型、像素图集、图标与应用图标均为本项目自制，不包含任何第三方游戏或素材站的原始素材；风格参考方块游戏的通用视觉语言（16px 贴图、体素比例、像素描边），未复制任何现成贴图或模型。
 
 ---
 
@@ -209,7 +136,6 @@ Godot 版的方块模型、像素图集、图标与应用图标均为本项目�
 - 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与历史版本同一把 release keystore，可直接覆盖安装）
 - SHA-256：`87E3C526E45AC66FC646B798980B5FA89D482ABEC58D9F41EBCCDA655FF87983`
 - 体积：26,954,303 字节（25.7MiB）
-- 历史存档：Unity 3.2.0 的 `TapArena-v3.2.0.apk` 仍保留在根目录，不会覆盖（versionCode 26 < 38）。
 
 - 横屏锁定；支持刘海屏；全屏沉浸式。
 - 返回键：战斗中按下打开暂停面板；结算页按下回首页；首页按下退出应用。
