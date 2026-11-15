@@ -35,7 +35,7 @@
 - 桌面自动行走 `[FPS] 60.0 sim_ms=0.75`，无明显掉帧；修复音效参数后无 ERROR 刷屏。
 - Android `TapArena-v4.6.2-dev.1.apk`：26,954,303 字节，versionCode 41，versionName 4.6.2-dev.1，arm64-v8a，证书 `CN=TapArena`；`aapt2`/`apksigner` 校验通过，SHA-256 `B3849EE616F3C5CDB7BD0547F966C1EAB328A01B926BE6F7C544C9B49E3E39DC`。Android 16 模拟器覆盖安装并启动，首页/战斗天空与奶油石正常；2400×1080 下约 35fps（模拟器软硬混合渲染）。
 
-
+## [4.6.1-dev.1] - 2026-11-15
 
 **巨兽播报只剩一条，相机锁死俯角与高度。**
 
