@@ -25,3 +25,13 @@ godot/*.log
 # 美术参考图：只在本机用于对照，不提交
 reference/
 
+# 临时录屏/截图与系统垃圾
+*.wav
+*.mp4
+*.avi
+*.tmp
+*.bak
+*.orig
+.DS_Store
+Thumbs.db
+desktop.ini
