@@ -902,6 +902,20 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_leaves(pos, color, maxf(radius, 130.0))
 		"bamboo_ult":
 			_spawn_bamboo(pos, color, maxf(radius, 190.0))
+		"claw_ult":
+			_spawn_claw_ult(pos, color, maxf(radius, 180.0))
+		"claw_radial":
+			_spawn_claw_radial(pos, color, maxf(radius, 180.0))
+		"starfall_ult":
+			_spawn_star_fall(pos, color, maxf(radius, 180.0))
+		"moon_ult":
+			_spawn_moon_ult(pos, color, maxf(radius, 175.0))
+		"quake_ult":
+			_spawn_quake_ult(pos, color, maxf(radius, 190.0))
+		"waterfall_ult":
+			_spawn_waterfall_ult(pos, color, maxf(radius, 175.0))
+		"nightfall_ult":
+			_spawn_nightfall_ult(pos, color, maxf(radius, 185.0))
 		"leafsmash", "quake", "bamboo", "spikes":
 			_spawn_ground(pos, color, maxf(radius, 150.0), style)
 		"moon", "nightfall":
@@ -996,23 +1010,32 @@ func _spawn_bamboo(pos: Vector3, color: Color, radius: float) -> void:
 			stalk, node_mat, leaf, float(i) * 0.035, ang)
 
 
-func _make_bamboo(base: Vector3, tall: float, thick: float, stalk: Material, node_mat: Material,
-		leaf: Material, delay: float, ang: float) -> void:
+func _make_pillar(base: Vector3, tall: float, thick: float, a: Material, b: Material,
+		delay: float, rot_y: float, segs := 3) -> Node3D:
 	# 根节点贴地，整体按 Y 轴拉伸，看起来就是从土里长出来。
 	var root := Node3D.new()
 	root.position = base
-	root.rotation.y = ang
+	root.rotation.y = rot_y
 	add_child(root)
-	var seg_h := tall / 3.0
-	for s in range(3):
+	var seg_h := tall / float(segs)
+	for s in range(segs):
 		var seg := MeshInstance3D.new()
 		var box := BoxMesh.new()
 		box.size = Vector3(thick, seg_h * 0.93, thick)
 		seg.mesh = box
 		seg.position = Vector3(0.0, seg_h * (float(s) + 0.5), 0.0)
-		seg.material_override = stalk if s % 2 == 0 else node_mat
+		seg.material_override = a if s % 2 == 0 else b
 		seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(seg)
+	root.visible = false
+	sprout_items.append({"node": root, "t": -delay, "grow": 0.16, "hold": 0.75, "fade": 0.30})
+	return root
+
+
+func _make_bamboo(base: Vector3, tall: float, thick: float, stalk: Material, node_mat: Material,
+		leaf: Material, delay: float, ang: float) -> void:
+	var root := _make_pillar(base, tall, thick, stalk, node_mat, delay, ang)
+	var seg_h := tall / 3.0
 	for s in range(2):
 		var ring := MeshInstance3D.new()
 		var box := BoxMesh.new()
@@ -1033,8 +1056,218 @@ func _make_bamboo(base: Vector3, tall: float, thick: float, stalk: Material, nod
 		lf.material_override = leaf
 		lf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(lf)
-	root.visible = false
-	sprout_items.append({"node": root, "t": -delay, "grow": 0.16, "hold": 0.75, "fade": 0.30})
+
+
+func _spawn_claw_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 阿狮「旋风爪」：橙色龙卷从脚下卷起，爪痕随旋风上升旋转。
+	var base_ring := TorusMesh.new()
+	base_ring.inner_radius = radius * 0.72
+	base_ring.outer_radius = radius * 0.82
+	base_ring.rings = 32
+	base_ring.ring_segments = 4
+	_add_fx_mesh(base_ring, _fx_mat(color, 0.65), Vector3(pos.x, 8.0, pos.z), 0.85, 0.5, 1.3)
+	var wind := _fx_mat(Color(color.r, color.g * 0.92, color.b * 0.55), 0.14)
+	for i in range(3):
+		var col := CylinderMesh.new()
+		col.top_radius = radius * (0.30 - float(i) * 0.06)
+		col.bottom_radius = radius * (0.46 - float(i) * 0.08)
+		col.height = 70.0
+		col.radial_segments = 20
+		_add_fx_mesh(col, wind, Vector3(pos.x, 34.0 + float(i) * 56.0, pos.z), 0.95, 0.55, 1.0)
+	var mat := _fx_mat(color, 0.95)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(64, 7, 10)
+	for i in range(12):
+		var ang := TAU * float(i) / 12.0
+		var at := pos + Vector3(cos(ang), 0.0, sin(ang)) * (radius * 0.42)
+		at.y = 18.0 + float(i % 5) * 26.0
+		_add_fx_mesh(mesh, mat, at, 0.80, 0.70, 1.25,
+			Vector3(0, 210.0, 0), Vector3(0, 7.0, 0), Vector3(0, -ang, 0.55))
+	var streak := BoxMesh.new()
+	streak.size = Vector3(6, 96, 6)
+	var streak_mat := _fx_mat(Color(1.0, 0.82, 0.42), 0.55)
+	for i in range(6):
+		var ang := TAU * float(i) / 6.0 + 0.3
+		var at := pos + Vector3(cos(ang), 0.0, sin(ang)) * (radius * 0.50)
+		_add_fx_mesh(streak, streak_mat, Vector3(at.x, 70.0, at.z), 0.75, 0.6, 1.0,
+			Vector3(0, 160.0, 0), Vector3(0, 9.0, 0), Vector3(0.10, ang, 0.0))
+
+
+func _spawn_claw_radial(pos: Vector3, color: Color, radius: float) -> void:
+	# 尖尖「万爪齐发」：地面拍出五枚带描边的大爪印，短爪痕贴地向四周炸开。
+	var pad_mat := _fx_mat(Color("6B4A22"), 0.95)
+	var fill_mat := _fx_mat(color.lightened(0.25), 0.95)
+	var pad_outline := BoxMesh.new()
+	pad_outline.size = Vector3(36, 2.4, 30)
+	var toe_outline := BoxMesh.new()
+	toe_outline.size = Vector3(12, 2.4, 12)
+	var pad_mesh := BoxMesh.new()
+	pad_mesh.size = Vector3(29, 3.0, 23)
+	var toe_mesh := BoxMesh.new()
+	toe_mesh.size = Vector3(8, 3.0, 8)
+	for i in range(5):
+		var ang := TAU * float(i) / 5.0 + 0.35
+		var dir := Vector3(cos(ang), 0.0, sin(ang))
+		var paw := pos + dir * (radius * 0.52)
+		paw.y = 3.2
+		_add_fx_mesh(pad_outline, pad_mat, paw, 1.0, 0.25, 1.05,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, -ang, 0.0))
+		_add_fx_mesh(pad_mesh, fill_mat, paw + Vector3(0, 1.0, 0), 1.0, 0.25, 1.05,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, -ang, 0.0))
+		for t in range(3):
+			var local := Vector3(22.0, 0.0, (float(t) - 1.0) * 9.0)
+			var toe := paw + (Basis(Vector3.UP, -ang) * local)
+			_add_fx_mesh(toe_outline, pad_mat, toe, 1.0, 0.2, 1.05,
+				Vector3.ZERO, Vector3.ZERO, Vector3(0.0, -ang, 0.0))
+			_add_fx_mesh(toe_mesh, fill_mat, toe + Vector3(0, 1.0, 0), 1.0, 0.2, 1.05,
+				Vector3.ZERO, Vector3.ZERO, Vector3(0.0, -ang, 0.0))
+	var mat := _fx_mat(Color(1.0, 0.97, 0.62), 0.95)
+	var claw := BoxMesh.new()
+	claw.size = Vector3(34, 5, 8)
+	for i in range(10):
+		var ang := TAU * float(i) / 10.0
+		var dir := Vector3(cos(ang), 0.0, sin(ang))
+		var at := pos + dir * 30.0
+		at.y = 10.0
+		_add_fx_mesh(claw, mat, at, 0.40, 0.6, 1.35,
+			dir * 420.0, Vector3.ZERO, Vector3(0.0, -ang, 0.0))
+
+
+func _spawn_star_fall(pos: Vector3, color: Color, radius: float) -> void:
+	# 灵灵「星河坠落」：星星拖着长尾从天上砸下来。
+	var mat := _fx_mat(color, 0.95)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(18, 52, 8)
+	for i in range(8):
+		var ang := TAU * float(i) / 8.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * rng.randf_range(0.12, 0.80))
+		at.y = 200.0 + float(i % 3) * 30.0
+		_add_fx_mesh(mesh, mat, at, 0.55, 0.5, 1.4,
+			Vector3(0, -450.0, 0), Vector3(0, 6.0, 0), Vector3(0, ang, 0))
+	_spawn_stars(pos, color, 6, radius)
+	_spawn_ring(pos, color, radius, 0.55)
+
+
+func _spawn_moon_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 朵朵「满月祝福」：天上升起大满月，月光柱落到地面。
+	var disc := CylinderMesh.new()
+	disc.top_radius = radius * 0.52
+	disc.bottom_radius = radius * 0.52
+	disc.height = 5.0
+	disc.radial_segments = 28
+	_add_fx_mesh(disc, _fx_mat(Color(1.0, 0.97, 0.72), 0.88), Vector3(pos.x, 165.0, pos.z),
+		1.15, 0.25, 1.05, Vector3.ZERO, Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0))
+	var beam := BoxMesh.new()
+	beam.size = Vector3(16, 190, 16)
+	var beam_mat := _fx_mat(Color(1.0, 0.98, 0.80), 0.32)
+	for i in range(5):
+		var ang := TAU * float(i) / 5.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.52)
+		_add_fx_mesh(beam, beam_mat, Vector3(at.x, 96.0, at.z), 1.0, 0.85, 0.95)
+	_spawn_leaves(pos, color, radius)
+	_spawn_ring(pos, color, radius, 0.6)
+
+
+func _spawn_quake_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 阿岳「山崩地裂」：地面裂开放射状裂缝，巨石从天砸落，扬尘环扩散。
+	var crack := _fx_mat(Color("2E2118"), 0.92)
+	var crack_mesh := BoxMesh.new()
+	crack_mesh.size = Vector3(56, 3.0, 13)
+	for i in range(12):
+		var ang := TAU * float(i) / 12.0 + rng.randf_range(-0.10, 0.10)
+		var dir := Vector3(cos(ang), 0.0, sin(ang))
+		var base_r := radius * rng.randf_range(0.10, 0.24)
+		var near := pos + dir * base_r
+		near.y = 2.4
+		_add_fx_mesh(crack_mesh, crack, near, 1.05, 0.15, 1.0,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, -ang, 0.0))
+		var far := pos + dir * (base_r + radius * rng.randf_range(0.26, 0.40))
+		far.y = 2.4
+		_add_fx_mesh(crack_mesh, crack, far, 1.05, 0.10, 0.9,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, -ang + rng.randf_range(-0.35, 0.35), 0.0))
+	var boulder := SphereMesh.new()
+	boulder.radius = 17.0
+	boulder.height = 34.0
+	boulder.radial_segments = 7
+	boulder.rings = 4
+	for i in range(7):
+		var ang := TAU * float(i) / 7.0 + rng.randf_range(-0.16, 0.16)
+		var at := pos + Vector3(cos(ang), 0.0, sin(ang)) * (radius * rng.randf_range(0.15, 0.80))
+		var top := rng.randf_range(120.0, 170.0)
+		at.y = top
+		_add_fx_mesh(boulder, _fx_mat(Color("8A6A4A") if i % 2 == 0 else Color("6A4E36"), 0.98),
+			at, top / 480.0, 1.0, 1.05, Vector3(0, -480.0, 0), Vector3(4.0, 3.0, 2.0))
+	var dust := TorusMesh.new()
+	dust.inner_radius = radius * 0.62
+	dust.outer_radius = radius * 0.80
+	dust.rings = 32
+	dust.ring_segments = 4
+	_add_fx_mesh(dust, _fx_mat(Color("C8A87A"), 0.55), Vector3(pos.x, 7.0, pos.z), 0.85, 0.35, 1.5)
+	_spawn_debris(pos, color, 14)
+
+
+func _spawn_waterfall_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 泡泡「瀑布冲击」：三重浪环向外炸开，白色浪花与气泡四散。
+	var wave_a := _fx_mat(Color(0.35, 0.66, 0.95), 0.62)
+	var wave_b := _fx_mat(Color(0.62, 0.88, 1.0), 0.50)
+	for i in range(3):
+		var ring := TorusMesh.new()
+		ring.inner_radius = radius * (0.30 + float(i) * 0.12)
+		ring.outer_radius = radius * (0.42 + float(i) * 0.12)
+		ring.rings = 32
+		ring.ring_segments = 4
+		_add_fx_mesh(ring, wave_a if i % 2 == 0 else wave_b,
+			Vector3(pos.x, 7.0 + float(i) * 4.0, pos.z), 0.85, 0.45, 1.55)
+	var foam := BoxMesh.new()
+	foam.size = Vector3(26, 9, 12)
+	var foam_mat := _fx_mat(Color(0.90, 0.98, 1.0), 0.88)
+	for i in range(16):
+		var ang := TAU * float(i) / 16.0
+		var dir := Vector3(cos(ang), 0.0, sin(ang))
+		var at := pos + dir * (radius * 0.34)
+		at.y = 12.0
+		_add_fx_mesh(foam, foam_mat, at, 0.55, 0.7, 1.15,
+			dir * 300.0 + Vector3(0, 40.0, 0), Vector3.ZERO, Vector3(0, -ang, 0))
+	var drop := SphereMesh.new()
+	drop.radius = 8.0
+	drop.height = 16.0
+	drop.radial_segments = 8
+	drop.rings = 4
+	var drop_mat := _fx_mat(Color(0.80, 0.95, 1.0), 0.70)
+	for i in range(9):
+		var ang := TAU * float(i) / 9.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.38)
+		_add_fx_mesh(drop, drop_mat, Vector3(at.x, 46.0, at.z), 0.62, 0.6, 1.15, Vector3(0, 270.0, 0))
+	_spawn_bubbles(pos, color, radius)
+
+
+func _spawn_nightfall_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 咕咕「夜枭俯冲」：夜色罩住地面，两只月光眼睁开，羽刃落下。
+	var shade := CylinderMesh.new()
+	shade.top_radius = radius * 0.95
+	shade.bottom_radius = radius * 0.95
+	shade.height = 2.0
+	shade.radial_segments = 28
+	_add_fx_mesh(shade, _fx_mat(Color(0.20, 0.16, 0.38), 0.48), Vector3(pos.x, 2.0, pos.z), 1.05, 0.55, 1.12)
+	var eye := CylinderMesh.new()
+	eye.top_radius = 26.0
+	eye.bottom_radius = 26.0
+	eye.height = 3.0
+	eye.radial_segments = 16
+	var eye_mat := _fx_mat(Color(1.0, 0.94, 0.62), 0.92)
+	for sx in [-1.0, 1.0]:
+		_add_fx_mesh(eye, eye_mat, Vector3(pos.x + sx * 56.0, 176.0, pos.z), 1.05, 0.08, 0.95,
+			Vector3.ZERO, Vector3.ZERO, Vector3(PI * 0.5, 0.0, 0.0))
+	var feather := BoxMesh.new()
+	feather.size = Vector3(5, 2, 28)
+	var fmat := _fx_mat(color, 0.92)
+	for i in range(7):
+		var ang := TAU * float(i) / 7.0
+		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * rng.randf_range(0.15, 0.7))
+		at.y = 230.0
+		_add_fx_mesh(feather, fmat, at, 0.70, 0.6, 1.25,
+			Vector3(0, -420.0, 0), Vector3(0, 9.0, 0), Vector3(0.3, ang, 0.0))
+	_spawn_feathers(pos, color, radius)
 
 
 func _step_sprouts(delta: float) -> void:

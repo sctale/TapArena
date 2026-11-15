@@ -173,6 +173,11 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		sim.player.level = 2
 		sim.player.xp = sim.xp_to_level2
 		sim.try_cast(sim.player, 2)
+	# 调试：以玩家为中心直接播放指定大招特效（--fx=waterfall_ult），用于逐个核对演出。
+	if "--fx" in OS.get_cmdline_user_args():
+		var s: Dictionary = sim.player.skills[2]
+		view._spawn_style(str(s.get("fx", "")), Vector3(sim.player.pos.x, 0.0, sim.player.pos.y),
+			s.get("color_c", Color.WHITE), float(s.get("radius", 180.0)))
 	if "--top" in OS.get_cmdline_user_args():
 		camera_follow = false
 		cam.frozen = true
