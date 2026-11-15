@@ -234,6 +234,44 @@ static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) ->
 	return VoxelModel.mesh(atlas, boxes)
 
 
+static func boss(atlas: PixelAtlas, color: Color, team: int) -> ArrayMesh:
+	# 3 分钟后出场的峡谷巨兽：石甲、金角、胸口团队色核心。
+	var boxes: Array = []
+	var stone := Color("5b5b66")
+	var dark := Color("33333c")
+	var glow := Color("ffd76a") if team == 0 else Color("ff8a5a")
+	for sx in [-1, 1]:
+		_b(boxes, Vector3(20.0 * sx, 4, 0), Vector3(30, 10, 36), "stone", dark)
+		_b(boxes, Vector3(18.0 * sx, 22, 0), Vector3(24, 34, 24), "stone", stone)
+		_b(boxes, Vector3(18.0 * sx, 38, 0), Vector3(25, 6, 25), "flat", color)
+	# 躯干、胸口核心、腰带
+	_b(boxes, Vector3(0, 58, 0), Vector3(58, 46, 38), "stone", stone)
+	_b(boxes, Vector3(0, 58, 19.6), Vector3(34, 8, 3), "flat", color)
+	_b(boxes, Vector3(0, 66, 20.2), Vector3(14, 14, 2), "glow", glow)
+	_b(boxes, Vector3(0, 42, 20.0), Vector3(20, 4, 2), "gold", Color("d8a63a"))
+	# 肩甲、手臂、巨拳
+	for sx in [-1, 1]:
+		_b(boxes, Vector3(36.0 * sx, 80, 0), Vector3(26, 20, 28), "stone", dark)
+		_b(boxes, Vector3(36.0 * sx, 88, 0), Vector3(27, 4, 29), "flat", color)
+		_b(boxes, Vector3(44.0 * sx, 54, 0), Vector3(20, 34, 20), "stone", stone)
+		_b(boxes, Vector3(46.0 * sx, 30, 0), Vector3(28, 22, 28), "stone", dark)
+		_b(boxes, Vector3(46.0 * sx, 30, 0), Vector3(29, 5, 29), "flat", color)
+	# 头、发光眼、金角
+	_b(boxes, Vector3(0, 99, 0), Vector3(30, 24, 28), "stone", stone)
+	_b(boxes, Vector3(0, 94, 14.4), Vector3(18, 5, 2), "flat", dark)
+	for sx in [-1, 1]:
+		_b(boxes, Vector3(7.0 * sx, 100, 14.8), Vector3(5, 5, 2), "glow", glow)
+		_b(boxes, Vector3(12.0 * sx, 117, 0), Vector3(7, 14, 7), "gold", Color("f0c04a"))
+	_b(boxes, Vector3(0, 114, 0), Vector3(10, 10, 5), "gold", Color("f0c04a"))
+	# 背部尖刺
+	for i in range(3):
+		_b(boxes, Vector3(float(i - 1) * 16.0, 78.0 + float(i % 2) * 10.0, -21.0),
+			Vector3(9, 16, 9), "stone", dark)
+		_b(boxes, Vector3(float(i - 1) * 16.0, 87.0 + float(i % 2) * 10.0, -21.0),
+			Vector3(5, 5, 5), "glow", glow)
+	return VoxelModel.mesh(atlas, boxes)
+
+
 static func tower(atlas: PixelAtlas, color: Color, radius: float, height: float, team: int) -> ArrayMesh:
 	# 卡通蘑菇塔：粗菌柄 + 多层菌盖，蓝方月光菇、红方熔岩菇。
 	var boxes: Array = []

@@ -155,6 +155,16 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		camera_follow = false
 		cam.set_target(Vector3(730, 0, 720))
 		cam.snap()
+	# 调试：直接触发 3 分钟峡谷巨兽，检查模型与推进。
+	if "--boss" in OS.get_cmdline_user_args():
+		sim.clock = 179.9
+		sim.step(0.2)
+		for i in range(60):
+			sim.step(1.0 / 60.0)
+		if sim.boss != null:
+			camera_follow = false
+			cam.set_target(Vector3(sim.boss.pos.x + 120.0, 0, sim.boss.pos.y))
+			cam.snap()
 	# 调试：直接升到 2 级并释放大招，检查冷却显示。
 	if "--ult" in OS.get_cmdline_user_args():
 		sim.player.level = 2

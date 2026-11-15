@@ -18,6 +18,7 @@ const HERO := 0
 const MINION := 1
 const TOWER := 2
 const BASE := 3
+const BOSS := 4
 
 class Unit:
 	var uid: int = 0
@@ -133,6 +134,10 @@ var towers_red: Array = []
 var base_blue = null
 var base_red = null
 var player = null
+var boss = null
+var boss_spawned := false
+var boss_team := -1
+var boss_respawn := 25.0
 
 var winner: int = -1
 var end_reason: String = ""
@@ -175,6 +180,7 @@ var tower_cfg: Dictionary = {}
 var minion_cfg: Dictionary = {}
 var comeback_cfg: Dictionary = {}
 var potion_cfg: Dictionary = {}
+var boss_cfg: Dictionary = {}
 
 var ai_think_base: float = 0.22
 var ai_skill_mul: float = 1.0
@@ -208,6 +214,10 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	base_blue = null
 	base_red = null
 	player = null
+	boss = null
+	boss_spawned = false
+	boss_team = -1
+	boss_respawn = 25.0
 	_uid = 0
 	_shot_view = 0
 	_potion_view = 0
@@ -245,6 +255,8 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	minion_cfg = rules.get("minion", {})
 	comeback_cfg = rules.get("comeback", {})
 	potion_cfg = rules.get("potion", {})
+	boss_cfg = rules.get("boss", {})
+	boss_respawn = float(boss_cfg.get("respawn", 25.0))
 	var hs: Dictionary = rules.get("hitstop", {})
 	hitstop_threshold = float(hs.get("threshold", 45))
 	hitstop_duration = float(hs.get("duration", 0.045))
@@ -430,6 +442,92 @@ func step_potions(dt: float) -> void:
 			break
 
 
+func leading_team() -> int:
+	var b: float = base_blue.hp / base_blue.max_hp
+	var r: float = base_red.hp / base_red.max_hp
+	if absf(b - r) >= 0.01:
+		return BLUE if b > r else RED
+	var bt := 0.0
+	for t in towers_blue:
+		bt += maxf(t.hp, 0.0) / t.max_hp
+	var rt := 0.0
+	for t in towers_red:
+		rt += maxf(t.hp, 0.0) / t.max_hp
+	if absf(bt - rt) >= 0.01:
+		return BLUE if bt > rt else RED
+	if score_blue != score_red:
+		return BLUE if score_blue > score_red else RED
+	return BLUE
+
+
+func spawn_boss(team: int) -> void:
+	var offset := Vector2(190.0 if team == BLUE else -190.0, 0.0)
+	var u = new_unit(BOSS, team, "峡谷巨兽", base_pos(team) + offset)
+	u.hp = float(boss_cfg.get("hp", 3200))
+	u.max_hp = u.hp
+	u.dmg = float(boss_cfg.get("dmg", 130))
+	u.attack_range = float(boss_cfg.get("range", 160))
+	u.atk_interval = float(boss_cfg.get("atk_interval", 0.85))
+	u.move_speed = float(boss_cfg.get("move_speed", 170))
+	u.radius = float(boss_cfg.get("radius", 58))
+	u.height = float(boss_cfg.get("height", 132))
+	u.atk_timer = 0.5
+	u.lane_index = 0 if team == BLUE else lane.size() - 1
+	boss = u
+	boss_team = team
+	banner.emit(("蓝方" if team == BLUE else "红方") + "峡谷巨兽加入战场！", 3.6)
+	sfx.emit("ult")
+	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(team), 200.0)
+
+
+func respawn_boss(u) -> void:
+	var home = base_blue if u.team == BLUE else base_red
+	if home == null or not home.is_alive():
+		return
+	u.hp = u.max_hp
+	u.pos = home.pos + Vector2(190.0 if u.team == BLUE else -190.0, 0.0)
+	u.prev_pos = u.pos
+	u.invuln_t = 1.0
+	u.stun_t = 0.0
+	u.slow_t = 0.0
+	u.shield = 0.0
+	u.atk_timer = 0.4
+	banner.emit("峡谷巨兽再次出发！", 2.6)
+	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(u.team), 180.0)
+
+
+func step_boss(u, dt: float) -> void:
+	if u.stun_t > 0.0:
+		return
+	var front = front_structure(u.team)
+	var target = nearest_enemy(u, u.attack_range + 90.0)
+	if target != null and u.pos.distance_to(target.pos) <= u.attack_range + target.radius:
+		u.moving = false
+		u.facing = 1.0 if target.pos.x >= u.pos.x else -1.0
+		if u.atk_timer <= 0.0:
+			u.atk_timer = u.atk_interval
+			u.atk_anim = 0.32
+			var mul := float(boss_cfg.get("structure_damage_mul", 1.6)) \
+				if (target.kind == TOWER or target.kind == BASE) else 1.0
+			hit_with_fx(target, u.dmg * mul, u, 0.2)
+		return
+	if front == null:
+		u.moving = false
+		return
+	var to: Vector2 = front.pos - u.pos
+	if to.length() <= u.attack_range * 0.8:
+		u.moving = false
+		u.facing = 1.0 if front.pos.x >= u.pos.x else -1.0
+		if u.atk_timer <= 0.0:
+			u.atk_timer = u.atk_interval
+			u.atk_anim = 0.32
+			var mul := float(boss_cfg.get("structure_damage_mul", 1.6)) \
+				if (front.kind == TOWER or front.kind == BASE) else 1.0
+			hit_with_fx(front, u.dmg * mul, u, 0.2)
+		return
+	move_ai(u, to, dt, 0.92)
+
+
 func make_hero(id: String, team: int, slot: int):
 	var d: Dictionary = defs_by_id.get(id, heroes_data[0])
 	var offset := Vector2(150.0 if team == BLUE else -150.0, float(slot - 1) * 70.0)
@@ -476,6 +574,9 @@ func step(dt: float) -> void:
 		sudden_death = true
 		banner.emit("终极对决！水晶护盾全部消失", 3.2)
 		sfx.emit("ult")
+	if not boss_spawned and clock >= sudden_death_time:
+		boss_spawned = true
+		spawn_boss(leading_team())
 	if not warned_45 and clock >= 240.0:
 		warned_45 = true
 		final_push = true
@@ -565,6 +666,11 @@ func step_unit(u, dt: float) -> void:
 			u.respawn_t -= dt
 			if u.respawn_t <= 0.0:
 				respawn(u)
+		elif u.kind == BOSS:
+			u.die_t += dt
+			u.respawn_t -= dt
+			if u.respawn_t <= 0.0:
+				respawn_boss(u)
 		return
 
 	u.atk_timer -= dt
@@ -583,6 +689,8 @@ func step_unit(u, dt: float) -> void:
 		step_hero(u, dt)
 	elif u.kind == MINION:
 		step_minion(u, dt)
+	elif u.kind == BOSS:
+		step_boss(u, dt)
 	else:
 		step_structure(u)
 
@@ -1062,6 +1170,15 @@ func kill(target, killer) -> void:
 		banner.emit("%s 击败了 %s" % [killer_name, target.display_name], 1.8)
 		sfx.emit("ult")
 
+	elif target.kind == BOSS:
+		target.respawn_t = boss_respawn
+		banner.emit("峡谷巨兽被击退了！", 2.4)
+		sfx.emit("boom")
+		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
+			_team_color(target.team), target.radius)
+		if killer != null and killer.kind == HERO:
+			add_xp(killer, 90.0)
+
 	elif target.kind == TOWER:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
 		sfx.emit("boom")
@@ -1225,8 +1342,8 @@ func cleanup_dead() -> void:
 		var u = units[i]
 		if u.is_alive():
 			continue
-		# 塔与水晶留在 units 里，表现层才能把原模型换成废墟。
-		if u.kind == HERO or u.kind == TOWER or u.kind == BASE:
+		# 塔、水晶与峡谷巨兽留在 units 里，表现层才能换废墟或显示复活。
+		if u.kind == HERO or u.kind == BOSS or u.kind == TOWER or u.kind == BASE:
 			continue
 		units.remove_at(i)
 	minions = minions.filter(func(m): return m.is_alive())

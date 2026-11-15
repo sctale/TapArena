@@ -124,6 +124,15 @@ func skill_rect(i: int) -> Rect2:
 	return Rect2(cx[i] - bs[i] * 0.5, cy[i] - bs[i] * 0.5, bs[i], bs[i])
 
 
+func joystick_center() -> Vector2:
+	var safe := _safe()
+	return Vector2(safe.position.x + safe.size.x * 0.145, safe.end.y - safe.size.y * 0.205)
+
+
+func joystick_radius() -> float:
+	return _safe().size.y * 0.112
+
+
 func _pause_panel() -> Rect2:
 	var safe := _safe()
 	return Rect2(safe.position.x + safe.size.x * 0.30, safe.position.y + safe.size.y * 0.13,
@@ -690,7 +699,7 @@ func _draw_battle_fg(safe: Rect2) -> void:
 
 
 func _plate_rect(safe: Rect2, h: float) -> Rect2:
-	return Rect2(safe.position.x + 12.0, safe.position.y + 12.0, safe.size.x * 0.34, h * 0.17)
+	return Rect2(safe.position.x + 12.0, safe.position.y + 12.0, safe.size.x * 0.325, h * 0.17)
 
 
 func _draw_player_plate_bg(safe: Rect2, h: float) -> void:
@@ -758,42 +767,54 @@ func _draw_player_plate_fg(safe: Rect2, h: float, p) -> void:
 
 
 func _draw_score_bg(safe: Rect2, h: float) -> void:
-	var w := safe.size.x
 	var panel := _score_rect(safe, h)
 	_panel(panel, PANEL_FILL)
-
-	var pip_y := panel.end.y + 5.0
-	var pip_w := w * 0.042
-	for i in range(4):
-		var x := safe.position.x + w * 0.5 - pip_w * 2.3 + float(i) * (pip_w + 5.0)
-		var r := Rect2(x, pip_y, pip_w, h * 0.014)
-		_add_rect(Rect2(r.position - Vector2(1, 1), r.size + Vector2(2, 2)), PANEL_DARK)
-		if i < 2:
-			_add_rect(r, BLUE if sim.towers_blue[i].is_alive() else Color(0.22, 0.28, 0.30, 0.7))
-		else:
-			_add_rect(r, Color("f07a63") if sim.towers_red[i - 2].is_alive() else Color(0.30, 0.24, 0.22, 0.7))
+	var chip := h * 0.032
+	var cy := panel.position.y + h * 0.014
+	# 左右队伍色块，让比分归属一眼可见。
+	var blue_chip := Rect2(panel.position.x + panel.size.x * 0.11 - chip * 0.5, cy, chip, chip)
+	_add_rect(blue_chip, BLUE)
+	_add_box(blue_chip, PANEL_DARK, 2.0)
+	var red_chip := Rect2(panel.end.x - panel.size.x * 0.11 - chip * 0.5, cy, chip, chip)
+	_add_rect(red_chip, Color("f07a63"))
+	_add_box(red_chip, PANEL_DARK, 2.0)
+	# 小比分条贴在本方半区，不再挤在正中间。
+	var pip_w := panel.size.x * 0.022
+	var pip_h := h * 0.012
+	var pip_y := panel.end.y - h * 0.022
+	for i in range(2):
+		var bx := panel.position.x + panel.size.x * 0.15 + float(i) * (pip_w + 4.0)
+		var br := Rect2(bx, pip_y, pip_w, pip_h)
+		_add_rect(Rect2(br.position - Vector2(1, 1), br.size + Vector2(2, 2)), PANEL_DARK)
+		_add_rect(br, BLUE if sim.towers_blue[i].is_alive() else Color(0.22, 0.28, 0.30, 0.7))
+		var rx := panel.end.x - panel.size.x * 0.15 - float(i) * (pip_w + 4.0) - pip_w
+		var rr := Rect2(rx, pip_y, pip_w, pip_h)
+		_add_rect(Rect2(rr.position - Vector2(1, 1), rr.size + Vector2(2, 2)), PANEL_DARK)
+		_add_rect(rr, Color("f07a63") if sim.towers_red[i].is_alive() else Color(0.30, 0.24, 0.22, 0.7))
 
 
 func _score_rect(safe: Rect2, h: float) -> Rect2:
 	var w := safe.size.x
-	return Rect2(safe.position.x + w * 0.5 - w * 0.15, safe.position.y + 8.0, w * 0.30, h * 0.115)
+	return Rect2(safe.position.x + w * 0.5 - w * 0.145, safe.position.y + 8.0, w * 0.29, h * 0.105)
 
 
 func _draw_score_icons(safe: Rect2, h: float) -> void:
 	var panel := _score_rect(safe, h)
-	var isz := panel.size.y * 0.52
-	var sword: Texture2D = icons.tex("ui_sword")
-	draw_texture_rect(sword, Rect2(panel.position.x + panel.size.x * 0.16, panel.position.y + 8.0, isz, isz), false)
-	var clock: Texture2D = icons.tex("ui_clock")
-	draw_texture_rect(clock, Rect2(panel.position.x + panel.size.x * 0.50, panel.position.y + 8.0, isz, isz), false)
+	var isz := h * 0.042
+	draw_texture_rect(icons.tex("ui_clock"),
+		Rect2(panel.get_center().x - h * 0.069, panel.position.y + h * 0.016, isz, isz), false)
 
 
 func _draw_score_fg(safe: Rect2, h: float) -> void:
 	var panel := _score_rect(safe, h)
-	_digit("%d:%d" % [sim.score_blue, sim.score_red],
-		Vector2(panel.position.x + panel.size.x * 0.29, panel.position.y + 10.0), maxf(2.0, h * 0.0045), CREAM)
-	_digit(_time_text(sim.clock),
-		Vector2(panel.position.x + panel.size.x * 0.63, panel.position.y + 10.0), maxf(2.0, h * 0.0045),
+	var px := maxf(2.2, h * 0.0052)
+	var ty := panel.position.y + h * 0.030
+	_digit_mid(str(sim.score_blue), panel.position.x + panel.size.x * 0.21, ty, px, Color(0.78, 0.91, 1.0))
+	_digit_mid(str(sim.score_red), panel.position.x + panel.size.x * 0.79, ty, px, Color(1.0, 0.82, 0.76))
+	var time_px := maxf(2.0, h * 0.0040)
+	var time_text := _time_text(sim.clock)
+	var time_x := panel.get_center().x - h * 0.019
+	_digit(time_text, Vector2(time_x, panel.position.y + h * 0.030), time_px,
 		GOLD if sim.sudden_death else CREAM)
 
 
@@ -813,7 +834,7 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 		var px: float = inner.position.x + rp.x / sim.map_w * inner.size.x
 		var py: float = inner.position.y + rp.y / sim.map_h * inner.size.y
 		var c := BLUE if u.team == sim.BLUE else Color("f07a63")
-		var s := 7.0 if u.kind == sim.BASE else 5.0
+		var s := 7.0 if u.kind == sim.BASE else (9.0 if u.kind == sim.BOSS else 5.0)
 		_add_rect(Rect2(px - s * 0.5, py - s * 0.5, s, s), PANEL_DARK)
 		_add_rect(Rect2(px - s * 0.5 + 1, py - s * 0.5 + 1, s - 2, s - 2), c)
 	# 回血药剂：小地图上的绿色十字点。
@@ -846,13 +867,13 @@ func _draw_world_bars(safe: Rect2, h: float) -> void:
 	for u in sim.units:
 		if not u.is_alive():
 			continue
-		if u.kind == sim.TOWER or u.kind == sim.BASE:
+		if u.kind == sim.TOWER or u.kind == sim.BASE or u.kind == sim.BOSS:
 			var rp: Vector2 = sim.render_pos(u)
 			var wp := Vector3(rp.x, u.height * 0.55 + 30.0, rp.y)
 			if cam.is_position_behind(wp):
 				continue
 			var sp := cam.unproject_position(wp)
-			var bw := h * 0.090 if u.kind == sim.BASE else h * 0.065
+			var bw := h * 0.090 if u.kind == sim.BASE else (h * 0.110 if u.kind == sim.BOSS else h * 0.065)
 			var bh := h * 0.009
 			var br := Rect2(sp.x - bw * 0.5, sp.y, bw, bh)
 			_add_rect(Rect2(br.position - Vector2(2, 2), br.size + Vector2(4, 4)), PANEL_DARK)
@@ -960,16 +981,19 @@ func _draw_cd_sweep(center: Vector2, radius: float, ratio: float, color: Color) 
 
 
 func _draw_joystick(safe: Rect2, h: float) -> void:
-	if input_hub == null or not input_hub.joy_active:
+	if input_hub == null:
 		return
-	var jr := h * 0.115
 	var c: Vector2 = input_hub.joy_center
-	var knob: Vector2 = input_hub.joy_knob
-	_add_rect(Rect2(c - Vector2(jr, jr), Vector2(jr, jr) * 2.0), Color(0.10, 0.16, 0.13, 0.35))
-	_add_box(Rect2(c - Vector2(jr, jr), Vector2(jr, jr) * 2.0), Color(1, 0.97, 0.88, 0.35), 2.0)
-	var ks := h * 0.045
-	_add_rect(Rect2(knob - Vector2(ks, ks), Vector2(ks, ks) * 2.0), Color(0.98, 0.94, 0.84, 0.62))
-	_add_box(Rect2(knob - Vector2(ks, ks), Vector2(ks, ks) * 2.0), Color(1, 1, 1, 0.75), 2.0)
+	var jr: float = input_hub.joy_radius
+	var active: bool = input_hub.joy_active
+	# 固定圆形轮盘：底座常驻左下角，激活时描边和摇杆头变亮。
+	draw_circle(c, jr, Color(0.07, 0.12, 0.09, 0.38 if active else 0.26))
+	draw_arc(c, jr, 0.0, TAU, 48, Color(1, 0.97, 0.88, 0.42 if active else 0.25), 2.5, true)
+	draw_arc(c, jr * 0.64, 0.0, TAU, 40, Color(1, 1, 1, 0.18 if active else 0.10), 1.5, true)
+	var knob: Vector2 = input_hub.joy_knob if active else c
+	var kr := jr * 0.38
+	draw_circle(knob, kr, Color(0.98, 0.94, 0.84, 0.78 if active else 0.52))
+	draw_arc(knob, kr, 0.0, TAU, 32, Color(1, 1, 1, 0.72 if active else 0.45), 2.0, true)
 
 
 func _draw_floats(safe: Rect2, h: float) -> void:

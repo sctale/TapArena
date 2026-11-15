@@ -45,6 +45,17 @@
     "respawn": 30,
     "radius": 30
   },
+  "boss": {
+    "hp": 3200,
+    "dmg": 130,
+    "range": 160,
+    "atk_interval": 0.85,
+    "move_speed": 170,
+    "radius": 58,
+    "height": 132,
+    "respawn": 25,
+    "structure_damage_mul": 1.6
+  },
   "lane": [
     [300, 800],
     [760, 800],

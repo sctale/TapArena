@@ -132,7 +132,7 @@ func _init() -> void:
 
 	var rule_issues := _rule_checks()
 	if rule_issues.is_empty():
-		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash")
+		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash/boss")
 	else:
 		failures += 1
 		for issue in rule_issues:
@@ -263,6 +263,26 @@ func _rule_checks() -> Array:
 	sim6.try_cast(dash_hero, 0)
 	if dash_hero.pos.x > dash_x - 40.0:
 		issues.append("位移技能没有朝移动方向")
+
+	# 3 分钟出现峡谷巨兽，帮助优势方推进；被击败后 25 秒复活。
+	var sim7 = BattleSimScript.new()
+	sim7.setup("tiger", 0, 784)
+	sim7.clock = 179.9
+	sim7.step(0.2)
+	if sim7.boss == null or sim7.boss.kind != BattleSimScript.BOSS:
+		issues.append("3 分钟后没有出现峡谷巨兽")
+	else:
+		if sim7.boss.team != sim7.leading_team():
+			issues.append("峡谷巨兽没有加入优势方")
+		if sim7.boss.hp <= 0.0:
+			issues.append("峡谷巨兽初始血量为 0")
+		var foe = sim7.heroes[3] if sim7.boss.team == BattleSimScript.BLUE else sim7.player
+		sim7.deal_damage(sim7.boss, 99999.0, foe)
+		if sim7.boss.is_alive():
+			issues.append("峡谷巨兽无法被击败")
+		sim7.step_unit(sim7.boss, 26.0)
+		if not sim7.boss.is_alive() or sim7.boss.hp < sim7.boss.max_hp:
+			issues.append("峡谷巨兽 25 秒后没有复活")
 
 	# 所有英雄的大招都应立刻进入冷却。
 	for id in HERO_IDS:

@@ -14,6 +14,7 @@ var icons = null
 
 var hero_nodes: Dictionary = {}
 var minion_nodes: Dictionary = {}
+var boss_nodes: Dictionary = {}
 var structure_nodes: Dictionary = {}
 var shot_nodes: Dictionary = {}
 var zone_mesh: CylinderMesh = null
@@ -249,6 +250,8 @@ func _build_units() -> void:
 			_add_hero(u)
 		elif u.kind == sim.MINION:
 			_add_minion(u)
+		elif u.kind == sim.BOSS:
+			_add_boss(u)
 		elif u.kind == sim.TOWER or u.kind == sim.BASE:
 			_add_structure(u)
 
@@ -294,6 +297,40 @@ func _add_minion(u) -> void:
 	var body := _make_instance(mesh)
 	root.add_child(body)
 	minion_nodes[u.uid] = {"root": root, "body": body}
+
+
+func _add_boss(u) -> void:
+	var root := Node3D.new()
+	root.name = "Boss_%d" % u.uid
+	add_child(root)
+	var mesh = _model("boss_%d" % u.team, func(): return BlockModels.boss(
+		atlas, _team_color(u.team), u.team))
+	var body := _make_instance(mesh)
+	root.add_child(body)
+	boss_nodes[u.uid] = {"root": root, "body": body}
+
+
+func _sync_boss(u) -> void:
+	var item = boss_nodes.get(u.uid)
+	if item == null:
+		_add_boss(u)
+		item = boss_nodes[u.uid]
+	var root: Node3D = item["root"]
+	root.visible = u.is_alive()
+	if not u.is_alive():
+		return
+	var rp: Vector2 = sim.render_pos(u)
+	var wt: float = u.walk_t
+	if u.moving:
+		wt -= (1.0 - sim.interp_alpha) * (1.0 / 30.0)
+	root.position = Vector3(rp.x, absf(sin(wt * 6.0)) * (5.0 if u.moving else 0.0), rp.y)
+	var yaw := PI * 0.5 - 0.34
+	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
+	var s := 1.0
+	if u.atk_anim > 0.0:
+		var k: float = 1.0 - u.atk_anim / 0.32
+		s = 1.0 + sin(k * PI) * 0.08
+	root.scale = Vector3(s, 1.0, s)
 
 
 func _add_structure(u) -> void:
@@ -360,6 +397,8 @@ func _sync_units(delta: float) -> void:
 			_sync_hero(u)
 		elif u.kind == sim.MINION:
 			_sync_minion(u)
+		elif u.kind == sim.BOSS:
+			_sync_boss(u)
 		elif u.kind == sim.TOWER or u.kind == sim.BASE:
 			var item = structure_nodes.get(u.uid)
 			if item != null:

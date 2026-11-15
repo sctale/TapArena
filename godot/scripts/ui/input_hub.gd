@@ -21,7 +21,9 @@ func attach(s, h) -> void:
 	sim = s
 	hud = h
 	hud.input_hub = self
-	joy_radius = maxf(80.0, hud.viewport_size().y * 0.12)
+	joy_center = hud.joystick_center()
+	joy_knob = joy_center
+	joy_radius = hud.joystick_radius()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -66,9 +68,14 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		if joy_finger == -1 and _in_joy_zone(pos):
 			joy_finger = event.index
 			joy_active = true
-			joy_center = pos
-			joy_knob = pos
-			move = Vector2.ZERO
+			# 轮盘固定在左下角，触摸只负责决定拖动方向。
+			joy_center = hud.joystick_center()
+			joy_radius = hud.joystick_radius()
+			var d0: Vector2 = pos - joy_center
+			if d0.length() > joy_radius:
+				d0 = d0.normalized() * joy_radius
+			joy_knob = joy_center + d0
+			move = d0 / joy_radius
 	else:
 		if event.index == joy_finger:
 			joy_finger = -1
@@ -121,6 +128,9 @@ func _process(_delta: float) -> void:
 		_zero_move()
 		return
 	if not joy_active:
+		joy_center = hud.joystick_center()
+		joy_knob = joy_center
+		joy_radius = hud.joystick_radius()
 		var kb := Vector2.ZERO
 		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
 			kb.x -= 1.0
