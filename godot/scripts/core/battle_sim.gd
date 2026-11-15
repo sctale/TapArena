@@ -476,7 +476,7 @@ func spawn_boss(team: int) -> void:
 	u.lane_index = 0 if team == BLUE else lane.size() - 1
 	boss = u
 	boss_team = team
-	banner.emit(("蓝方" if team == BLUE else "红方") + "峡谷巨兽加入战场！", 3.6)
+	banner.emit("终极对决！%s峡谷巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	sfx.emit("ult")
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(team), 200.0)
 
@@ -573,7 +573,8 @@ func step(dt: float) -> void:
 
 	if not sudden_death and clock >= sudden_death_time:
 		sudden_death = true
-		banner.emit("终极对决！水晶护盾全部消失", 3.2)
+		# 「终极对决」与巨兽出场同一帧发生，播报合并到 spawn_boss 里只出一条，
+		# 否则两条长提示会互相覆盖，看起来像文字叠在一起。
 		sfx.emit("ult")
 	if not boss_spawned and clock >= sudden_death_time:
 		boss_spawned = true

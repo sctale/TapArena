@@ -8,7 +8,7 @@
 
 | 版本 | 位置 | 状态 |
 | --- | --- | --- |
-| **Godot 版（4.6.0-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：方块像素风 + 8 位人形动物英雄 + 纯逻辑 BattleSim + 首页选人 + 固定圆形摇杆/技能 + 60Hz 模拟 + 像素 HUD + 圆形范围指示 + 建筑遮挡抖动挖空 + 一塔回血药剂 + 3 分钟峡谷巨兽 + 英雄专属音色 + 8 英雄独立大招演出 + 胜利演出 + 6 人全员结算，1920×1080 UI 基准，出 Android APK |
+| **Godot 版（4.6.1-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：方块像素风 + 8 位人形动物英雄 + 纯逻辑 BattleSim + 首页选人 + 固定圆形摇杆/技能 + 60Hz 模拟 + 像素 HUD + 圆形范围指示 + 建筑遮挡抖动挖空 + 一塔回血药剂 + 3 分钟峡谷巨兽 + 英雄专属音色 + 8 英雄独立大招演出 + 胜利演出 + 6 人全员结算 + 固定俯角/高度相机，1920×1080 UI 基准，出 Android APK |
 | Unity 版（3.2.0，冻结） | `unity/` | 历史存档，保留用于对照旧玩法与旧美术，不再维护 |
 | Web 版（1.3，冻结） | `www/`、`android/` | 历史存档，封存在 git 标签 `web-v1.3.0` |
 
@@ -86,7 +86,7 @@ unity/Assets/Shaders/
 - **动画/内存**：18 个 `.anim` 源文件从 39.6MB 降到约 3.1MB（Idle 保留完整循环，导入 `Optimal` 压缩）；主路径不再生成 1280×683 地面贴图。
 - **素材授权**：Polyfork 免费资产允许商用、无需署名，允许随游戏分发，但不允许把 GLB/FBX 文件本体再次分发；`unity/ArtSource/`、`Resources/Polyfork/`、`Resources/PolyforkProps/`、`Resources/Heroes/` 在 `.gitignore` 中，构建前用 Blender 脚本拉取。
 
-## Godot 版（4.6.0-dev.1，唯一主线）
+## Godot 版（4.6.1-dev.1，唯一主线）
 
 Godot 4.7.2 工程在 `godot/`。这一版把美术整体重做成**方块像素风**：16×16 像素图集、体素盒子模型、像素数字与像素图标；8 位英雄为**人形动物**，用耳朵、尾巴、面部涂装、围巾/背心/靴子体现动物特色。首页选人、难度选择、程序合成音效、英雄肢体动画与水晶破碎演出已接入。
 
@@ -147,7 +147,7 @@ godot --path godot
 powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 ```
 
-产物：`TapArena-v4.6.0-dev.1.apk`（26,954,303 字节，versionCode 39，arm64-v8a，签名 `CN=TapArena`，SHA-256 `EE277441D79371AA54F4E262B22E8E21403D92BEE36326B21DD25F25BC0D6691`，与 3.2.0 同一把 keystore，可覆盖升级）。
+产物：`TapArena-v4.6.1-dev.1.apk`（26,954,303 字节，versionCode 40，arm64-v8a，签名 `CN=TapArena`，SHA-256 `87E3C526E45AC66FC646B798980B5FA89D482ABEC58D9F41EBCCDA655FF87983`，与 3.2.0 同一把 keystore，可覆盖升级）。
 
 调试参数（写在 `--` 之后）：`--skip-home` 跳过首页、`--hero=frog` 指定英雄、`--auto-run` 自动向右推进（录制用）、`--dash` 配合 `--auto-run` 在移动中反复放 1 技能检查位移手感、`--top` 全图俯瞰、`--look-base` 看蓝方基地、`--look-red` 看红方基地、`--look-lane` 看兵线、`--look-tower` 看红方外塔、`--ruins` 拆掉双方外塔看废墟、`--boss` 直接触发 3 分钟峡谷巨兽、`--victory` 直接摧毁红方水晶看胜利演出、`--victory-minion` 用小兵最后一击验证结束动画、`--behind` 检查建筑半透明、`--ult` 检查大招冷却、`--fx` 把当前英雄大招定在屏幕中心播放、`--no-hud` 隐藏 HUD、`--pause` 直接打开暂停、`--result` 直接看结算。
 
@@ -158,9 +158,10 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 - 首页 → 选人 → 开战 → 暂停 → 音效开关 → 回首页的状态机回归（`tests/flow_headless.gd`）通过。
 - 桌面录像逐帧检查：8 英雄首页、双方蘑菇塔、蓝红小兵细节、左上角血条完整、水晶破碎演出与结算页；塔后方抖动挖空后角色轮廓清晰可见；圆形技能钮与冷却转盘同尺寸；左下角固定圆形摇杆常驻；顶部比分/时间已分栏；3 分钟峡谷巨兽模型、血条与推进正常；8 位英雄大招特效分别不同；熊猫大招的竹竿从地面逐根拔起；`--auto-run --dash` 连续位移时镜头稳定跟住角色。
 - 规则单测覆盖：基地圈内 15%/秒快速回血、出圈立即停止；8 位英雄大招释放后全部立即进入冷却；回血药剂踩到恢复 35% 最大生命、30 秒后刷新；3 分钟巨兽加入优势方、被击败后 25 秒复活。
-- Android 16 模拟器：`adb install -r` 覆盖安装 versionCode 39 成功，`dumpsys` 确认 versionName 为 4.6.0-dev.1，monkey 启动进入应用；本轮大招特效的逐帧检查使用桌面端录像（`--fx` 居中播放）。
+- 相机：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右、向上 = 画面上方；角色带 20° 偏航，侧视也能看到脸和涂装。4.6.1 起机位高度、俯角、朝向为常量，推镜只缩 FOV；60Hz 自动行走逐帧录像的背景位移稳定在 8.0px/帧（帧间偏差 p99 0.43px，无停顿/回跳帧）。
+- BOSS 出场播报：4.6.1 起「终极对决」与「峡谷巨兽加入战场」合并为一条，播报条移到顶部 HUD 之下；录像确认播报条与玩家面板底部间距 ≥45px、与「终极对决 · 水晶全开」状态标签完全分开。
 - 颜色：Android 端与桌面端一致（水晶蓝、老虎橙、冰蓝老家、熔岩红老家），调色板着色器已规避顶点色通道问题。
-- 相机：横屏相机在 +Z 侧俯视，摇杆向右 = 画面向右、向上 = 画面上方；角色带 20° 偏航，侧视也能看到脸和涂装。
+- Android：`TapArena-v4.6.1-dev.1.apk` 通过 aapt2/apksigner 校验（包名 `com.sctale.taparena`、versionCode 40、versionName 4.6.1-dev.1、arm64-v8a、证书 `CN=TapArena`）；本轮模拟器未在线，覆盖安装待补测。
 
 已知边界：
 
@@ -203,10 +204,10 @@ Godot 版的方块模型、像素图集、图标与应用图标均为本项目�
 
 ## 安卓版（Godot 主线）
 
-安装 `TapArena-v4.6.0-dev.1.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 4.6.0-dev.1（versionCode 39），最低 Android 7.0（API 24），targetSdk 36。
+安装 `TapArena-v4.6.1-dev.1.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 4.6.1-dev.1（versionCode 40），最低 Android 7.0（API 24），targetSdk 36。
 
 - 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与历史版本同一把 release keystore，可直接覆盖安装）
-- SHA-256：`EE277441D79371AA54F4E262B22E8E21403D92BEE36326B21DD25F25BC0D6691`
+- SHA-256：`87E3C526E45AC66FC646B798980B5FA89D482ABEC58D9F41EBCCDA655FF87983`
 - 体积：26,954,303 字节（25.7MiB）
 - 历史存档：Unity 3.2.0 的 `TapArena-v3.2.0.apk` 仍保留在根目录，不会覆盖（versionCode 26 < 38）。
 

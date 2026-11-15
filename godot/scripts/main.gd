@@ -159,15 +159,7 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		cam.set_target(Vector3(730, 0, 720))
 		cam.snap()
 	# 调试：直接触发 3 分钟峡谷巨兽，检查模型与推进。
-	if "--boss" in OS.get_cmdline_user_args():
-		sim.clock = 179.9
-		sim.step(0.2)
-		for i in range(60):
-			sim.step(1.0 / 60.0)
-		if sim.boss != null:
-			camera_follow = false
-			cam.set_target(Vector3(sim.boss.pos.x + 120.0, 0, sim.boss.pos.y))
-			cam.snap()
+	# 放在 HUD/相机信号连接之后，这样巨兽播报、震屏与变形都能一起验收。
 	# 调试：直接升到 2 级并释放大招，检查冷却显示。
 	if "--ult" in OS.get_cmdline_user_args():
 		sim.player.level = 2
@@ -216,6 +208,17 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	sim.hitstop.connect(_on_hitstop)
 	sim.match_ended.connect(_on_match_ended)
 	sim.banner.connect(_on_banner)
+
+	# 调试：直接触发 3 分钟峡谷巨兽，检查模型与推进（此时播报与震屏已接通）。
+	if "--boss" in OS.get_cmdline_user_args():
+		sim.clock = 179.9
+		sim.step(0.2)
+		for i in range(60):
+			sim.step(1.0 / 60.0)
+		if sim.boss != null:
+			camera_follow = false
+			cam.set_target(Vector3(sim.boss.pos.x + 120.0, 0, sim.boss.pos.y))
+			cam.snap()
 
 	# 开发用：直接查看暂停/结算界面。
 	if "--pause" in OS.get_cmdline_user_args():
@@ -387,6 +390,9 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_on_go_back_requested()
 	elif what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		# 自动跑图/录制时窗口通常不在前台，失焦不自动暂停，否则会录到暂停面板。
+		if auto_run:
+			return
 		if match_active and sim != null and not sim.over and not paused:
 			_toggle_pause()
 

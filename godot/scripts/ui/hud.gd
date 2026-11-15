@@ -484,9 +484,7 @@ func _update_labels() -> void:
 	if not banners.is_empty() and show_battle:
 		var b: Dictionary = banners[banners.size() - 1]
 		var a: float = clampf(float(b["t"]) * 6.0, 0.0, 1.0)
-		var r := Rect2(_safe().position.x + _safe().size.x * 0.22, _safe().position.y + h * 0.135,
-			_safe().size.x * 0.56, h * 0.062)
-		_place(lbl_banner, r, true)
+		_place(lbl_banner, _banner_rect(_safe(), h), true)
 		lbl_banner.add_theme_color_override("font_color", Color(1, 0.97, 0.88, a))
 		_set_label(lbl_banner, str(b["text"]))
 	else:
@@ -640,6 +638,9 @@ func _draw_battle_bg(safe: Rect2) -> void:
 	_draw_world_bars(safe, h)
 	_draw_skill_bg(safe, h)
 	_draw_joystick(safe, h)
+	# 播报底框：独立一层，避免文字直接压在战场上，也把播报和比分/倒计时分开。
+	if not banners.is_empty():
+		_panel(_banner_rect(safe, h), Color(0.12, 0.15, 0.12, 0.90))
 
 
 func _draw_battle_icons(safe: Rect2) -> void:
@@ -700,6 +701,13 @@ func _draw_battle_fg(safe: Rect2) -> void:
 
 func _plate_rect(safe: Rect2, h: float) -> Rect2:
 	return Rect2(safe.position.x + 12.0, safe.position.y + 12.0, safe.size.x * 0.325, h * 0.17)
+
+
+func _banner_rect(safe: Rect2, h: float) -> Rect2:
+	# 主播报条：下移到玩家信息面板 / 小地图 / 比分与倒计时之下，留出整段空白，
+	# 巨兽出场等长提示不会再和顶部任何文字贴在一起。
+	return Rect2(safe.position.x + safe.size.x * 0.24, safe.position.y + h * 0.245,
+		safe.size.x * 0.52, h * 0.056)
 
 
 func _draw_player_plate_bg(safe: Rect2, h: float) -> void:
