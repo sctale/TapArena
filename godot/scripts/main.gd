@@ -63,7 +63,7 @@ func _ready() -> void:
 		elif str(a) == "--mode=5v5":
 			current_mode_5v5 = true
 	if "--skip-home" in args or "--top" in args or "--no-hud" in args:
-		_start_match(current_hero, current_difficulty, current_seed)
+		_start_match(current_hero, current_difficulty, current_seed, current_mode_5v5)
 	else:
 		_show_home()
 
@@ -180,8 +180,15 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 		camera_follow = false
 		cam.frozen = true
 		cam.fov = 58.0
-		cam.position = Vector3(1500, 1450, 2500)
-		cam.look_at(Vector3(1500, 0, 820), Vector3.UP)
+		var cx: float = sim.map_w * 0.5
+		var cz: float = sim.map_h * 0.5
+		if sim.five_v_five:
+			# 5v5 用正俯视核对对角三路与河道；3v3 保持原来的斜俯视。
+			cam.position = Vector3(cx, maxf(3000.0, sim.map_h * 1.35), cz + 1.0)
+			cam.look_at(Vector3(cx, 0, cz), Vector3(0, 0, -1))
+		else:
+			cam.position = Vector3(1500, 1450, 2500)
+			cam.look_at(Vector3(1500, 0, 820), Vector3.UP)
 	# 调试：拆掉双方外塔，检查废墟模型。
 	if "--ruins" in OS.get_cmdline_user_args():
 		sim.deal_damage(sim.towers_blue[0], 99999.0, sim.player)

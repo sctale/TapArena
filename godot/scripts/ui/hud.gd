@@ -837,18 +837,22 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 	_panel(mini, Color("3f6b32"))
 	var inner := Rect2(mini.position + Vector2(4, 4), mini.size - Vector2(8, 8))
 	_add_rect(inner, Color("4f8a3f"))
-	# 3v3 画一条中路，5v5 画三条并行兵线；野区营地用金色点标出。
+	# 3v3 一条中路，5v5 三条对角兵线；河道用浅蓝折线。
 	var mini_paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
+	if sim.five_v_five and sim.river.size() >= 2:
+		var river_pts := PackedVector2Array()
+		for p in sim.river:
+			river_pts.append(Vector2(inner.position.x + p.x / sim.map_w * inner.size.x,
+				inner.position.y + p.y / sim.map_h * inner.size.y))
+		draw_polyline(river_pts, Color("7fc4e8"), maxf(2.0, inner.size.y * 0.022), true)
 	for path in mini_paths:
-		if path.is_empty():
+		if path.size() < 2:
 			continue
-		var lane_y := 0.0
+		var pts := PackedVector2Array()
 		for p in path:
-			lane_y += p.y
-		lane_y /= float(path.size())
-		var lane_px: float = inner.position.y + lane_y / sim.map_h * inner.size.y
-		_add_rect(Rect2(inner.position.x, lane_px - inner.size.y * 0.055,
-			inner.size.x, inner.size.y * 0.11), Color("b09464"))
+			pts.append(Vector2(inner.position.x + p.x / sim.map_w * inner.size.x,
+				inner.position.y + p.y / sim.map_h * inner.size.y))
+		draw_polyline(pts, Color("b09464"), maxf(2.0, inner.size.y * 0.030), true)
 	for u in sim.units:
 		if not u.is_alive() or u.kind == sim.MINION:
 			continue

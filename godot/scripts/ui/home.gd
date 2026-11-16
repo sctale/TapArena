@@ -304,7 +304,7 @@ func _refresh_labels() -> void:
 	lbl_start.text = "开始冒险"
 	_place(lbl_hint, Rect2(safe.position.x + safe.size.x * 0.06, easy_rect().end.y + 6.0,
 		safe.size.x * 0.38, h * 0.034))
-	lbl_hint.text = ("5v5 三路：多 5 位英雄 + 野区" if mode_5v5 else "3v3 单路：10 位英雄") + 		(" · 轻松" if difficulty == 0 else " · 挑战")
+	lbl_hint.text = ("5v5 对角三路 · 河道野区 · 15 位英雄" if mode_5v5 else "3v3 单路：10 位英雄") + 		(" · 轻松" if difficulty == 0 else " · 挑战")
 	_place(lbl_foot, Rect2(safe.end.x - safe.size.x * 0.30, safe.end.y - h * 0.045,
 		safe.size.x * 0.26, h * 0.032))
 	lbl_foot.text = "v%s · Godot" % str(ProjectSettings.get_setting("application/config/version", "dev"))
@@ -323,7 +323,7 @@ func _refresh_labels() -> void:
 	_place(lbl_detail_blurb, Rect2(tx, dr.position.y + dr.size.y * 0.165, right_w, h * 0.052))
 	lbl_detail_blurb.text = str(dsel.get("blurb", ""))
 	_place(lbl_detail_tip, Rect2(tx, dr.end.y - h * 0.045, right_w * 0.55, h * 0.030))
-	lbl_detail_tip.text = "关闭后可点其他卡片 · 开始后进入 %s" % ("5v5 三路" if mode_5v5 else "3v3 单路")
+	lbl_detail_tip.text = "关闭后可点其他卡片 · 开始后进入 %s" % ("5v5 对角三路" if mode_5v5 else "3v3 单路")
 
 	var skills: Array = dsel.get("skills", [])
 	for i in range(3):

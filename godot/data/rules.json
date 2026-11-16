@@ -14,32 +14,57 @@
   "xp_minion": 14,
   "xp_minion_assist": 7,
   "lanes_5v5": [
-    [[260, 320], [760, 320], [1180, 320], [1500, 320], [1900, 320], [2320, 320], [2740, 320]],
-    [[260, 800], [760, 800], [1180, 800], [1500, 800], [1900, 800], [2320, 800], [2740, 800]],
-    [[260, 1280], [760, 1280], [1180, 1280], [1500, 1280], [1900, 1280], [2320, 1280], [2740, 1280]]
+    [[360, 2040], [300, 1500], [300, 900], [300, 300], [900, 300], [1500, 300], [2040, 360]],
+    [[360, 2040], [700, 1700], [1000, 1400], [1200, 1200], [1400, 1000], [1700, 700], [2040, 360]],
+    [[360, 2040], [900, 2100], [1500, 2100], [2100, 2100], [2100, 1500], [2100, 900], [2040, 360]]
   ],
+  "river_5v5": [[450, 450], [1950, 1950]],
   "mode_5v5": {
     "team_size": 5,
     "match_cap": 300.0,
     "sudden_death_time": 180.0,
-    "base_open_towers": 1
+    "base_open_towers": 1,
+    "map_w": 2400,
+    "map_h": 2400,
+    "base_blue": [360, 2040],
+    "base_red": [2040, 360],
+    "keep_protection_in_sudden_death": true
   },
   "jungle": [
-    {"kind": "boar", "pos": [760, 560]},
-    {"kind": "wolf", "pos": [930, 1040]},
-    {"kind": "boar", "pos": [2240, 560]},
-    {"kind": "wolf", "pos": [2070, 1040]},
-    {"kind": "crab", "pos": [1500, 560]},
-    {"kind": "crab", "pos": [1500, 1040]}
+    {"kind": "boar", "pos": [620, 1200]},
+    {"kind": "boar", "pos": [1780, 1200]},
+    {"kind": "wolf", "pos": [1200, 1750]},
+    {"kind": "wolf", "pos": [1200, 650]},
+    {"kind": "crab", "pos": [950, 950]},
+    {"kind": "crab", "pos": [1450, 1450]}
   ],
   "jungle_stats": {
     "hp": 650,
-    "dmg": 36,
+    "dmg": 26,
     "range": 110,
     "atk_interval": 1.1,
     "respawn": 45,
     "xp": 90,
-    "heal_pct": 0.08
+    "heal_pct": 0.12,
+    "kinds": {
+      "boar": {"xp": 90, "heal_pct": 0.12},
+      "wolf": {"xp": 110, "buff": {"dmg_pct": 0.10, "duration": 20, "label": "猎狼增益"}},
+      "crab": {"xp": 70, "buff": {"speed_pct": 0.15, "duration": 12, "label": "迅捷蟹增益"}}
+    }
+  },
+  "combat": {
+    "mark_amp": 1.22,
+    "chain_falloff": 0.82,
+    "spin_tick": 0.30,
+    "spin_knock": 6.0,
+    "spin_slow": 0.35,
+    "fear_speed": 1.15,
+    "boss_kill_xp": 90.0,
+    "thorn_base": 24.0,
+    "thorn_per_level": 5.0,
+    "trap_lead": 0.8,
+    "jungle_gank_at": 60.0,
+    "jungle_gank_time": 20.0
   },
   "base": {
     "hp": 3000,
@@ -48,7 +73,9 @@
     "range": 400,
     "dmg": 120,
     "atk_interval": 1.0,
-    "hp_5v5": 2100
+    "hp_5v5": 2100,
+    "dmg_5v5": 90,
+    "range_5v5": 360
   },
   "tower": {
     "hp": 4200,

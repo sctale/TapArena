@@ -79,6 +79,15 @@ class Unit:
 	var spin_radius: float = 130.0
 	var spin_dmg: float = 0.0
 	var spin_color := Color.WHITE
+	# 野区增益与刺客伏击：野怪 buff 与「尖刺伏击」都用同一套计时字段。
+	var buff_dmg_t: float = 0.0
+	var buff_dmg_pct: float = 0.0
+	var buff_speed_t: float = 0.0
+	var buff_speed_pct: float = 0.0
+	var vanish_t: float = 0.0
+	var ambush_t: float = 0.0
+	var ambush_pending: float = 0.0
+	var ambush_mul: float = 1.8
 
 	var atk_anim: float = 0.0
 	var cast_anim: float = 0.0
@@ -96,6 +105,10 @@ class Unit:
 	var lane_id: int = 1
 	var jungle_kind: String = ""
 	var respawn_home := Vector2.ZERO
+	# 打野位：-2 表示不在任何一路；gank 计时结束后回野区。
+	var is_jungler: bool = false
+	var jungle_gank_t: float = 0.0
+	var jungle_gank_lane: int = 1
 
 	# BOSS 技能状态：前摇、冲撞、施法目标。普通英雄不用这些字段。
 	var boss_skill: String = ""
@@ -162,6 +175,8 @@ class Potion:
 	var active := true
 	var respawn_t := 0.0
 	var view_id: int = 0
+	# 守卫塔：本路塔被拆后，这瓶药剂停止刷新（5v5 每路各管各的）。
+	var guard = null
 
 var rules: Dictionary = {}
 var heroes_data: Array = []
@@ -203,8 +218,10 @@ var interp_alpha: float = 1.0
 
 var lane: Array = []
 var lane_paths: Array = []
+var river: Array = []
 var five_v_five := false
 var team_size := 3
+var keep_protection := false
 var rng := RandomNumberGenerator.new()
 
 var map_w: float = 3000.0
@@ -230,6 +247,7 @@ var potion_cfg: Dictionary = {}
 var boss_cfg: Dictionary = {}
 var jungle_cfg: Dictionary = {}
 var ai_cfg: Dictionary = {}
+var combat_cfg: Dictionary = {}
 
 var ai_think_base: float = 0.22
 var ai_skill_mul: float = 1.0
@@ -309,6 +327,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	boss_cfg = rules.get("boss", {})
 	jungle_cfg = rules.get("jungle_stats", {})
 	ai_cfg = rules.get("ai", {})
+	combat_cfg = rules.get("combat", {})
 	boss_respawn = float(boss_cfg.get("respawn", 25.0))
 	var hs: Dictionary = rules.get("hitstop", {})
 	hitstop_threshold = float(hs.get("threshold", 45))
@@ -321,11 +340,15 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	enemy_dmg_mul = float(dcfg.get("enemy_dmg_mul", 1.0))
 
 	lane_paths.clear()
+	river.clear()
 	if five_v_five:
 		var mode_cfg: Dictionary = rules.get("mode_5v5", {})
 		team_size = int(mode_cfg.get("team_size", 5))
 		match_cap = float(mode_cfg.get("match_cap", match_cap))
 		sudden_death_time = float(mode_cfg.get("sudden_death_time", sudden_death_time))
+		keep_protection = bool(mode_cfg.get("keep_protection_in_sudden_death", true))
+		map_w = float(mode_cfg.get("map_w", map_w))
+		map_h = float(mode_cfg.get("map_h", map_h))
 		for raw_lane in rules.get("lanes_5v5", []):
 			var path: Array = []
 			for p in raw_lane:
@@ -333,6 +356,8 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 			lane_paths.append(path)
 		if lane_paths.is_empty():
 			lane_paths.append([])
+		for rp in rules.get("river_5v5", []):
+			river.append(Vector2(float(rp[0]), float(rp[1])))
 	else:
 		team_size = 3
 	lane.clear()
@@ -353,18 +378,26 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 		others[i] = others[j]
 		others[j] = tmp
 
-	base_blue = make_base(BLUE, Vector2(230, 800))
-	base_red = make_base(RED, Vector2(2770, 800))
+	var blue_home := Vector2(230, 800)
+	var red_home := Vector2(2770, 800)
 	if five_v_five:
-		# 三路各一座外塔；塔位取该路的中点，战斗推进仍按 lane 过滤。
+		var mode_home: Dictionary = rules.get("mode_5v5", {})
+		var bb: Array = mode_home.get("base_blue", [360, 2040])
+		var rb: Array = mode_home.get("base_red", [2040, 360])
+		blue_home = Vector2(float(bb[0]), float(bb[1]))
+		red_home = Vector2(float(rb[0]), float(rb[1]))
+	base_blue = make_base(BLUE, blue_home)
+	base_red = make_base(RED, red_home)
+	if five_v_five:
+		# 三路各一座外塔；药剂由本路塔守卫，塔没了这一路才停刷。
 		for lane_id in range(lane_paths.size()):
 			var path: Array = lane_paths[lane_id]
 			if path.size() < 6:
 				continue
 			towers_blue.append(make_tower(BLUE, 0, path[2], lane_id))
 			towers_red.append(make_tower(RED, 0, path[4], lane_id))
-			make_potion(BLUE, path[1])
-			make_potion(RED, path[5])
+			make_potion(BLUE, path[1], towers_blue[towers_blue.size() - 1])
+			make_potion(RED, path[5], towers_red[towers_red.size() - 1])
 		for camp in rules.get("jungle", []):
 			var cp = camp.get("pos", [0, 0])
 			make_jungle(str(camp.get("kind", "boar")), Vector2(float(cp[0]), float(cp[1])))
@@ -375,40 +408,71 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 		towers_red.append(make_tower(RED, 0, Vector2(1900, 800)))
 		towers_red.append(make_tower(RED, 1, Vector2(2320, 800)))
 		# 双方一塔后方各放一瓶回血药剂，踩到即喝，30 秒后重新长出来。
-		make_potion(BLUE, Vector2(1050, 800))
-		make_potion(RED, Vector2(2030, 800))
+		make_potion(BLUE, Vector2(1050, 800), towers_blue[0])
+		make_potion(RED, Vector2(2030, 800), towers_red[0])
 
 	var allies: Array = []
-	var player_front := player_hero == "tiger" or player_hero == "bear" or player_hero == "turtle"
-	var ally_prefs := [
-		["turtle", "bear", "tiger", "panda"],
-		["rabbit", "axolotl", "frog", "cat", "deer", "fox"],
-		["hedgehog", "wolf", "cat", "fox", "redpanda", "owl"],
-		["deer", "crane", "owl", "frog", "rabbit"],
-	]
-	if player_front:
-		ally_prefs = [
-			["deer", "cat", "fox", "rabbit", "axolotl", "frog"],
-			["axolotl", "rabbit", "frog", "deer", "fox", "cat"],
-			["hedgehog", "wolf", "redpanda", "crane", "owl"],
-			["turtle", "panda", "bear", "owl", "crane"],
+	var red_jungler := ""
+	if five_v_five:
+		# 保证双方各有一名打野（狼优先、刺猬替补），再按角色桶随机补位。
+		if not (player_hero == "wolf" or player_hero == "hedgehog"):
+			var jg0: String = take_jungler(others)
+			if jg0 != "":
+				allies.append(jg0)
+		red_jungler = take_jungler(others)
+		var rest_allies: Array = pick_allies_5v5(others, team_size - 1 - allies.size())
+		for a in rest_allies:
+			allies.append(a)
+	else:
+		var player_front := player_hero == "tiger" or player_hero == "bear" or player_hero == "turtle"
+		var ally_prefs := [
+			["turtle", "bear", "tiger", "panda"],
+			["rabbit", "axolotl", "frog", "cat", "deer", "fox"],
+			["hedgehog", "wolf", "cat", "fox", "redpanda", "owl"],
+			["deer", "crane", "owl", "frog", "rabbit"],
 		]
-	for i in range(team_size - 1):
-		var prefs: Array = ally_prefs[i % ally_prefs.size()]
-		allies.append(take_preferred(others, prefs))
+		if player_front:
+			ally_prefs = [
+				["deer", "cat", "fox", "rabbit", "axolotl", "frog"],
+				["axolotl", "rabbit", "frog", "deer", "fox", "cat"],
+				["hedgehog", "wolf", "redpanda", "crane", "owl"],
+				["turtle", "panda", "bear", "owl", "crane"],
+			]
+		for i in range(team_size - 1):
+			var prefs: Array = ally_prefs[i % ally_prefs.size()]
+			allies.append(take_preferred(others, prefs))
 
 	var blue_ids: Array = [player_hero] + allies
 	var red_ids: Array = others
+	if five_v_five:
+		var red_team: Array = []
+		if red_jungler != "":
+			red_team.append(red_jungler)
+		var rest_red: Array = pick_allies_5v5(others, team_size - red_team.size())
+		for r in rest_red:
+			red_team.append(r)
+		red_ids = red_team
 	var lanes_5 := [1, 0, 2, 1, 0]
-	for i in range(team_size):
-		var lane_id: int = lanes_5[i] if five_v_five else 1
-		var h = make_hero(str(blue_ids[i]), BLUE, i, lane_id)
-		if i == 0:
-			h.is_player = true
-			player = h
-	for i in range(team_size):
-		var lane_id: int = lanes_5[i] if five_v_five else 1
-		make_hero(str(red_ids[i]), RED, i, lane_id)
+	if five_v_five:
+		var blue_lanes: Array = assign_lanes_5v5(blue_ids, true)
+		var red_lanes: Array = assign_lanes_5v5(red_ids, false)
+		for i in range(team_size):
+			var h = make_hero(str(blue_ids[i]), BLUE, i, int(blue_lanes[i]))
+			if i == 0:
+				h.is_player = true
+				player = h
+		for i in range(team_size):
+			make_hero(str(red_ids[i]), RED, i, int(red_lanes[i]))
+	else:
+		for i in range(team_size):
+			var lane_id: int = lanes_5[i] if five_v_five else 1
+			var h = make_hero(str(blue_ids[i]), BLUE, i, lane_id)
+			if i == 0:
+				h.is_player = true
+				player = h
+		for i in range(team_size):
+			var lane_id: int = lanes_5[i] if five_v_five else 1
+			make_hero(str(red_ids[i]), RED, i, lane_id)
 
 	started = true
 	wave_t = 3.0
@@ -453,6 +517,180 @@ func take_preferred(pool: Array, prefs: Array) -> String:
 	return fallback
 
 
+func take_jungler(pool: Array) -> String:
+	for cand in ["wolf", "hedgehog"]:
+		if pool.has(cand):
+			pool.erase(cand)
+			return cand
+	return ""
+
+
+func _shuffle_pool(arr: Array) -> void:
+	for i in range(arr.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
+
+
+func _take_bucket(pool: Array, bucket: Array, picked: Array, count: int) -> void:
+	_shuffle_pool(bucket)
+	for id in bucket:
+		if picked.size() >= count:
+			return
+		if pool.has(id):
+			pool.erase(id)
+			picked.append(id)
+			return
+
+
+func pick_allies_5v5(pool: Array, count: int) -> Array:
+	# 角色桶随机组队：1 前排 + 1 辅助优先，其余随机，避免每局阵容雷同。
+	var front: Array = []
+	var support: Array = []
+	var rest: Array = []
+	for id in pool:
+		var role := str(defs_by_id.get(id, {}).get("role", ""))
+		if role == "坦克" or role == "战士":
+			front.append(id)
+		elif role == "辅助" or role == "控制" or role == "法坦":
+			support.append(id)
+		else:
+			rest.append(id)
+	var picked: Array = []
+	_take_bucket(pool, front, picked, count)
+	_take_bucket(pool, support, picked, count)
+	_shuffle_pool(rest)
+	for id in rest:
+		if picked.size() >= count:
+			break
+		if pool.has(id):
+			pool.erase(id)
+			picked.append(id)
+	while picked.size() < count and not pool.is_empty():
+		var extra: String = str(pool[0])
+		pool.remove_at(0)
+		picked.append(extra)
+	return picked
+
+
+func assign_lanes_5v5(ids: Array, protect_player: bool) -> Array:
+	# 打野位 -2；前排上路、输出下路、其余中路；玩家固定在中间路（除非玩家就是打野）。
+	var lanes: Array = []
+	for i in range(ids.size()):
+		lanes.append(1)
+	var jungler := -1
+	for i in range(ids.size()):
+		if str(defs_by_id.get(str(ids[i]), {}).get("role", "")) == "打野":
+			jungler = i
+			break
+	if jungler < 0:
+		for i in range(ids.size()):
+			if str(defs_by_id.get(str(ids[i]), {}).get("role", "")) == "刺客":
+				jungler = i
+				break
+	if jungler >= 0:
+		lanes[jungler] = -2
+	var front := -1
+	var damage := -1
+	for i in range(ids.size()):
+		if i == jungler or (protect_player and i == 0):
+			continue
+		var role := str(defs_by_id.get(str(ids[i]), {}).get("role", ""))
+		if front < 0 and (role == "坦克" or role == "战士"):
+			front = i
+		elif damage < 0 and (role == "射手" or role == "法师"):
+			damage = i
+	if front >= 0:
+		lanes[front] = 0
+	if damage >= 0:
+		lanes[damage] = 2
+	return lanes
+
+
+func path_of(lane_id: int) -> Array:
+	if five_v_five and lane_id >= 0 and lane_id < lane_paths.size():
+		return lane_paths[lane_id]
+	return lane
+
+
+func path_length(path: Array) -> float:
+	var total := 0.0
+	for i in range(path.size() - 1):
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		total += a.distance_to(b)
+	return total
+
+
+func lane_progress(lane_id: int, p: Vector2) -> float:
+	# 点投影到兵线折线上的累计弧长（从蓝方起点算起）。
+	var path: Array = path_of(lane_id)
+	if path.size() < 2:
+		return 0.0
+	var acc := 0.0
+	var best := 1.0e20
+	var best_s := 0.0
+	for i in range(path.size() - 1):
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		var ab: Vector2 = b - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		var d: float = (a + ab * t).distance_to(p)
+		if d < best:
+			best = d
+			best_s = acc + ab.length() * t
+		acc += ab.length()
+	return best_s
+
+
+func point_at_progress(lane_id: int, s: float) -> Vector2:
+	var path: Array = path_of(lane_id)
+	if path.is_empty():
+		return Vector2.ZERO
+	var remain := clampf(s, 0.0, path_length(path))
+	for i in range(path.size() - 1):
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		var seg := a.distance_to(b)
+		if remain <= seg:
+			return a.lerp(b, clampf(remain / maxf(seg, 0.001), 0.0, 1.0))
+		remain -= seg
+	return path[path.size() - 1]
+
+
+func nearest_path_index(lane_id: int, p: Vector2) -> int:
+	var path: Array = path_of(lane_id)
+	var best := 0
+	var bd := 1.0e20
+	for i in range(path.size()):
+		var wp: Vector2 = path[i]
+		var d := wp.distance_to(p)
+		if d < bd:
+			bd = d
+			best = i
+	return best
+
+
+func lane_of_front(lane_id: int) -> int:
+	return lane_id if five_v_five and lane_id >= 0 else -1
+
+
+func standoff_point(team: int, t, extra: float) -> Vector2:
+	# 塔射程外的等待点：沿兵线退到塔前 range+extra 的位置。
+	var lid: int = t.lane_id if five_v_five else -1
+	var fp := lane_progress(lid, t.pos)
+	var off: float = t.attack_range + extra
+	var s := fp - off if team == BLUE else fp + off
+	return point_at_progress(lid, s)
+
+
+func speed_of(u) -> float:
+	if u.buff_speed_t > 0.0:
+		return u.move_speed * (1.0 + u.buff_speed_pct)
+	return u.move_speed
+
+
 func new_unit(kind: int, team: int, display_name: String, pos: Vector2):
 	var u = Unit.new()
 	u.uid = _uid
@@ -473,11 +711,12 @@ func make_base(team: int, pos: Vector2):
 	u.max_hp = u.hp
 	u.radius = float(base_cfg.get("radius", 90))
 	u.height = float(base_cfg.get("height", 150))
-	u.attack_range = float(base_cfg.get("range", 400))
-	u.dmg = float(base_cfg.get("dmg", 120))
+	u.attack_range = float(base_cfg.get("range_5v5", 360) if five_v_five else base_cfg.get("range", 400))
+	u.dmg = float(base_cfg.get("dmg_5v5", 90) if five_v_five else base_cfg.get("dmg", 120))
 	u.atk_interval = float(base_cfg.get("atk_interval", 1.0))
 	u.atk_timer = 1.0
 	u.level = 0
+	u.lane_id = 1
 	return u
 
 
@@ -520,7 +759,25 @@ func respawn_jungle(u) -> void:
 	u.prev_pos = u.pos
 	u.stun_t = 0.0
 	u.slow_t = 0.0
+	u.mark_t = 0.0
+	u.fear_t = 0.0
+	u.taunt_t = 0.0
+	u.spin_t = 0.0
+	u.buff_dmg_t = 0.0
+	u.buff_speed_t = 0.0
 	u.atk_timer = 0.6
+
+
+func _apply_jungle_buff(h, buff: Dictionary) -> void:
+	var dur := float(buff.get("duration", 15.0))
+	if buff.has("dmg_pct"):
+		h.buff_dmg_pct = float(buff.get("dmg_pct", 0.0))
+		h.buff_dmg_t = dur
+	if buff.has("speed_pct"):
+		h.buff_speed_pct = float(buff.get("speed_pct", 0.0))
+		h.buff_speed_t = dur
+	float_text.emit(Vector3(h.pos.x, h.height + 30.0, h.pos.y),
+		str(buff.get("label", "野区增益")), Color(1.0, 0.93, 0.55))
 
 
 func step_jungle(u, dt: float) -> void:
@@ -536,11 +793,12 @@ func step_jungle(u, dt: float) -> void:
 		hit_with_fx(foe, u.dmg, u, 0.0)
 
 
-func make_potion(team: int, pos: Vector2):
+func make_potion(team: int, pos: Vector2, guard = null):
 	var p = Potion.new()
 	p.team = team
 	p.pos = pos
 	p.radius = float(potion_cfg.get("radius", 30))
+	p.guard = guard
 	p.view_id = _potion_view
 	_potion_view += 1
 	potions.append(p)
@@ -548,11 +806,11 @@ func make_potion(team: int, pos: Vector2):
 
 
 func step_potions(dt: float) -> void:
-	# 回血药剂：一塔被拆后不再刷新；满血英雄路过不会拿走。
+	# 回血药剂：本路塔被拆后不再刷新；满血英雄路过不会拿走。
 	var heal_pct := float(potion_cfg.get("heal_pct", 0.35))
 	var respawn := float(potion_cfg.get("respawn", 30.0))
 	for p in potions:
-		var guard = towers_blue[0] if p.team == BLUE else towers_red[0]
+		var guard = p.guard
 		if guard == null or not guard.is_alive():
 			p.active = false
 			p.respawn_t = 0.0
@@ -622,7 +880,14 @@ func spawn_boss(team: int) -> void:
 	u.boss_charge_t = 0.0
 	u.boss_charge_hit.clear()
 	u.boss_target = null
-	u.lane_index = 0 if team == BLUE else lane.size() - 1
+	if five_v_five:
+		# 5v5 巨兽从河道中央加入战场，只推中路。
+		var mid_len := path_length(path_of(1))
+		u.pos = point_at_progress(1, mid_len * 0.5 + (180.0 if team == BLUE else -180.0))
+		u.prev_pos = u.pos
+		u.lane_index = nearest_path_index(1, u.pos)
+	else:
+		u.lane_index = 0 if team == BLUE else lane.size() - 1
 	boss = u
 	boss_team = team
 	banner.emit("终极对决！%s峡谷巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
@@ -635,7 +900,12 @@ func respawn_boss(u) -> void:
 	if home == null or not home.is_alive():
 		return
 	u.hp = u.max_hp
-	u.pos = home.pos + Vector2(190.0 if u.team == BLUE else -190.0, 0.0)
+	if five_v_five:
+		var mid_len := path_length(path_of(1))
+		u.pos = point_at_progress(1, mid_len * 0.5 + (180.0 if u.team == BLUE else -180.0))
+		u.lane_index = nearest_path_index(1, u.pos)
+	else:
+		u.pos = home.pos + Vector2(190.0 if u.team == BLUE else -190.0, 0.0)
 	u.prev_pos = u.pos
 	u.invuln_t = 1.0
 	u.stun_t = 0.0
@@ -686,11 +956,11 @@ func step_boss(u, dt: float) -> void:
 		if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(second.get("radius", 300.0))) > 0:
 			_begin_boss_cast(u, "cyclone", second, 1)
 			return
-		var front_fly = front_structure(u.team)
+		var front_fly = front_structure(u.team, 1 if five_v_five else -1)
 		if front_fly != null and front_fly.is_alive():
 			var fd2: float = u.pos.distance_to(front_fly.pos)
 			if fd2 > u.attack_range * 0.8:
-				move_ai(u, front_fly.pos - u.pos, dt, 0.92)
+				_move_along_lane(u, dt, 0.92)
 				return
 	else:
 		# 地面形态：裂地重击 / 咆哮 / 冲撞。
@@ -700,13 +970,13 @@ func step_boss(u, dt: float) -> void:
 		if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(second.get("radius", 330.0))) > 0:
 			_begin_boss_cast(u, "roar", second, 1)
 			return
-		var front = front_structure(u.team)
+		var front = front_structure(u.team, 1 if five_v_five else -1)
 		if u.cds[2] <= 0.0 and front != null and front.is_alive():
 			var fd: float = u.pos.distance_to(front.pos)
 			if fd >= float(charge.get("min_range", 260.0)) and fd <= float(charge.get("range", 620.0)):
 				_begin_boss_cast(u, "charge", charge, 2, front)
 				return
-	var front = front_structure(u.team)
+	var front = front_structure(u.team, 1 if five_v_five else -1)
 
 	# 其余时间保持原来的普攻推进。
 	var target = nearest_enemy(u, u.attack_range + 90.0)
@@ -734,7 +1004,33 @@ func step_boss(u, dt: float) -> void:
 				if (front.kind == TOWER or front.kind == BASE) else 1.0
 			hit_with_fx(front, u.dmg * mul, u, 0.2)
 		return
-	move_ai(u, to, dt, 0.92)
+	_move_along_lane(u, dt, 0.92)
+
+
+func _move_along_lane(u, dt: float, speed_k: float) -> void:
+	# 沿兵线折线推进：巨兽在 5v5 只走中路，3v3 走单路。
+	var lid := 1 if five_v_five else -1
+	var path: Array = path_of(lid)
+	if path.is_empty():
+		u.moving = false
+		return
+	var idx := clampi(u.lane_index, 0, path.size() - 1)
+	var dir_step := 1 if u.team == BLUE else -1
+	var goal: Vector2 = path[idx]
+	for guard in range(path.size()):
+		if goal.distance_to(u.pos) > 90.0:
+			break
+		var next_idx := idx + dir_step
+		if next_idx < 0 or next_idx >= path.size():
+			break
+		idx = next_idx
+		goal = path[idx]
+	u.lane_index = idx
+	var to: Vector2 = goal - u.pos
+	if to.length() < 8.0:
+		u.moving = false
+		return
+	move_ai(u, to, dt, speed_k)
 
 
 func count_enemy_units_near(from, radius: float) -> int:
@@ -916,13 +1212,14 @@ func _step_boss_charge(u, dt: float) -> void:
 func make_hero(id: String, team: int, slot: int, lane_id := 1):
 	var d: Dictionary = defs_by_id.get(id, heroes_data[0])
 	var spawn := base_pos(team) + Vector2(150.0 if team == BLUE else -150.0, float(slot - 1) * 70.0)
-	if five_v_five and lane_paths.size() > lane_id:
+	if five_v_five and lane_id >= 0 and lane_paths.size() > lane_id:
 		var path: Array = lane_paths[lane_id]
 		if path.size() > 0:
 			spawn = path[0] if team == BLUE else path[path.size() - 1]
 			spawn += Vector2(0.0, float(slot % 2) * 32.0 - 16.0)
 	var u = new_unit(HERO, team, str(d.get("name", id)), spawn)
 	u.lane_id = lane_id
+	u.is_jungler = five_v_five and lane_id == -2
 	u.def = d
 	u.hero_id = id
 	u.skills = d.get("skills", [])
@@ -979,7 +1276,7 @@ func step(dt: float) -> void:
 
 	# 最后 45 秒兵线加速，让「终极对决」真的能打出结果，而不是干等时间到。
 	var wave_gap := wave_interval
-	if clock >= 240.0:
+	if clock >= match_cap - 45.0:
 		wave_gap = maxf(8.0, wave_interval * 0.5)
 	wave_t -= dt
 	if wave_t <= 0.0:
@@ -1061,6 +1358,15 @@ func step_unit(u, dt: float) -> void:
 	u.mark_t = maxf(0.0, u.mark_t - dt)
 	u.fear_t = maxf(0.0, u.fear_t - dt)
 	u.taunt_t = maxf(0.0, u.taunt_t - dt)
+	u.buff_dmg_t = maxf(0.0, u.buff_dmg_t - dt)
+	u.buff_speed_t = maxf(0.0, u.buff_speed_t - dt)
+	u.ambush_t = maxf(0.0, u.ambush_t - dt)
+	u.jungle_gank_t = maxf(0.0, u.jungle_gank_t - dt)
+	if u.vanish_t > 0.0:
+		u.vanish_t = maxf(0.0, u.vanish_t - dt)
+		if u.vanish_t <= 0.0 and u.kind == HERO and u.ambush_pending > 0.0:
+			u.ambush_t = maxf(u.ambush_t, u.ambush_pending)
+			u.ambush_pending = 0.0
 	if u.shield_t <= 0.0:
 		u.shield = 0.0
 
@@ -1128,13 +1434,27 @@ func step_hero(h, dt: float) -> void:
 			dir = dir.normalized()
 			h.move_dir = dir
 			h.facing = 1.0 if dir.x >= 0.0 else -1.0
-			var speed_k := 0.55 if h.slow_t > 0.0 else 1.0
-			move_to(h, h.pos + dir * (h.move_speed * speed_k * dt))
+			var speed_k := 1.0 if h.fear_t > 0.0 else (0.55 if h.slow_t > 0.0 else 1.0)
+			move_to(h, h.pos + dir * (speed_of(h) * speed_k * dt))
 			h.walk_t += dt
 	else:
 		step_hero_ai(h, dt)
 
-	var target = nearest_enemy(h, h.attack_range + h.radius)
+	# 恐惧期间不能普攻：被吓到只会抱头跑，先拉开距离。
+	if h.fear_t > 0.0:
+		return
+	# 普攻优先打被嘲讽目标 / AI 锁定的目标，而不是永远打最近的那个。
+	var target = null
+	if h.taunt_t > 0.0 and h.taunt_src != null and h.taunt_src.is_alive() \
+			and h.pos.distance_to(h.taunt_src.pos) <= h.attack_range + h.taunt_src.radius:
+		target = h.taunt_src
+	elif h.ai_target != null and h.ai_target.is_alive() \
+			and h.pos.distance_to(h.ai_target.pos) <= h.attack_range + h.ai_target.radius \
+			and not (h.ai_target.kind == TOWER and is_tower_protected(h.ai_target)) \
+			and not (h.ai_target.kind == BASE and is_base_protected(h.ai_target)):
+		target = h.ai_target
+	else:
+		target = nearest_enemy(h, h.attack_range + h.radius)
 	if target != null and h.atk_timer <= 0.0:
 		h.atk_timer = h.atk_interval
 		h.atk_anim = 0.34
@@ -1246,8 +1566,10 @@ func _step_spin(h, dt: float) -> void:
 	h.spin_tick -= dt
 	if h.spin_tick > 0.0:
 		return
-	h.spin_tick = 0.30
-	area_damage(h.pos, h.spin_radius, h.spin_dmg, h, h.team, 0.35, 0.0, 14.0, true)
+	h.spin_tick = float(combat_cfg.get("spin_tick", 0.30))
+	area_damage(h.pos, h.spin_radius, h.spin_dmg, h, h.team,
+		float(combat_cfg.get("spin_slow", 0.35)), 0.0,
+		float(combat_cfg.get("spin_knock", 6.0)), true)
 	fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), h.spin_color, h.spin_radius)
 	fx.emit("burst", Vector3(h.pos.x, 26.0, h.pos.y), h.spin_color, 0.0)
 
@@ -1258,10 +1580,10 @@ func step_hero_ai(h, dt: float) -> void:
 	if h.fear_t > 0.0 and h.fear_src != null and h.fear_src.is_alive():
 		var away_f: Vector2 = h.pos - h.fear_src.pos
 		if away_f.length_squared() > 0.01:
-			move_ai(h, away_f, dt, 1.15)
+			move_ai(h, away_f, dt, float(combat_cfg.get("fear_speed", 1.15)))
 			h.facing = 1.0 if away_f.x >= 0.0 else -1.0
 			return
-	if five_v_five:
+	if five_v_five and not h.is_jungler:
 		# 本路塔拆完后，AI 自动换到还有塔的路，避免围着已保护的水晶空站。
 		var lane_front = front_structure(h.team, h.lane_id)
 		if lane_front != null and lane_front.kind == BASE and is_base_protected(lane_front):
@@ -1289,15 +1611,30 @@ func step_hero_ai(h, dt: float) -> void:
 	if think or h.ai_target == null or not h.ai_target.is_alive():
 		h.ai_target = ai_target(h)
 	# 嘲讽：潮汐守卫举盾时，附近敌人暂时只能打它。
-	if h.taunt_t > 0.0 and h.taunt_src != null and h.taunt_src.is_alive():
+	var taunted: bool = h.taunt_t > 0.0 and h.taunt_src != null and h.taunt_src.is_alive()
+	if taunted:
 		h.ai_target = h.taunt_src
 		retreat = false
+	# 打野位：前 60 秒刷野，二级后周期性去最吃紧的一路 gank 20 秒。
+	if h.is_jungler and not taunted:
+		if h.jungle_gank_t > 0.0:
+			h.lane_id = h.jungle_gank_lane
+		else:
+			h.lane_id = -2
+			var gank_ready: bool = h.level >= 2 and clock >= float(combat_cfg.get("jungle_gank_at", 60.0))
+			if gank_ready and not retreat:
+				h.jungle_gank_lane = _pick_gank_lane(h)
+				h.jungle_gank_t = float(combat_cfg.get("jungle_gank_time", 20.0))
+				h.lane_id = h.jungle_gank_lane
+			elif not retreat:
+				# 刷野阶段不放位移/突进技能，避免被残留的线上目标拽出野区。
+				if _step_jungler_ai(h, dt):
+					return
 	var t = h.ai_target
-	var front = front_structure(h.team, h.lane_id if five_v_five else -1)
+	var front = front_structure(h.team, lane_of_front(h.lane_id))
 	# 锁定目标后仍可能一路追到塔后；追击途中也要受前塔限制。
 	if t != null and t != front and front != null and front.kind == TOWER and front.is_alive():
-		if (h.team == BLUE and t.pos.x > front.pos.x + 20.0) or \
-				(h.team == RED and t.pos.x < front.pos.x - 20.0):
+		if _crossed_front(h, t, front):
 			h.ai_target = null
 			t = null
 
@@ -1318,8 +1655,7 @@ func step_hero_ai(h, dt: float) -> void:
 		# 没有可打目标时，先等兵线；近战没兵不要空手越塔。
 		if front != null and front.is_alive():
 			if front.kind == TOWER and not tower_safe_for(h, front):
-				var stand: Vector2 = front.pos + Vector2(-1.0 if h.team == BLUE else 1.0, 0.0) \
-					* (front.attack_range + float(ai_cfg.get("tower_standoff", 100.0)))
+				var stand: Vector2 = standoff_point(h.team, front, float(ai_cfg.get("tower_standoff", 100.0)))
 				if h.pos.distance_to(stand) > 45.0:
 					move_ai(h, stand - h.pos, dt, 0.85)
 				else:
@@ -1332,8 +1668,7 @@ func step_hero_ai(h, dt: float) -> void:
 
 	# 近战无兵不越塔：站在塔射程外等下一波兵；远程能点塔时照常输出。
 	if t.kind == TOWER and not tower_safe_for(h, t):
-		var stand: Vector2 = t.pos + Vector2(-1.0 if h.team == BLUE else 1.0, 0.0) \
-			* (t.attack_range + float(ai_cfg.get("tower_standoff", 100.0)))
+		var stand: Vector2 = standoff_point(h.team, t, float(ai_cfg.get("tower_standoff", 100.0)))
 		if h.pos.distance_to(stand) > 45.0:
 			move_ai(h, stand - h.pos, dt, 0.85)
 		else:
@@ -1371,8 +1706,8 @@ func move_ai(h, dir: Vector2, dt: float, speed_k: float) -> void:
 	dir = dir.normalized()
 	h.move_dir = dir
 	h.moving = true
-	var slow_k := 0.55 if h.slow_t > 0.0 else 1.0
-	move_to(h, h.pos + dir * (h.move_speed * speed_k * slow_k * dt))
+	var slow_k := 1.0 if h.fear_t > 0.0 else (0.55 if h.slow_t > 0.0 else 1.0)
+	move_to(h, h.pos + dir * (speed_of(h) * speed_k * slow_k * dt))
 	h.walk_t += dt
 
 
@@ -1384,7 +1719,7 @@ func step_hero_skills(h, hp_p: float, retreat: bool) -> void:
 		if h.cds[i] > 0.0:
 			continue
 		var kind := str(s.get("kind", ""))
-		var support := kind == "heal" or kind == "shield" or kind == "taunt" or kind == "heal_zone"
+		var support := kind == "heal" or kind == "shield" or kind == "taunt" or kind == "heal_zone" or kind == "vanish"
 		if retreat and not support:
 			continue
 
@@ -1414,6 +1749,33 @@ func step_hero_skills(h, hp_p: float, retreat: bool) -> void:
 			"aoe":
 				var aoe_n := count_enemies_around(h, float(s.get("radius", 180)), -1.0)
 				use = aoe_n >= 2 or (aoe_n > 0 and nearest_hero(h, float(s.get("radius", 180))) != null)
+			"vanish":
+				use = hp_p < 0.7 and enemy_hero_near(h, 320.0)
+			"spin":
+				var spin_n := count_enemies_around(h, float(s.get("radius", 150)), -1.0)
+				use = spin_n >= 2 or (spin_n >= 1 and hp_p < 0.5)
+			"fear":
+				var fear_n := count_enemies_around(h, float(s.get("radius", 210)), -1.0)
+				use = fear_n >= 2 or (fear_n >= 1 and hp_p < 0.45)
+			"mark":
+				var mark_n := count_enemies_around(h, float(s.get("radius", 270)), -1.0)
+				use = mark_n >= 1 and nearest_hero(h, float(s.get("range", 270))) != null
+			"taunt":
+				use = enemy_hero_near(h, float(s.get("radius", 230)))
+			"heal_zone":
+				use = low_ally(h, float(s.get("range", 460)), 0.72)
+			"trap":
+				use = nearest_hero(h, float(s.get("range", 460))) != null and rng.randf() < 0.6
+			"boomerang", "beam", "chain", "blink":
+				var range_kind := float(s.get("range", 420))
+				var kind_foe = nearest_enemy(h, range_kind)
+				if kind == "blink":
+					var bt = h.ai_target
+					if bt != null and bt.kind == HERO:
+						var bd: float = h.pos.distance_to(bt.pos)
+						use = bd > range_kind * 0.55 and bd < range_kind * 1.6
+				else:
+					use = kind_foe != null and rng.randf() < 0.4
 			_:
 				use = nearest_enemy(h, maxf(float(s.get("range", 260)), h.attack_range)) != null and rng.randf() < 0.36
 
@@ -1456,19 +1818,21 @@ func count_enemies_around(h, radius: float, dot_min: float) -> int:
 
 
 func front_structure(team: int, lane_id := -1):
-	# 敌方最靠前（离我方最近）的存活塔；指定 lane_id 时只看该路。
+	# 敌方最靠前（按兵线进度离我方基地最近）的存活塔；指定 lane_id 时只看该路。
 	var list: Array = towers_red if team == BLUE else towers_blue
 	var best = null
+	var best_key := 1.0e20
 	for t in list:
 		if not t.is_alive():
 			continue
 		if five_v_five and lane_id >= 0 and t.lane_id != lane_id:
 			continue
-		if best == null:
-			best = t
-		elif team == BLUE and t.pos.x < best.pos.x:
-			best = t
-		elif team == RED and t.pos.x > best.pos.x:
+		var lid: int = t.lane_id if five_v_five else -1
+		var s := lane_progress(lid, t.pos)
+		# 红方推进方向相反：进度越大越靠前。
+		var key := s if team == BLUE else -s
+		if key < best_key:
+			best_key = key
 			best = t
 	if best != null:
 		return best
@@ -1476,7 +1840,8 @@ func front_structure(team: int, lane_id := -1):
 
 
 func ai_target(h):
-	var front = front_structure(h.team, h.lane_id if five_v_five else -1)
+	var lane_scope: int = h.lane_id if five_v_five and h.lane_id >= 0 else -1
+	var front = front_structure(h.team, lane_scope)
 	var tower_alive: bool = front != null and front.kind == TOWER and front.is_alive()
 	var best = null
 	var best_score := -1.0e20
@@ -1492,10 +1857,10 @@ func ai_target(h):
 			continue
 		if o.kind == JUNGLE:
 			continue
-		if five_v_five and o.kind == TOWER and o.lane_id != h.lane_id:
+		if five_v_five and o.kind == TOWER and o.lane_id != lane_scope:
 			continue
-		if five_v_five and o.kind != TOWER and o.kind != BASE:
-			if o.lane_id != h.lane_id and h.pos.distance_to(o.pos) > 320.0:
+		if five_v_five and lane_scope >= 0 and o.kind != TOWER and o.kind != BASE:
+			if o.lane_id != lane_scope and h.pos.distance_to(o.pos) > 320.0:
 				continue
 		if o.kind == TOWER and is_tower_protected(o):
 			continue
@@ -1503,9 +1868,7 @@ func ai_target(h):
 			continue
 		# 前塔还活着时不越过它去追英雄/小兵，否则会从塔边溜过去直扑水晶。
 		if tower_alive and o != front and (o.kind == HERO or o.kind == MINION):
-			if h.team == BLUE and o.pos.x > front.pos.x + 20.0:
-				continue
-			if h.team == RED and o.pos.x < front.pos.x - 20.0:
+			if _crossed_front(h, o, front):
 				continue
 		var d: float = h.pos.distance_to(o.pos)
 		if d > 900.0:
@@ -1545,6 +1908,78 @@ func ai_target(h):
 			best_score = score
 			best = o
 	return best
+
+
+func _crossed_front(h, target, front) -> bool:
+	# 目标是否已经越过敌方前塔（按兵线进度判断，适用于对角/竖直路段）。
+	if five_v_five and target.lane_id != front.lane_id:
+		return false
+	var lid: int = front.lane_id if five_v_five else -1
+	var fp := lane_progress(lid, front.pos)
+	var tp := lane_progress(lid, target.pos)
+	if h.team == BLUE:
+		return tp > fp + 20.0
+	return tp < fp - 20.0
+
+
+func _pick_gank_lane(h) -> int:
+	# 挑敌方英雄最多的一路去抓；没有英雄就回中路。
+	var best_lane := 1
+	var best_n := -1
+	for l in range(mini(3, lane_paths.size())):
+		var n := 0
+		for o in heroes:
+			if o.is_alive() and o.team != h.team and o.lane_id == l:
+				n += 1
+		if n > best_n:
+			best_n = n
+			best_lane = l
+	return best_lane
+
+
+func _step_jungler_ai(h, dt) -> bool:
+	# 返回 true 表示这一帧由刷野逻辑接管：只刷本方野区（离自家基地更近的营地），
+	# 营地全空时就近等刷新，绝不横穿地图去对面野区送命。
+	if h.hp < h.max_hp * 0.35:
+		var home := base_pos(h.team) + Vector2(70.0 if h.team == BLUE else -70.0, 0.0)
+		if h.pos.distance_to(home) > 60.0:
+			move_ai(h, home - h.pos, dt, 1.0)
+		else:
+			h.moving = false
+		return true
+	var camp = null
+	var best := 1.0e20
+	var fallback_home := Vector2.ZERO
+	var fallback_d := 1.0e20
+	for u in units:
+		if u.kind != JUNGLE:
+			continue
+		var own_d: float = u.pos.distance_to(base_pos(h.team))
+		var foe_d: float = u.pos.distance_to(base_pos(1 - h.team))
+		if own_d > foe_d + 100.0:
+			continue
+		if fallback_home == Vector2.ZERO or own_d < fallback_d:
+			fallback_d = own_d
+			fallback_home = u.respawn_home
+		if not u.is_alive():
+			continue
+		var d: float = h.pos.distance_to(u.pos)
+		if d < best:
+			best = d
+			camp = u
+	if camp == null:
+		if fallback_home != Vector2.ZERO and h.pos.distance_to(fallback_home) > 50.0:
+			move_ai(h, fallback_home - h.pos, dt, 0.9)
+		else:
+			h.moving = false
+		return true
+	var reach: float = h.attack_range + camp.radius * 0.5
+	if h.pos.distance_to(camp.pos) <= reach:
+		h.moving = false
+		h.facing = 1.0 if camp.pos.x >= h.pos.x else -1.0
+	else:
+		move_ai(h, camp.pos - h.pos, dt, 0.95)
+	return true
 
 
 func count_enemies_at(pos: Vector2, team: int, radius: float) -> int:
@@ -1797,6 +2232,11 @@ func step_projectiles(dt: float) -> void:
 
 
 func hit_with_fx(target, amount: float, src, stun := 0.0, col = null) -> void:
+	# 尖刺伏击：隐身结束后的第一击强化。
+	if src != null and src.kind == HERO and src.ambush_t > 0.0:
+		amount *= src.ambush_mul
+		src.ambush_t = 0.0
+		float_text.emit(Vector3(src.pos.x, src.height + 24.0, src.pos.y), "伏击！", Color(1.0, 0.86, 0.55))
 	deal_damage(target, amount, src)
 	if stun > 0.0:
 		target.stun_t = maxf(target.stun_t, stun)
@@ -1830,16 +2270,20 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 
 	if src != null and src.team == RED and target.team == BLUE:
 		amount *= enemy_dmg_mul
+	# 野区增益：灰狼营的猎狼 buff。
+	if src != null and src.kind == HERO and src.buff_dmg_t > 0.0:
+		amount *= 1.0 + src.buff_dmg_pct
 	# 猎杀标记：被狼盯上的目标承受更多伤害。
 	if target.mark_t > 0.0:
-		amount *= 1.22
+		amount *= float(combat_cfg.get("mark_amp", 1.22))
 
 	# 终极对决：建筑变脆，保证 3 分钟内能打出结果。
 	if sudden_death and (target.kind == TOWER or target.kind == BASE):
 		amount *= float(comeback_cfg.get("sudden_death_structure_mul", 1.8))
 
 	if reflect and target.thorn_t > 0.0 and src != null and src != target and src.is_alive() and src.kind == HERO:
-		deal_damage(src, 24.0 + target.level * 5.0, target, false)
+		deal_damage(src, float(combat_cfg.get("thorn_base", 24.0)) \
+			+ target.level * float(combat_cfg.get("thorn_per_level", 5.0)), target, false)
 		fx.emit("hit", Vector3(src.pos.x, 40.0, src.pos.y), Color(1, 0.85, 0.66), 0.0)
 
 	if target.shield > 0.0:
@@ -1894,12 +2338,24 @@ func kill(target, killer) -> void:
 
 	elif target.kind == JUNGLE:
 		target.respawn_t = float(jungle_cfg.get("respawn", 45.0))
+		var kind_cfg: Dictionary = jungle_cfg.get("kinds", {}).get(target.jungle_kind, {})
+		var xp_gain := float(kind_cfg.get("xp", jungle_cfg.get("xp", 90.0)))
 		if killer != null and killer.kind == HERO:
-			add_xp(killer, float(jungle_cfg.get("xp", 90.0)))
-			var heal: float = killer.max_hp * float(jungle_cfg.get("heal_pct", 0.08))
+			add_xp(killer, xp_gain)
+			var heal_pct := float(kind_cfg.get("heal_pct", jungle_cfg.get("heal_pct", 0.08)))
+			var heal: float = killer.max_hp * heal_pct
 			killer.hp = minf(killer.max_hp, killer.hp + heal)
+			var buff: Dictionary = kind_cfg.get("buff", {})
+			if not buff.is_empty():
+				_apply_jungle_buff(killer, buff)
 			float_text.emit(Vector3(killer.pos.x, killer.height + 24.0, killer.pos.y),
-				"+%d 野怪经验" % int(jungle_cfg.get("xp", 90.0)), Color(0.85, 1.0, 0.7))
+				"+%d 野怪经验" % int(xp_gain), Color(0.85, 1.0, 0.7))
+		# 助攻经验：和英雄/小兵一致，700 范围内的同队英雄分一半。
+		if killer != null:
+			for a in heroes:
+				if a != killer and a.is_alive() and a.team == killer.team \
+						and a.pos.distance_to(target.pos) < 700.0:
+					add_xp(a, xp_gain * 0.5)
 		sfx.emit("pickup")
 	elif target.kind == BOSS:
 		target.respawn_t = boss_respawn
@@ -1908,7 +2364,7 @@ func kill(target, killer) -> void:
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
 		if killer != null and killer.kind == HERO:
-			add_xp(killer, 90.0)
+			add_xp(killer, float(combat_cfg.get("boss_kill_xp", 90.0)))
 
 	elif target.kind == TOWER:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
@@ -1960,6 +2416,19 @@ func respawn(h) -> void:
 	h.slow_t = 0.0
 	h.shield = 0.0
 	h.thorn_t = 0.0
+	h.mark_t = 0.0
+	h.fear_t = 0.0
+	h.fear_src = null
+	h.taunt_t = 0.0
+	h.taunt_src = null
+	h.spin_t = 0.0
+	h.spin_tick = 0.0
+	h.vanish_t = 0.0
+	h.ambush_t = 0.0
+	h.ambush_pending = 0.0
+	h.buff_dmg_t = 0.0
+	h.buff_speed_t = 0.0
+	h.jungle_gank_t = 0.0
 	h.move_dir = Vector2.ZERO
 	h.atk_timer = 0.3
 	fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), Color(0.6, 0.95, 1.0) if h.team == BLUE else Color(1, 0.7, 0.6), 90.0)
@@ -2023,6 +2492,15 @@ func nearest_enemy_excluding(from, origin: Vector2, radius: float, excluded: Arr
 
 
 func _throw_boomerang(h, dir: Vector2, dmg: float, color: Color, s: Dictionary) -> void:
+	# count 把回旋镖做成扇形三连，每把独立命中表，去程回程都能扎人。
+	var n := int(maxf(1.0, float(s.get("count", 1))))
+	var base_ang := atan2(dir.y, dir.x) if dir.length_squared() > 0.001 else 0.0
+	for i in range(n):
+		var ang := base_ang + (float(i) - float(n - 1) * 0.5) * 0.14
+		_spawn_boomerang(h, Vector2(cos(ang), sin(ang)), dmg, color, s)
+
+
+func _spawn_boomerang(h, dir: Vector2, dmg: float, color: Color, s: Dictionary) -> void:
 	var p = Projectile.new()
 	p.pos = h.pos
 	p.prev_pos = p.pos
@@ -2076,7 +2554,7 @@ func nearest_ally(from, radius: float, include_self: bool):
 
 
 func is_tower_protected(t) -> bool:
-	if sudden_death:
+	if sudden_death and not (five_v_five and keep_protection):
 		return false
 	if t.kind != TOWER:
 		return false
@@ -2088,7 +2566,7 @@ func is_tower_protected(t) -> bool:
 
 
 func is_base_protected(b) -> bool:
-	if sudden_death:
+	if sudden_death and not (five_v_five and keep_protection):
 		return false
 	if b.kind != BASE:
 		return false
@@ -2318,6 +2796,18 @@ func cast(h, s: Dictionary, index: int) -> void:
 				a.hp = minf(a.max_hp, a.hp + a.max_hp * heal_pct * 0.7)
 				fx.emit("ring", Vector3(a.pos.x, 6.0, a.pos.y), color, 80.0)
 				float_text.emit(Vector3(a.pos.x, a.height + 24.0, a.pos.y), "+" + str(roundi(a.max_hp * heal_pct * 0.7)), color)
+		"vanish":
+			# 尖刺伏击：短暂隐身无敌并加速，结束后下一击强化。
+			var vanish_time := float(s.get("invuln", 0.8))
+			h.invuln_t = maxf(h.invuln_t, vanish_time)
+			h.vanish_t = vanish_time
+			h.ambush_pending = float(s.get("ambush_time", 2.0))
+			h.ambush_mul = float(s.get("ambush_mul", 1.8))
+			h.buff_speed_pct = float(s.get("speed_pct", 0.3))
+			h.buff_speed_t = maxf(h.buff_speed_t, vanish_time)
+			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
+			fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, 90.0)
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "伏击准备！", color)
 		"shield":
 			h.shield = h.max_hp * float(s.get("shield_pct", 0.0))
 			h.shield_t = float(s.get("buff_t", 3.0))
@@ -2341,6 +2831,11 @@ func cast(h, s: Dictionary, index: int) -> void:
 		"leap":
 			var leap_target = nearest_hero(h, float(s.get("range", 360.0)))
 			var dest: Vector2 = leap_target.pos if leap_target != null else h.pos + aim_dir * 220.0
+			if leap_target != null and float(s.get("behind", 0.0)) > 0.0:
+				# 猎影突袭：穿过目标落到他身后，形成绕后切入。
+				var away: Vector2 = leap_target.pos - h.pos
+				if away.length_squared() > 0.01:
+					dest = leap_target.pos + away.normalized() * float(s.get("behind", 90.0))
 			if not h.is_player:
 				dest = clamp_to_front(h, dest)
 			# 跳跃用 0.32 秒弧线走完，落地再结算范围伤害。
@@ -2404,7 +2899,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			for k in range(int(s.get("count", 4))):
 				if cur == null or not cur.is_alive() or chain_hit.has(cur):
 					break
-				var falloff: float = pow(0.82, float(k))
+				var falloff: float = pow(float(combat_cfg.get("chain_falloff", 0.82)), float(k))
 				deal_damage(cur, dmg * falloff, h)
 				cur.slow_t = maxf(cur.slow_t, float(s.get("slow", 0.5)))
 				fx.emit("hit", Vector3(cur.pos.x, 32.0, cur.pos.y), color, 0.0)
@@ -2419,6 +2914,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 			var marked := 0
 			for u in units:
 				if not u.is_alive() or u.team == h.team:
+					continue
+				if u.kind == TOWER or u.kind == BASE:
 					continue
 				if h.pos.distance_to(u.pos) > radius + u.radius:
 					continue
@@ -2449,16 +2946,18 @@ func cast(h, s: Dictionary, index: int) -> void:
 				"来打我呀！" if taunted > 0 else "护盾展开", color)
 		"fear":
 			# 震慑咆哮：把周围敌人吓得往后退，短时间无法正常追击。
+			# 英雄不吃减速（否则「吓退」变成慢走），小兵照常减速。
 			for u in units:
 				if not u.is_alive() or u.team == h.team:
 					continue
 				if h.pos.distance_to(u.pos) > radius + u.radius:
 					continue
 				deal_damage(u, dmg, h)
-				u.slow_t = maxf(u.slow_t, float(s.get("slow", 0.6)))
 				if u.kind == HERO:
 					u.fear_t = maxf(u.fear_t, float(s.get("fear_time", 1.2)))
 					u.fear_src = h
+				else:
+					u.slow_t = maxf(u.slow_t, float(s.get("slow", 0.6)))
 			fx.emit("cast_roar", Vector3(h.pos.x, 20.0, h.pos.y), color, radius)
 			fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
 			sfx.emit("ult")
@@ -2472,13 +2971,19 @@ func cast(h, s: Dictionary, index: int) -> void:
 			fx.emit("cast_spin", Vector3(h.pos.x, 22.0, h.pos.y), color, h.spin_radius)
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "滚成刺球！", color)
 		"trap":
-			# 竹叶陷阱：在目标脚下布一个延时陷阱，触发后定身并伤害。
+			# 竹叶陷阱：布在目标脚下并按移动方向预判，延时后定身并伤害。
 			var trap_target = nearest_enemy(h, float(s.get("range", 460.0)))
-			var trap_pos: Vector2 = trap_target.pos if trap_target != null else h.pos + aim_dir * float(s.get("range", 460.0)) * 0.72
+			var trap_delay := float(s.get("delay", 0.55))
+			var trap_pos: Vector2 = h.pos + aim_dir * float(s.get("range", 460.0)) * 0.72
+			if trap_target != null:
+				trap_pos = trap_target.pos
+				if trap_target.move_dir.length_squared() > 0.01:
+					var lead := float(combat_cfg.get("trap_lead", 0.8))
+					trap_pos += trap_target.move_dir.normalized() * trap_target.move_speed * trap_delay * lead
 			fx.emit("cast_trap", Vector3(trap_pos.x, 12.0, trap_pos.y), color, radius)
 			fx.emit("ring", Vector3(trap_pos.x, 6.0, trap_pos.y), color, radius)
 			pending.append({
-				"t": float(s.get("delay", 0.7)),
+				"t": trap_delay,
 				"center": trap_pos,
 				"skill": s,
 				"src": h,
@@ -2493,9 +2998,18 @@ func cast(h, s: Dictionary, index: int) -> void:
 		"boomerang":
 			_throw_boomerang(h, aim_dir, dmg, color, s)
 		"heal_zone":
-			# 再生水域：在地面留下持续回血的区域，和一次性的治疗技能区分开。
-			var hz_target = nearest_enemy(h, float(s.get("range", 460.0)))
-			var hz_pos: Vector2 = hz_target.pos if hz_target != null else h.pos + aim_dir * float(s.get("range", 460.0)) * 0.6
+			# 再生水域：放在最残血的队友脚下（含自己），而不是敌人脚下。
+			var hz_pos: Vector2 = h.pos
+			var best_pct := 0.72
+			for a in heroes:
+				if not a.is_alive() or a.team != h.team:
+					continue
+				if a.pos.distance_to(h.pos) > float(s.get("range", 460.0)):
+					continue
+				var pct: float = a.hp / a.max_hp
+				if pct < best_pct:
+					best_pct = pct
+					hz_pos = a.pos
 			var z = make_zone(hz_pos, radius, float(s.get("duration", 4.0)),
 				float(s.get("slow", 0.0)), h.team, color)
 			z.heal_pct = float(s.get("heal_pct", 0.05))

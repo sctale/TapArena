@@ -144,66 +144,125 @@ func _build_world() -> void:
 	add_child(ground)
 
 	var lane_paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
-	var lane_mat := _tiled_material("path", Vector2(sim.map_w / 48.0, 190.0 / 48.0))
-	for path in lane_paths:
-		if path.is_empty():
-			continue
-		var lane_y := 0.0
-		for pnt in path:
-			lane_y += pnt.y
-		lane_y /= float(path.size())
-		var lane := MeshInstance3D.new()
-		var lane_plane := PlaneMesh.new()
-		lane_plane.size = Vector2(sim.map_w, 190.0)
-		lane.mesh = lane_plane
-		lane.position = Vector3(sim.map_w * 0.5, 0.6, lane_y)
-		lane.material_override = lane_mat
-		lane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(lane)
+	_build_lane_roads(lane_paths)
 
+	_build_river()
 	_build_lane_curb()
 	_build_hills()
 	_build_scatter()
 	_build_units()
 
 
-func _lane_ys() -> Array:
-	var out: Array = []
-	var paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
-	for path in paths:
-		if path.is_empty():
+func _build_lane_roads(lane_paths: Array) -> void:
+	# 沿兵线折线逐段铺路：对角/竖直路段都不会画成整幅横条，拐角靠两端各多铺 95 接缝。
+	for path in lane_paths:
+		if path.size() < 2:
 			continue
-		var y := 0.0
-		for p in path:
-			y += p.y
-		out.append(y / float(path.size()))
-	return out
+		for i in range(path.size() - 1):
+			var a: Vector2 = path[i]
+			var b: Vector2 = path[i + 1]
+			var seg: float = a.distance_to(b)
+			if seg < 1.0:
+				continue
+			var mid: Vector2 = (a + b) * 0.5
+			var lane := MeshInstance3D.new()
+			var lane_plane := PlaneMesh.new()
+			lane_plane.size = Vector2(seg + 190.0, 190.0)
+			lane.mesh = lane_plane
+			lane.position = Vector3(mid.x, 0.6, mid.y)
+			lane.rotation.y = -atan2(b.y - a.y, b.x - a.x)
+			lane.material_override = _tiled_material("path", Vector2((seg + 190.0) / 48.0, 190.0 / 48.0))
+			lane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(lane)
 
 
-func _near_lane(z: float, margin := 145.0) -> bool:
-	for lane_y in _lane_ys():
-		if absf(z - lane_y) < margin:
+func _build_river() -> void:
+	# 河道：与中路垂直的对角浅水带，河蟹营地就在这里。
+	if not sim.five_v_five or sim.river.size() < 2:
+		return
+	var a: Vector2 = sim.river[0]
+	var b: Vector2 = sim.river[1]
+	var seg: float = a.distance_to(b)
+	var mid: Vector2 = (a + b) * 0.5
+	var water := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(seg, 260.0)
+	water.mesh = plane
+	water.position = Vector3(mid.x, 0.3, mid.y)
+	water.rotation.y = -atan2(b.y - a.y, b.x - a.x)
+	var mat := _tile_material("ice", Color(0.62, 0.86, 1.0), 0.86)
+	mat.uv1_scale = Vector3(seg / 48.0, 260.0 / 48.0, 1.0)
+	water.material_override = mat
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(water)
+
+
+func _lane_paths() -> Array:
+	return sim.lane_paths if sim.five_v_five else [sim.lane]
+
+
+func _dist_to_path(p: Vector2, path: Array) -> float:
+	var best := 1.0e20
+	for i in range(path.size() - 1):
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		var ab: Vector2 = b - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		best = minf(best, (a + ab * t).distance_to(p))
+	return best
+
+
+func _near_lane(x: float, z: float, margin := 145.0) -> bool:
+	for path in _lane_paths():
+		if path.size() >= 2 and _dist_to_path(Vector2(x, z), path) < margin:
 			return true
 	return false
+
+
+func _near_river(x: float, z: float, margin := 200.0) -> bool:
+	if not sim.five_v_five or sim.river.size() < 2:
+		return false
+	return _dist_to_path(Vector2(x, z), sim.river) < margin
 
 
 func _build_lane_curb() -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(46, 22, 46)
 	var mat := _tile_material("stone", Color(1, 1, 1))
-	var count := int(sim.map_w / 56.0) + 1
-	var lane_ys := _lane_ys()
+	var spots: Array = []
+	for path in _lane_paths():
+		if path.size() < 2:
+			continue
+		for i in range(path.size() - 1):
+			var a: Vector2 = path[i]
+			var b: Vector2 = path[i + 1]
+			var seg: float = a.distance_to(b)
+			if seg < 1.0:
+				continue
+			var dir: Vector2 = (b - a) / seg
+			var normal := Vector2(-dir.y, dir.x)
+			var steps := int(seg / 56.0)
+			for k in range(steps + 1):
+				var p: Vector2 = a + dir * (56.0 * float(k))
+				for side in [-1.0, 1.0]:
+					spots.append(p + normal * (118.0 * float(side)))
+	# 拐角接缝处去重，避免两块石头叠在一起。
+	var kept: Array = []
+	for p in spots:
+		var dup := false
+		for k in kept:
+			if k.distance_to(p) < 40.0:
+				dup = true
+				break
+		if not dup:
+			kept.append(p)
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
-	mm.instance_count = count * 2 * lane_ys.size()
-	var i := 0
-	for lane_y in lane_ys:
-		for k in range(count):
-			for side in [-1, 1]:
-				var pos := Vector3(28.0 + float(k) * 56.0, 0, lane_y + float(side) * 118.0)
-				mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, pos))
-				i += 1
+	mm.instance_count = kept.size()
+	for i in range(kept.size()):
+		var p: Vector2 = kept[i]
+		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(p.x, 0, p.y)))
 	var node := MultiMeshInstance3D.new()
 	node.multimesh = mm
 	node.material_override = mat
@@ -246,8 +305,8 @@ func _build_scatter() -> void:
 		for k in range(6):
 			for tries in range(8):
 				var x := rng.randf_range(140.0, sim.map_w - 140.0)
-				var z := rng.randf_range(120.0, 600.0) if (k % 2 == 0) else rng.randf_range(1000.0, 1480.0)
-				if _near_lane(z, 170.0):
+				var z := rng.randf_range(140.0, sim.map_h - 140.0)
+				if _near_lane(x, z, 170.0) or _near_river(x, z, 210.0):
 					continue
 				spots.append(Vector3(x, 0, z))
 				break
@@ -271,8 +330,8 @@ func _build_scatter() -> void:
 		for k in range(5):
 			for tries in range(8):
 				var x := rng.randf_range(180.0, sim.map_w - 180.0)
-				var z := rng.randf_range(200.0, 500.0) if (k % 2 == 0) else rng.randf_range(1100.0, 1420.0)
-				if _near_lane(z, 170.0):
+				var z := rng.randf_range(180.0, sim.map_h - 180.0)
+				if _near_lane(x, z, 170.0) or _near_river(x, z, 210.0):
 					continue
 				rock_spots.append(Vector3(x, 0, z))
 				break
@@ -286,17 +345,17 @@ func _build_scatter() -> void:
 		add_child(rnode)
 
 	var mush = _model("mushroom", func(): return BlockModels.mushroom(atlas))
-	for k in range(4):
+	var mush_spots := [Vector2(560, 1500), Vector2(1840, 900), Vector2(1000, 1900), Vector2(1400, 500)]
+	for k in range(mush_spots.size()):
 		var node := _make_instance(mush)
-		var x := 300.0 + float(k) * 620.0
-		var z := 520.0 if (k % 2 == 0) else 1080.0
-		node.position = Vector3(x, 0, z)
+		var p: Vector2 = mush_spots[k]
+		node.position = Vector3(p.x, 0, p.y)
 		var s := rng.randf_range(0.7, 1.1)
 		node.scale = Vector3(s, s, s)
 		add_child(node)
 
 	var sign_mesh = _model("sign", func(): return BlockModels.sign(atlas))
-	for p in [Vector3(520, 0, 900), Vector3(2460, 0, 700)]:
+	for p in [Vector3(430, 0, 1470), Vector3(1970, 0, 930)]:
 		var node := _make_instance(sign_mesh)
 		node.position = p
 		add_child(node)

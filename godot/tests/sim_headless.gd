@@ -146,6 +146,30 @@ func _init() -> void:
 		for issue in sig_issues:
 			print("SIG_FAIL " + issue)
 
+	var map_issues := _map_checks()
+	if map_issues.is_empty():
+		print("MAP_OK 3lanes/river/jungle/progress")
+	else:
+		failures += 1
+		for issue in map_issues:
+			print("MAP_FAIL " + issue)
+
+	var jgl_issues := _jungle_checks()
+	if jgl_issues.is_empty():
+		print("JGL_OK jungler/camp_buff/assist/respawn")
+	else:
+		failures += 1
+		for issue in jgl_issues:
+			print("JGL_FAIL " + issue)
+
+	var fix_issues := _fix_checks()
+	if fix_issues.is_empty():
+		print("FIX_OK potion/respawn/wave/mark/trap/heal_zone/boomerang/leap/vanish/protection/composition")
+	else:
+		failures += 1
+		for issue in fix_issues:
+			print("FIX_FAIL " + issue)
+
 	if failures == 0:
 		print("SIM_OK matches=%d dt=%.4f" % [MATCHES, DT])
 		quit(0)
@@ -367,15 +391,21 @@ func _rule_checks() -> Array:
 		issues.append("5v5 应有 3 条分路")
 	var camp_count := 0
 	var lane_set: Dictionary = {}
+	var junglers := 0
 	for u in simA.units:
 		if u.kind == BattleSimScript.JUNGLE:
 			camp_count += 1
 		if u.kind == BattleSimScript.HERO:
-			lane_set[u.lane_id] = true
+			if u.lane_id >= 0:
+				lane_set[u.lane_id] = true
+			if u.is_jungler:
+				junglers += 1
 	if camp_count != 6:
 		issues.append("5v5 野区营地不是 6，实际 %d" % camp_count)
 	if lane_set.size() != 3:
 		issues.append("5v5 英雄没有分布到三条路")
+	if junglers != 2:
+		issues.append("5v5 双方打野位不是各 1 名，实际 %d" % junglers)
 	var tower_ys: Dictionary = {}
 	for t in simA.towers_blue:
 		tower_ys[int(t.pos.y)] = true
@@ -611,4 +641,428 @@ func _signature_skill_checks() -> Array:
 	if a10.hp <= ahp:
 		issues.append("再生水域没有治疗友军")
 
+	return issues
+
+
+class JungleProbe extends BattleSim:
+	var jg_kills := 0
+
+	func kill(target, killer) -> void:
+		if target.kind == JUNGLE and killer != null and killer.is_jungler:
+			jg_kills += 1
+		super(target, killer)
+
+
+func _dist_to_path(p: Vector2, path: Array) -> float:
+	var best := 1.0e20
+	for i in range(path.size() - 1):
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		var ab: Vector2 = b - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		best = minf(best, (a + ab * t).distance_to(p))
+	return best
+
+
+func _map_checks() -> Array:
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("fox", 0, 9500, true)
+	if sim.map_w != 2400.0 or sim.map_h != 2400.0:
+		issues.append("5v5 地图不是 2400×2400")
+	if sim.lane_paths.size() != 3:
+		issues.append("5v5 不是三条路")
+	# 塔位置：蓝塔在路径 30-45%，红塔在 55-70%。
+	for l in range(mini(3, sim.lane_paths.size())):
+		var path: Array = sim.lane_paths[l]
+		if path.size() < 7:
+			issues.append("第 %d 路点数不足" % l)
+			continue
+		var total: float = sim.path_length(path)
+		var bp: float = sim.lane_progress(l, sim.towers_blue[l].pos) / total
+		var rp: float = sim.lane_progress(l, sim.towers_red[l].pos) / total
+		if bp < 0.30 or bp > 0.45:
+			issues.append("第 %d 路蓝塔位置 %.2f 不在 30-45%%" % [l, bp])
+		if rp < 0.55 or rp > 0.70:
+			issues.append("第 %d 路红塔位置 %.2f 不在 55-70%%" % [l, rp])
+		if absf(sim.lane_progress(l, path[0])) > 1.0:
+			issues.append("第 %d 路起点进度不是 0" % l)
+		if absf(sim.lane_progress(l, path[path.size() - 1]) - total) > 1.0:
+			issues.append("第 %d 路终点进度不是全长" % l)
+		var mid: Vector2 = path[3]
+		if sim.point_at_progress(l, sim.lane_progress(l, mid)).distance_to(mid) > 2.0:
+			issues.append("第 %d 路进度往返不一致" % l)
+	# 旋转对称：上路↔下路，中路自对称。
+	for l in range(3):
+		var pb: Array = sim.lane_paths[l]
+		var pr: Array = sim.lane_paths[2 - l]
+		for i in range(pb.size()):
+			var src: Vector2 = pb[i]
+			var mirror := Vector2(2400.0 - src.x, 2400.0 - src.y)
+			var dst: Vector2 = pr[pr.size() - 1 - i]
+			if mirror.distance_to(dst) > 1.0:
+				issues.append("第 %d 路不满足 180° 旋转对称" % l)
+				break
+	# 营地：离兵线 ≥220；河蟹在河道、野猪/灰狼离河道 ≥300；镜像成对。
+	for u in sim.units:
+		if u.kind != BattleSimScript.JUNGLE:
+			continue
+		var lane_min := 1.0e20
+		for l in range(3):
+			lane_min = minf(lane_min, _dist_to_path(u.pos, sim.lane_paths[l]))
+		if lane_min < 220.0:
+			issues.append("%s 离兵线太近 %.0f" % [u.display_name, lane_min])
+		var river_d: float = _dist_to_path(u.pos, sim.river)
+		if u.jungle_kind == "crab":
+			if river_d > 130.0:
+				issues.append("河蟹不在河道里 %.0f" % river_d)
+		elif river_d < 300.0:
+			issues.append("%s 离河道太近 %.0f" % [u.display_name, river_d])
+		var mirror_c := Vector2(2400.0 - u.pos.x, 2400.0 - u.pos.y)
+		var found := false
+		for o in sim.units:
+			if o.kind == BattleSimScript.JUNGLE and o.jungle_kind == u.jungle_kind \
+					and o.pos.distance_to(mirror_c) < 1.0:
+				found = true
+				break
+		if not found:
+			issues.append("%s 缺少镜像营地" % u.display_name)
+	# 30 秒实跑：三路都有小兵，且上/下路确实走了竖直段。
+	var sim2 = BattleSimScript.new()
+	sim2.setup("fox", 0, 9501, true)
+	var top_vertical := false
+	var bot_vertical := false
+	for k in range(1800):
+		sim2.step(1.0 / 60.0)
+		for m in sim2.minions:
+			if m.lane_id == 0 and m.pos.x < 430.0 and m.pos.y < 1450.0:
+				top_vertical = true
+			if m.lane_id == 2 and m.pos.y > 1970.0 and m.pos.x > 1500.0:
+				bot_vertical = true
+	if sim2.minions.size() == 0:
+		issues.append("5v5 30 秒没有小兵")
+	for l in range(3):
+		var seen := false
+		for m in sim2.minions:
+			if m.lane_id == l:
+				seen = true
+				break
+		if not seen:
+			issues.append("第 %d 路 30 秒内没有小兵" % l)
+	if not top_vertical:
+		issues.append("上路小兵没有经过竖直段")
+	if not bot_vertical:
+		issues.append("下路小兵没有经过竖直段")
+	return issues
+
+
+func _jungle_checks() -> Array:
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("fox", 0, 9600, true)
+	var junglers := 0
+	var jg = null
+	for h in sim.heroes:
+		if h.is_jungler:
+			junglers += 1
+			if h.team == BattleSimScript.BLUE:
+				jg = h
+	if junglers != 2 or jg == null:
+		issues.append("5v5 打野位配置不对 junglers=%d" % junglers)
+		return issues
+	# 猎狼 buff：经验、增伤计时、实测伤害。
+	var wolf_camp = null
+	for u in sim.units:
+		if u.kind == BattleSimScript.JUNGLE and u.jungle_kind == "wolf":
+			wolf_camp = u
+			break
+	if wolf_camp == null:
+		issues.append("找不到灰狼营地")
+		return issues
+	sim.deal_damage(wolf_camp, 99999.0, jg)
+	if jg.buff_dmg_t < 19.0 or jg.buff_dmg_pct < 0.09:
+		issues.append("猎狼增益没有生效 t=%.1f pct=%.2f" % [jg.buff_dmg_t, jg.buff_dmg_pct])
+	var foe = null
+	for h in sim.heroes:
+		if h.team == BattleSimScript.RED:
+			foe = h
+			break
+	foe.invuln_t = 0.0
+	foe.shield = 0.0
+	foe.mark_t = 0.0
+	var fhp: float = foe.hp
+	sim.deal_damage(foe, 100.0, jg)
+	var dealt: float = fhp - foe.hp
+	if dealt < 109.0 or dealt > 111.0:
+		issues.append("猎狼增益伤害不是 ×1.10，实际 %.1f" % dealt)
+	# 迅捷蟹 buff：移速 ×1.15。
+	var crab = null
+	for u in sim.units:
+		if u.kind == BattleSimScript.JUNGLE and u.jungle_kind == "crab":
+			crab = u
+			break
+	if crab != null:
+		sim.deal_damage(crab, 99999.0, jg)
+		var spd: float = sim.speed_of(jg)
+		if jg.buff_speed_t <= 0.0 or absf(spd - jg.move_speed * 1.15) > 1.0:
+			issues.append("迅捷蟹增益移速不对 %.1f" % spd)
+	# 助攻经验：700 内队友分一半。
+	var ally = null
+	for h in sim.heroes:
+		if h.team == BattleSimScript.BLUE and h != jg:
+			ally = h
+			break
+	var boar = null
+	for u in sim.units:
+		if u.kind == BattleSimScript.JUNGLE and u.jungle_kind == "boar" and u.is_alive():
+			boar = u
+			break
+	if boar != null and ally != null:
+		ally.pos = boar.pos + Vector2(120, 0)
+		var axp: float = ally.xp
+		sim.deal_damage(boar, 99999.0, jg)
+		if ally.xp - axp < 40.0:
+			issues.append("野怪助攻经验没有给到队友 %.0f" % (ally.xp - axp))
+	# 营地清状态并按时刷新。
+	if boar != null:
+		boar.mark_t = 2.0
+		sim.step_unit(boar, 46.0)
+		if not boar.is_alive() or boar.mark_t > 0.0:
+			issues.append("营地 45 秒没有满血刷新或标记没清")
+	# 90 秒实跑：打野必须真的刷野。
+	var probe = JungleProbe.new()
+	probe.setup("fox", 0, 9700, true)
+	var blue_jg = null
+	for h in probe.heroes:
+		if h.team == BattleSimScript.BLUE and h.is_jungler:
+			blue_jg = h
+	var jungle_samples := 0
+	var jungle_ok := 0
+	var enemy_half := 0
+	for k in range(5400):
+		probe.step(1.0 / 60.0)
+		if k % 120 == 0 and probe.clock <= 60.0 and blue_jg != null:
+			jungle_samples += 1
+			var lane_min := 1.0e20
+			for l in range(3):
+				lane_min = minf(lane_min, _dist_to_path(blue_jg.pos, probe.lane_paths[l]))
+			if lane_min > 200.0:
+				jungle_ok += 1
+			if blue_jg.is_alive() and blue_jg.fear_t <= 0.0 and blue_jg.taunt_t <= 0.0 \
+					and blue_jg.pos.distance_to(probe.base_red.pos) + 100.0 < blue_jg.pos.distance_to(probe.base_blue.pos):
+				enemy_half += 1
+	var ratio: float = float(jungle_ok) / maxf(1.0, float(jungle_samples))
+	if probe.jg_kills < 3:
+		issues.append("打野 90 秒击杀营地不足 3，实际 %d" % probe.jg_kills)
+	# 跨野区转场会经过兵线，取 50% 作为下限；关键是绝不进敌方半场。
+	if ratio < 0.5:
+		issues.append("打野前 60 秒在野区时间不足 50%%，实际 %.0f%%" % (ratio * 100.0))
+	if enemy_half > 0:
+		issues.append("打野进入了敌方半场 %d 次采样" % enemy_half)
+	if blue_jg != null and blue_jg.level < 2:
+		issues.append("打野前 60 秒没有到 2 级")
+	return issues
+
+
+func _fix_checks() -> Array:
+	var issues: Array = []
+	# 药剂守卫：拆上路塔只影响上路药剂。
+	var s1 = BattleSimScript.new()
+	s1.setup("fox", 0, 9800, true)
+	s1.kill(s1.towers_blue[0], null)
+	s1.step_potions(0.02)
+	var active := 0
+	for p in s1.potions:
+		if p.team == BattleSimScript.BLUE and p.active:
+			active += 1
+	if active != 2:
+		issues.append("拆上路塔后蓝方仍活跃药剂不是 2，实际 %d" % active)
+	# 复活清状态。
+	var s2 = BattleSimScript.new()
+	s2.setup("hedgehog", 0, 9801, true)
+	var hh = s2.player
+	hh.spin_t = 2.0
+	hh.mark_t = 3.0
+	hh.fear_t = 1.0
+	hh.taunt_t = 1.0
+	hh.buff_dmg_t = 5.0
+	hh.buff_speed_t = 5.0
+	s2.kill(hh, null)
+	hh.respawn_t = 0.0
+	s2.step(0.02)
+	if hh.spin_t > 0.0 or hh.mark_t > 0.0 or hh.fear_t > 0.0 or hh.taunt_t > 0.0 \
+			or hh.buff_dmg_t > 0.0 or hh.buff_speed_t > 0.0:
+		issues.append("复活没有清干净状态")
+	# 兵线加速时机：5v5 最后 45 秒（255s）才加速。
+	var s3 = BattleSimScript.new()
+	s3.setup("fox", 0, 9802, true)
+	s3.clock = 250.0
+	s3.wave_t = 0.001
+	s3.step(0.01)
+	if absf(s3.wave_t - 18.0) > 0.5:
+		issues.append("5v5 250s 兵线提前加速 wave_t=%.1f" % s3.wave_t)
+	s3.clock = 256.0
+	s3.wave_t = 0.001
+	s3.step(0.01)
+	if absf(s3.wave_t - 9.0) > 0.5:
+		issues.append("5v5 256s 兵线没有加速 wave_t=%.1f" % s3.wave_t)
+	# 狼嚎只标记单位，不打塔。
+	var s4 = BattleSimScript.new()
+	s4.setup("wolf", 0, 9803, true)
+	var p4 = s4.player
+	var rt = s4.towers_red[0]
+	p4.pos = rt.pos + Vector2(-150, 0)
+	var near_4 = null
+	for h in s4.heroes:
+		if h.team == BattleSimScript.RED:
+			near_4 = h
+			break
+	near_4.pos = rt.pos + Vector2(60, 0)
+	near_4.prev_pos = near_4.pos
+	p4.cds = [0.0, 0.0, 0.0]
+	var thp: float = rt.hp
+	s4.try_cast(p4, 1)
+	if absf(rt.hp - thp) > 0.01 or rt.mark_t > 0.0:
+		issues.append("狼嚎打到了塔 hp %.0f->%.0f mark=%.1f" % [thp, rt.hp, rt.mark_t])
+	var marked_hero = null
+	for h in s4.heroes:
+		if h.team == BattleSimScript.RED and h.mark_t > 0.0:
+			marked_hero = h
+			break
+	if marked_hero == null:
+		issues.append("狼嚎没有标记到英雄")
+	# 陷阱预判：移动目标也能踩中。
+	var s5 = BattleSimScript.new()
+	s5.setup("redpanda", 0, 9804, true)
+	var p5 = s5.player
+	var v5 = null
+	for h in s5.heroes:
+		if h.team == BattleSimScript.RED:
+			v5 = h
+			break
+	v5.pos = p5.pos + Vector2(300, 0)
+	v5.prev_pos = v5.pos
+	v5.move_dir = Vector2(0, 1)
+	p5.cds = [0.0, 0.0, 0.0]
+	s5.try_cast(p5, 1)
+	var vhp: float = v5.hp
+	v5.pos += Vector2(0, v5.move_speed * 0.55 * 0.8)
+	s5.step_pending(0.6)
+	if v5.hp >= vhp:
+		issues.append("陷阱预判后仍打不中移动目标")
+	# 再生水域放在残血队友脚下。
+	var s6 = BattleSimScript.new()
+	s6.setup("axolotl", 0, 9805, true)
+	var p6 = s6.player
+	p6.level = 2
+	var a6 = null
+	for h in s6.heroes:
+		if h.team == BattleSimScript.BLUE and h != p6:
+			a6 = h
+			break
+	a6.hp = a6.max_hp * 0.4
+	a6.pos = p6.pos + Vector2(300, 0)
+	a6.prev_pos = a6.pos
+	p6.cds = [0.0, 0.0, 0.0]
+	s6.try_cast(p6, 2)
+	if s6.zones.is_empty() or s6.zones[s6.zones.size() - 1].pos.distance_to(a6.pos) > 20.0:
+		issues.append("再生水域没有落在残血队友脚下")
+	# 回旋尖刺三连。
+	var s7 = BattleSimScript.new()
+	s7.setup("hedgehog", 0, 9806, true)
+	var p7 = s7.player
+	var boom_count := 0
+	s7.try_cast(p7, 0)
+	for p in s7.shots:
+		if p.boom:
+			boom_count += 1
+	if boom_count != 3:
+		issues.append("回旋尖刺一次只飞出 %d 把" % boom_count)
+	# 狼跃身后。
+	var s8 = BattleSimScript.new()
+	s8.setup("wolf", 0, 9807, true)
+	var p8 = s8.player
+	p8.level = 2
+	var e8 = null
+	for h in s8.heroes:
+		if h.team == BattleSimScript.RED:
+			e8 = h
+			break
+	e8.pos = p8.pos + Vector2(220, 0)
+	e8.prev_pos = e8.pos
+	s8.try_cast(p8, 2)
+	for k in range(40):
+		s8.step_hero(p8, 1.0 / 60.0)
+		if p8.move_skill_t <= 0.0:
+			break
+	if p8.pos.x < e8.pos.x + 60.0 or p8.pos.x > e8.pos.x + 130.0:
+		issues.append("猎影突袭没有落到目标身后 x=%.0f" % (p8.pos.x - e8.pos.x))
+	# 尖刺伏击：无敌 + 下一击强化。
+	var s9 = BattleSimScript.new()
+	s9.setup("hedgehog", 0, 9808, true)
+	var p9 = s9.player
+	s9.try_cast(p9, 1)
+	if p9.invuln_t <= 0.0 or p9.vanish_t <= 0.0:
+		issues.append("尖刺伏击没有无敌窗口")
+	s9.step_unit(p9, 0.9)
+	if p9.ambush_t <= 0.0:
+		issues.append("伏击结束后没有强化窗口")
+	var dummy9 = null
+	for h in s9.heroes:
+		if h.team == BattleSimScript.RED:
+			dummy9 = h
+			break
+	dummy9.invuln_t = 0.0
+	var dhp: float = dummy9.hp
+	s9.hit_with_fx(dummy9, 100.0, p9)
+	var ambush_dmg: float = dhp - dummy9.hp
+	if ambush_dmg < 175.0 or ambush_dmg > 185.0:
+		issues.append("伏击首击不是 ×1.8，实际 %.1f" % ambush_dmg)
+	# 5v5 终极对决仍保护水晶；拆两塔后才开放。
+	var s10 = BattleSimScript.new()
+	s10.setup("fox", 0, 9809, true)
+	s10.sudden_death = true
+	s10.clock = 181.0
+	var bhp: float = s10.base_red.hp
+	s10.deal_damage(s10.base_red, 500.0, s10.player)
+	if s10.base_red.hp < bhp - 0.01:
+		issues.append("5v5 终极对决水晶保护失效")
+	s10.deal_damage(s10.towers_red[0], 99999.0, s10.player)
+	s10.deal_damage(s10.towers_red[1], 99999.0, s10.player)
+	s10.deal_damage(s10.base_red, 500.0, s10.player)
+	if s10.base_red.hp >= bhp - 0.01:
+		issues.append("5v5 拆两塔后水晶仍免疫")
+	# 5v5 水晶射程/攻击与 3v3 不同。
+	if s10.base_red.attack_range != 360.0 or s10.base_red.dmg != 90.0:
+		issues.append("5v5 水晶数值不是 90/360")
+	var s11 = BattleSimScript.new()
+	s11.setup("fox", 0, 9810)
+	if s11.base_red.attack_range != 400.0 or s11.base_red.dmg != 120.0:
+		issues.append("3v3 水晶数值被误改")
+	# 阵容多样性：10 个 seed 至少 5 种蓝方阵容。
+	var comps: Dictionary = {}
+	for seed_value in range(10):
+		var s12 = BattleSimScript.new()
+		s12.setup("fox", 0, 9820 + seed_value, true)
+		var ids: Array = []
+		for h in s12.heroes:
+			if h.team == BattleSimScript.BLUE:
+				ids.append(h.hero_id)
+		ids.sort()
+		comps[",".join(ids)] = true
+	if comps.size() < 5:
+		issues.append("10 局只有 %d 种蓝方阵容" % comps.size())
+	# 刺刺与尖尖不再同模。
+	var s13 = BattleSimScript.new()
+	s13.setup("cat", 0, 9811, true)
+	var cat_def: Dictionary = s13.defs_by_id.get("cat", {})
+	var hedge_def: Dictionary = s13.defs_by_id.get("hedgehog", {})
+	var diff_count := 0
+	for field in ["hp", "dmg", "range", "atk_interval", "move_speed"]:
+		if absf(float(cat_def.get(field, 0)) - float(hedge_def.get(field, 0))) > 0.001:
+			diff_count += 1
+	if diff_count < 4:
+		issues.append("刺刺与尖尖属性仍然雷同，仅 %d 项不同" % diff_count)
+	if str(hedge_def.get("skills", [])[1].get("kind", "")) != "vanish":
+		issues.append("刺刺二技能不是尖刺伏击")
 	return issues
