@@ -1,6 +1,6 @@
 extends SceneTree
 
-# 固定种子无头对局：验证一局一定会在 5 分钟内结束、先拆塔后破水晶、数值不出现 NaN。
+# 固定种子无头对局：验证 3v3 一局在 5 分钟内结束、5v5 在 8 分钟内结束、先拆塔后破水晶、数值不出现 NaN。
 # 运行：godot --headless --path godot --script res://tests/sim_headless.gd
 
 const BattleSimScript = preload("res://scripts/core/battle_sim.gd")
@@ -169,6 +169,14 @@ func _init() -> void:
 		failures += 1
 		for issue in fix_issues:
 			print("FIX_FAIL " + issue)
+
+	var lv_issues := _level_checks()
+	if lv_issues.is_empty():
+		print("LEVEL_OK xp5/stat_growth/skill_power/3v3_frozen/diagonal_face")
+	else:
+		failures += 1
+		for issue in lv_issues:
+			print("LEVEL_FAIL " + issue)
 
 	if failures == 0:
 		print("SIM_OK matches=%d dt=%.4f" % [MATCHES, DT])
@@ -378,7 +386,7 @@ func _rule_checks() -> Array:
 	if stop_count[0] != 1:
 		issues.append("位移结束后没有恢复顿帧")
 
-	# ---- 5v5：三路、三塔、野区、两位数的英雄与 5 分钟上限 ----
+	# ---- 5v5：三路、三塔、野区、两位数的英雄与 8 分钟上限 ----
 	var simA = BattleSimScript.new()
 	simA.setup("wolf", 0, 9100, true)
 	if not simA.five_v_five:
@@ -422,7 +430,7 @@ func _rule_checks() -> Array:
 	var simB = BattleSimScript.new()
 	simB.setup("turtle", 0, 9001, true)
 	var t5 := 0.0
-	while not simB.over and t5 < 340.0:
+	while not simB.over and t5 < 540.0:
 		simB.step(DT)
 		t5 += DT
 	if not simB.over:
@@ -488,6 +496,240 @@ func _rule_checks() -> Array:
 		if simu.player.cds[2] <= 0.0:
 			issues.append("%s 大招未立即进入冷却" % id)
 
+	return issues
+
+
+func _level_checks() -> Array:
+	var issues: Array = []
+	# 5v5 五级成长：阈值 110/380/900/1500，属性 ×1.36 / ×1.32，技能 ×1.40。
+	var s1 = BattleSimScript.new()
+	s1.setup("fox", 0, 9900, true)
+	var p1 = s1.player
+	var base_hp := float(p1.def.get("hp", 900))
+	var base_dmg := float(p1.def.get("dmg", 45))
+	if s1.level_cap != 5:
+		issues.append("5v5 等级上限不是 5，实际 %d" % s1.level_cap)
+	s1.add_xp(p1, 1499.0)
+	if p1.level != 4:
+		issues.append("5v5 1499xp 等级不是 4，实际 %d" % p1.level)
+	s1.add_xp(p1, 1.0)
+	if p1.level != 5:
+		issues.append("5v5 1500xp 等级不是 5，实际 %d" % p1.level)
+	if absf(p1.max_hp - base_hp * 1.36) > 0.5:
+		issues.append("5v5 五级血量不是 ×1.36，实际 %.1f 基础 %.1f" % [p1.max_hp, base_hp])
+	if absf(p1.dmg - base_dmg * 1.32) > 0.01:
+		issues.append("5v5 五级普攻不是 ×1.32，实际 %.2f 基础 %.2f" % [p1.dmg, base_dmg])
+	if absf(p1.hp - p1.max_hp) > 0.5:
+		issues.append("升级没有补回新增血量 hp=%.1f max=%.1f" % [p1.hp, p1.max_hp])
+	s1.add_xp(p1, 500.0)
+	if p1.level != 5 or absf(p1.max_hp - base_hp * 1.36) > 0.5:
+		issues.append("5v5 满级后仍然成长")
+	if absf(s1.skill_power(p1) - 1.4) > 0.001:
+		issues.append("5v5 五级技能强度不是 ×1.4，实际 %.3f" % s1.skill_power(p1))
+	# 3v3 冻结：2 级封顶、零属性成长、技能强度 1.0。
+	var s2 = BattleSimScript.new()
+	s2.setup("fox", 0, 9901)
+	var p2 = s2.player
+	var base2_hp := float(p2.def.get("hp", 900))
+	var base2_dmg := float(p2.def.get("dmg", 45))
+	s2.add_xp(p2, 9999.0)
+	if p2.level != 2:
+		issues.append("3v3 等级上限不是 2，实际 %d" % p2.level)
+	if absf(p2.max_hp - base2_hp) > 0.01 or absf(p2.dmg - base2_dmg) > 0.01:
+		issues.append("3v3 升级产生了属性成长")
+	if absf(s2.skill_power(p2) - 1.0) > 0.001:
+		issues.append("3v3 技能强度不是 1.0")
+	# 技能伤害 ×1.4：找一个带伤害的投射类技能实测（任意英雄的任意技能位）。
+	var cast_id := ""
+	var cast_index := -1
+	for hid in HERO_IDS:
+		var probe = BattleSimScript.new()
+		probe.setup(hid, 0, 9902, true)
+		for i in range(probe.player.skills.size()):
+			var sk: Dictionary = probe.player.skills[i]
+			var kind := str(sk.get("kind", ""))
+			if float(sk.get("dmg", 0.0)) > 0.0 \
+					and (kind == "projectile" or kind == "radial" or kind == "splash" or kind == "boomerang"):
+				cast_id = hid
+				cast_index = i
+				break
+		if cast_index >= 0:
+			break
+	if cast_index >= 0:
+		var l1 = BattleSimScript.new()
+		l1.setup(cast_id, 0, 9903, true)
+		var b1: int = l1.shots.size()
+		l1.try_cast(l1.player, cast_index)
+		var dmg1 := 0.0
+		for i in range(b1, l1.shots.size()):
+			dmg1 = l1.shots[i].dmg
+		var l5 = BattleSimScript.new()
+		l5.setup(cast_id, 0, 9904, true)
+		l5.player.level = 5
+		var b5: int = l5.shots.size()
+		l5.try_cast(l5.player, cast_index)
+		var dmg5 := 0.0
+		for i in range(b5, l5.shots.size()):
+			dmg5 = l5.shots[i].dmg
+		if dmg1 <= 0.0 or absf(dmg5 / dmg1 - 1.4) > 0.01:
+			issues.append("5v5 五级技能伤害不是 ×1.4（%s 技能%d：%.1f→%.1f）" % [cast_id, cast_index, dmg1, dmg5])
+	# 斜向移动：位置与 face_dir 都按 45° 走。
+	var s4 = BattleSimScript.new()
+	s4.setup("fox", 0, 9905)
+	var p4 = s4.player
+	var x0: float = p4.pos.x
+	var y0: float = p4.pos.y
+	s4.player_move = Vector2(0.7, -0.7)
+	for k in range(60):
+		s4.step_hero(p4, 1.0 / 60.0)
+	var dx: float = p4.pos.x - x0
+	var dy: float = p4.pos.y - y0
+	if dx <= 0.0 or dy >= 0.0:
+		issues.append("斜向移动没有同时改变 x/y dx=%.1f dy=%.1f" % [dx, dy])
+	if absf(absf(dx) - absf(dy)) > maxf(0.5, absf(dx) * 0.05):
+		issues.append("斜向移动比例不对 dx=%.1f dy=%.1f" % [dx, dy])
+	if p4.face_dir.distance_to(Vector2(0.7071, -0.7071)) > 0.01:
+		issues.append("face_dir 与斜向移动方向不一致 %s" % str(p4.face_dir))
+	# 攻击时 face_dir 指向目标。
+	var s5 = BattleSimScript.new()
+	s5.setup("fox", 0, 9906)
+	var p5 = s5.player
+	var e5 = s5.heroes[3]
+	e5.pos = p5.pos + Vector2(60.0, -130.0)
+	e5.prev_pos = e5.pos
+	p5.atk_timer = 0.0
+	s5.player_move = Vector2.ZERO
+	if p5.attack_range + p5.radius < 150.0:
+		e5.pos = p5.pos + Vector2(60.0, -60.0)
+		e5.prev_pos = e5.pos
+	s5.step_hero(p5, 1.0 / 60.0)
+	var want: Vector2 = (e5.pos - p5.pos).normalized()
+	if p5.face_dir.distance_to(want) > 0.05:
+		issues.append("普攻时 face_dir 没有指向目标 %s vs %s" % [str(p5.face_dir), str(want)])
+	# 挥砍期间朝向稳定：攻击帧朝目标，动作结束再回到移动方向。
+	var s6 = BattleSimScript.new()
+	s6.setup("fox", 0, 9907)
+	var p6 = s6.player
+	var e6 = s6.heroes[3]
+	e6.pos = p6.pos + Vector2(60.0, -40.0)
+	e6.prev_pos = e6.pos
+	e6.invuln_t = 0.0
+	s6.player_move = Vector2(1, 0)
+	p6.atk_timer = 0.0
+	s6.step_unit(p6, 1.0 / 60.0)
+	var want_atk: Vector2 = (e6.pos - p6.pos).normalized()
+	if p6.face_dir.distance_to(want_atk) > 0.05:
+		issues.append("挥砍帧 face_dir 没有指向目标")
+	s6.step_unit(p6, 1.0 / 60.0)
+	if p6.face_dir.distance_to(want_atk) > 0.05:
+		issues.append("挥砍期间朝向被移动方向覆盖")
+	for k in range(30):
+		s6.step_unit(p6, 1.0 / 60.0)
+	if p6.face_dir.distance_to(Vector2(1, 0)) > 0.2:
+		issues.append("挥砍结束后朝向没有回到移动方向 %s" % str(p6.face_dir))
+	# 复活后朝向敌方基地。
+	var s7 = BattleSimScript.new()
+	s7.setup("fox", 0, 9908)
+	var p7r = s7.player
+	s7.kill(p7r, null)
+	p7r.respawn_t = 0.0
+	s7.step(0.02)
+	var want_r: Vector2 = (s7.base_red.pos - p7r.pos).normalized()
+	if p7r.face_dir.distance_to(want_r) > 0.05:
+		issues.append("复活后 face_dir 没有朝向敌方基地")
+	# 巨兽普攻朝目标。
+	var s8 = BattleSimScript.new()
+	s8.setup("fox", 0, 9909)
+	s8.clock = 179.9
+	s8.step(0.2)
+	if s8.boss == null:
+		issues.append("巨兽朝向测试没有生成巨兽")
+	else:
+		var bb = s8.boss
+		var foe_b = s8.heroes[3] if bb.team == BattleSimScript.BLUE else s8.player
+		bb.pos = foe_b.pos + Vector2(-60.0, 0.0)
+		bb.prev_pos = bb.pos
+		bb.cds = [9.0, 9.0, 9.0]
+		bb.atk_timer = 0.0
+		bb.stun_t = 0.0
+		foe_b.invuln_t = 0.0
+		s8.step_boss(bb, 0.016)
+		var want_b: Vector2 = (foe_b.pos - bb.pos).normalized()
+		if bb.face_dir.distance_to(want_b) > 0.05:
+			issues.append("巨兽普攻 face_dir 没有指向目标")
+	# 位移/旋转类技能同样吃等级成长。
+	var all_ids: Array = HERO_IDS.duplicate()
+	for extra in ["wolf", "hedgehog", "redpanda", "turtle", "crane"]:
+		if not all_ids.has(extra):
+			all_ids.append(extra)
+	for gk in ["dash", "leap", "spin"]:
+		var gid := ""
+		var gidx := -1
+		var gunlock := false
+		for hid in all_ids:
+			var pr = BattleSimScript.new()
+			pr.setup(hid, 0, 9950, true)
+			for i in range(pr.player.skills.size()):
+				var sk: Dictionary = pr.player.skills[i]
+				if str(sk.get("kind", "")) == gk and float(sk.get("dmg", 0.0)) > 0.0:
+					gid = hid
+					gidx = i
+					gunlock = bool(sk.get("unlock_at_2", false))
+					break
+			if gidx >= 0:
+				break
+		if gidx < 0:
+			issues.append("找不到 %s 技能用于成长测试" % gk)
+			continue
+		var lv_low := 2 if gunlock else 1
+		var lo = BattleSimScript.new()
+		lo.setup(gid, 0, 9951, true)
+		var hi = BattleSimScript.new()
+		hi.setup(gid, 0, 9952, true)
+		lo.player.level = lv_low
+		hi.player.level = 5
+		lo.player_move = Vector2(1, 0)
+		hi.player_move = Vector2(1, 0)
+		var dmg_low := 0.0
+		var dmg_high := 0.0
+		if gk == "spin":
+			lo.try_cast(lo.player, gidx)
+			hi.try_cast(hi.player, gidx)
+			dmg_low = lo.player.spin_dmg
+			dmg_high = hi.player.spin_dmg
+		else:
+			var fa = null
+			var fb = null
+			for hh in lo.heroes:
+				if hh.team == BattleSimScript.RED:
+					fa = hh
+					break
+			for hh in hi.heroes:
+				if hh.team == BattleSimScript.RED:
+					fb = hh
+					break
+			fa.pos = lo.player.pos + Vector2(170.0, 0.0)
+			fb.pos = hi.player.pos + Vector2(170.0, 0.0)
+			fa.prev_pos = fa.pos
+			fb.prev_pos = fb.pos
+			fa.invuln_t = 0.0
+			fb.invuln_t = 0.0
+			lo.player.atk_timer = 99.0
+			hi.player.atk_timer = 99.0
+			var ha: float = fa.hp
+			var hb: float = fb.hp
+			lo.try_cast(lo.player, gidx)
+			hi.try_cast(hi.player, gidx)
+			for k in range(60):
+				lo.step_hero(lo.player, 1.0 / 60.0)
+				hi.step_hero(hi.player, 1.0 / 60.0)
+				if lo.player.move_skill_t <= 0.0 and hi.player.move_skill_t <= 0.0:
+					break
+			dmg_low = ha - fa.hp
+			dmg_high = hb - fb.hp
+		var want_ratio: float = 1.4 / (1.0 + 0.10 * float(lv_low - 1))
+		if dmg_low <= 0.0 or absf(dmg_high / dmg_low - want_ratio) > 0.02:
+			issues.append("%s 技能强度不是 ×%.2f（%.1f→%.1f）" % [gk, want_ratio, dmg_low, dmg_high])
 	return issues
 
 
@@ -893,19 +1135,34 @@ func _fix_checks() -> Array:
 	if hh.spin_t > 0.0 or hh.mark_t > 0.0 or hh.fear_t > 0.0 or hh.taunt_t > 0.0 \
 			or hh.buff_dmg_t > 0.0 or hh.buff_speed_t > 0.0:
 		issues.append("复活没有清干净状态")
-	# 兵线加速时机：5v5 最后 45 秒（255s）才加速。
+	# 兵线加速时机：5v5 最后 45 秒（435s）才加速。
 	var s3 = BattleSimScript.new()
 	s3.setup("fox", 0, 9802, true)
-	s3.clock = 250.0
+	s3.clock = 430.0
 	s3.wave_t = 0.001
 	s3.step(0.01)
 	if absf(s3.wave_t - 18.0) > 0.5:
-		issues.append("5v5 250s 兵线提前加速 wave_t=%.1f" % s3.wave_t)
-	s3.clock = 256.0
+		issues.append("5v5 430s 兵线提前加速 wave_t=%.1f" % s3.wave_t)
+	s3.clock = 440.0
 	s3.wave_t = 0.001
 	s3.step(0.01)
 	if absf(s3.wave_t - 9.0) > 0.5:
-		issues.append("5v5 256s 兵线没有加速 wave_t=%.1f" % s3.wave_t)
+		issues.append("5v5 440s 兵线没有加速 wave_t=%.1f" % s3.wave_t)
+	# 5v5 节奏：5:00 出巨兽与终极对决，8:00 结算；3v3 保持 3:00 / 4:45。
+	if absf(s3.match_cap - 480.0) > 0.01 or absf(s3.sudden_death_time - 300.0) > 0.01:
+		issues.append("5v5 节奏不是 300/480 cap=%.1f sd=%.1f" % [s3.match_cap, s3.sudden_death_time])
+	var s3b = BattleSimScript.new()
+	s3b.setup("fox", 0, 9812, true)
+	s3b.clock = 299.0
+	s3b.step(0.2)
+	if s3b.boss != null or s3b.sudden_death:
+		issues.append("5v5 299s 提前进入终极对决")
+	var s3c = BattleSimScript.new()
+	s3c.setup("fox", 0, 9813, true)
+	s3c.clock = 299.9
+	s3c.step(0.2)
+	if s3c.boss == null or not s3c.sudden_death:
+		issues.append("5v5 300s 没有出现巨兽/终极对决")
 	# 狼嚎只标记单位，不打塔。
 	var s4 = BattleSimScript.new()
 	s4.setup("wolf", 0, 9803, true)

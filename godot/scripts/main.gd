@@ -34,6 +34,7 @@ var sim_frames := 0
 var sim_acc := 0.0
 var camera_follow := true
 var auto_run := false
+var walk_debug := Vector2.ZERO
 var dash_auto := false
 var cinematic := false
 var cinematic_until_ms := 0
@@ -139,6 +140,19 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	# 调试：`-- --look-base` 把镜头固定在蓝方基地，用于核对素材颜色。
 	camera_follow = true
 	auto_run = "--auto-run" in OS.get_cmdline_user_args()
+	# 调试：`--walk=up|down|left|right|up-right|down-left...` 按固定方向走，用于核对朝向。
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--walk="):
+			match str(a).substr(7):
+				"up": walk_debug = Vector2(0, -1)
+				"down": walk_debug = Vector2(0, 1)
+				"left": walk_debug = Vector2(-1, 0)
+				"right": walk_debug = Vector2(1, 0)
+				"up-right": walk_debug = Vector2(1, -1)
+				"up-left": walk_debug = Vector2(-1, -1)
+				"down-right": walk_debug = Vector2(1, 1)
+				"down-left": walk_debug = Vector2(-1, 1)
+			walk_debug = walk_debug.normalized()
 	# 调试：移动中不断放 1 技能，检查位移手感和镜头跟随。
 	dash_auto = "--dash" in OS.get_cmdline_user_args()
 	if "--look-base" in OS.get_cmdline_user_args():
@@ -171,6 +185,17 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 		sim.player.level = 2
 		sim.player.xp = sim.xp_to_level2
 		sim.try_cast(sim.player, 2)
+	# 调试：`--lv=3` 直接升到指定等级，经验条停在该级中段，用于核对 HUD 与成长。
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--lv="):
+			var want_lv := clampi(int(str(a).substr(5)), 1, sim.level_cap)
+			if want_lv >= 2:
+				var target_xp: float = float(sim.xp_levels[sim.xp_levels.size() - 1])
+				if want_lv < sim.level_cap:
+					var lo: float = float(sim.xp_levels[want_lv - 2])
+					var hi: float = float(sim.xp_levels[want_lv - 1])
+					target_xp = (lo + hi) * 0.5
+				sim.add_xp(sim.player, maxf(0.1, target_xp - sim.player.xp))
 	# 调试：以玩家为中心直接播放指定大招特效（--fx=waterfall_ult），用于逐个核对演出。
 	if "--fx" in OS.get_cmdline_user_args():
 		var s: Dictionary = sim.player.skills[2]
@@ -222,15 +247,15 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	sim.match_ended.connect(_on_match_ended)
 	sim.banner.connect(_on_banner)
 
-	# 调试：直接触发 3 分钟峡谷巨兽，检查模型与推进（此时播报与震屏已接通）。
+	# 调试：直接触发峡谷巨兽（5v5 为 5:00，3v3 为 3:00），检查模型与推进。
 	if "--boss" in OS.get_cmdline_user_args():
-		sim.clock = 179.9
+		sim.clock = sim.sudden_death_time - 0.1
 		sim.step(0.2)
 		for i in range(60):
 			sim.step(1.0 / 60.0)
 	# 调试：直接看巨兽第二形态（翅膀 + 陨石/旋风），不用等它先被打倒一次。
 	if "--boss-fly" in OS.get_cmdline_user_args():
-		sim.clock = 179.9
+		sim.clock = sim.sudden_death_time - 0.1
 		sim.step(0.2)
 		if sim.boss != null:
 			sim.boss.boss_phase = 2
@@ -278,7 +303,9 @@ func _process(delta: float) -> void:
 		sim_frames = 0
 
 	if not paused:
-		if auto_run and sim.player != null:
+		if walk_debug.length_squared() > 0.01 and sim.player != null:
+			sim.player_move = walk_debug
+		if auto_run and walk_debug.length_squared() < 0.01 and sim.player != null:
 			sim.player_move = Vector2(1, 0)
 			if dash_auto and sim.player.cds[0] <= 0.0:
 				sim.set_skill(0)

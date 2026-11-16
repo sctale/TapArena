@@ -35,6 +35,8 @@ class Unit:
 	var prev_pos := Vector2.ZERO
 	var facing: float = 1.0
 	var move_dir := Vector2.ZERO
+	# 表现用朝向：移动/攻击/施法方向（任意角度），不参与战斗逻辑；facing 的 ±1 语义保留。
+	var face_dir := Vector2.ZERO
 
 	var hp: float = 0.0
 	var max_hp: float = 0.0
@@ -238,6 +240,12 @@ var xp_hero_assist: float = 45.0
 var xp_tower: float = 70.0
 var xp_minion: float = 10.0
 var xp_minion_assist: float = 5.0
+# 等级系统：3v3 保持 2 级封顶零成长；5v5 由 mode_5v5 覆盖为 5 级并逐级成长。
+var level_cap := 2
+var xp_levels: Array = [110.0]
+var hp_per_level := 0.0
+var dmg_per_level := 0.0
+var skill_per_level := 0.0
 
 var base_cfg: Dictionary = {}
 var tower_cfg: Dictionary = {}
@@ -313,6 +321,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	base_heal_per_sec = float(rules.get("base_heal_per_sec", 0.15))
 	wave_interval = float(rules.get("wave_interval", 18))
 	xp_to_level2 = float(rules.get("xp_to_level2", 180))
+	xp_levels = [xp_to_level2]
 	xp_passive_per_sec = float(rules.get("xp_passive_per_sec", 1))
 	xp_hero_kill = float(rules.get("xp_hero_kill", 120))
 	xp_hero_assist = float(rules.get("xp_hero_assist", 45))
@@ -347,6 +356,14 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 		match_cap = float(mode_cfg.get("match_cap", match_cap))
 		sudden_death_time = float(mode_cfg.get("sudden_death_time", sudden_death_time))
 		keep_protection = bool(mode_cfg.get("keep_protection_in_sudden_death", true))
+		# 5v5 五级成长：阈值与增幅全部来自 rules.json，便于按节奏调整。
+		level_cap = int(mode_cfg.get("level_cap", 5))
+		hp_per_level = float(mode_cfg.get("hp_per_level", 0.09))
+		dmg_per_level = float(mode_cfg.get("dmg_per_level", 0.08))
+		skill_per_level = float(mode_cfg.get("skill_per_level", 0.10))
+		xp_levels.clear()
+		for t in mode_cfg.get("xp_levels", [110, 280, 520, 840]):
+			xp_levels.append(float(t))
 		map_w = float(mode_cfg.get("map_w", map_w))
 		map_h = float(mode_cfg.get("map_h", map_h))
 		for raw_lane in rules.get("lanes_5v5", []):
@@ -757,6 +774,7 @@ func respawn_jungle(u) -> void:
 	u.hp = u.max_hp
 	u.pos = u.respawn_home
 	u.prev_pos = u.pos
+	u.face_dir = Vector2.ZERO
 	u.stun_t = 0.0
 	u.slow_t = 0.0
 	u.mark_t = 0.0
@@ -787,6 +805,7 @@ func step_jungle(u, dt: float) -> void:
 		return
 	u.moving = false
 	u.facing = 1.0 if foe.pos.x >= u.pos.x else -1.0
+	u.face_dir = (foe.pos - u.pos).normalized()
 	if u.atk_timer <= 0.0:
 		u.atk_timer = u.atk_interval
 		u.atk_anim = 0.25
@@ -907,6 +926,7 @@ func respawn_boss(u) -> void:
 	else:
 		u.pos = home.pos + Vector2(190.0 if u.team == BLUE else -190.0, 0.0)
 	u.prev_pos = u.pos
+	u.face_dir = (base_pos(1 - u.team) - u.pos).normalized()
 	u.invuln_t = 1.0
 	u.stun_t = 0.0
 	u.slow_t = 0.0
@@ -983,6 +1003,7 @@ func step_boss(u, dt: float) -> void:
 	if target != null and u.pos.distance_to(target.pos) <= u.attack_range + target.radius:
 		u.moving = false
 		u.facing = 1.0 if target.pos.x >= u.pos.x else -1.0
+		u.face_dir = (target.pos - u.pos).normalized()
 		if u.atk_timer <= 0.0:
 			u.atk_timer = u.atk_interval
 			u.atk_anim = 0.32
@@ -1063,6 +1084,8 @@ func nearest_enemy_unit(from, radius: float):
 func _begin_boss_cast(u, kind: String, cfg: Dictionary, index: int, target = null) -> void:
 	u.boss_skill = kind
 	u.boss_target = target
+	if target != null:
+		u.face_dir = (target.pos - u.pos).normalized()
 	var windup := float(cfg.get("windup", 0.6))
 	u.boss_cast_t = windup
 	u.cast_anim = windup
@@ -1178,6 +1201,7 @@ func _step_boss_charge(u, dt: float) -> void:
 	u.moving = true
 	u.walk_t += dt
 	u.facing = 1.0 if u.boss_charge_dir.x >= 0.0 else -1.0
+	u.face_dir = u.boss_charge_dir.normalized()
 	var speed := float(cfg.get("speed", 700.0))
 	var dmg := float(cfg.get("dmg", 120.0))
 	var stun := float(cfg.get("stun", 0.25))
@@ -1433,6 +1457,9 @@ func step_hero(h, dt: float) -> void:
 		if h.moving:
 			dir = dir.normalized()
 			h.move_dir = dir
+			# 挥砍/施法期间保持面向目标或施法方向，动作结束再回到移动方向，避免朝向抖动。
+			if h.atk_anim <= 0.0 and h.cast_anim <= 0.0:
+				h.face_dir = dir
 			h.facing = 1.0 if dir.x >= 0.0 else -1.0
 			var speed_k := 1.0 if h.fear_t > 0.0 else (0.55 if h.slow_t > 0.0 else 1.0)
 			move_to(h, h.pos + dir * (speed_of(h) * speed_k * dt))
@@ -1459,6 +1486,7 @@ func step_hero(h, dt: float) -> void:
 		h.atk_timer = h.atk_interval
 		h.atk_anim = 0.34
 		h.facing = 1.0 if target.pos.x >= h.pos.x else -1.0
+		h.face_dir = (target.pos - h.pos).normalized()
 		if h.attack_range > 250.0:
 			shoot(h, target.pos - h.pos, h.dmg, h.accent, 700.0, 0.0, 0.0, 0.0, 0,
 				false, null, hero_shot_style(h.hero_id))
@@ -1509,7 +1537,7 @@ func _finish_move_skill(h, kind: String, data: Dictionary) -> void:
 	var color: Color = data.get("color", Color.WHITE)
 	match kind:
 		"dash":
-			var dmg := float(s.get("dmg", 0.0))
+			var dmg := float(s.get("dmg", 0.0)) * skill_power(h)
 			var radius := float(s.get("radius", 120.0))
 			if dmg > 0.0:
 				area_damage(h.pos, radius, dmg, h, h.team,
@@ -1528,7 +1556,7 @@ func _finish_move_skill(h, kind: String, data: Dictionary) -> void:
 			var count := int(maxf(1.0, float(s.get("count", 3))))
 			for i in range(count):
 				var ang := atan2(dir.y, dir.x) + (float(i) - float(count - 1) * 0.5) * 0.16
-				shoot(h, Vector2(cos(ang), sin(ang)), float(s.get("dmg", 0.0)), color,
+				shoot(h, Vector2(cos(ang), sin(ang)), float(s.get("dmg", 0.0)) * skill_power(h), color,
 					float(s.get("speed", 700.0)), float(s.get("slow", 0.0)), 0.0, 0.0,
 					int(s.get("pierce", 0)), false, null, str(s.get("shot_style", "arrow")))
 			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
@@ -1705,6 +1733,8 @@ func move_ai(h, dir: Vector2, dt: float, speed_k: float) -> void:
 		return
 	dir = dir.normalized()
 	h.move_dir = dir
+	if h.atk_anim <= 0.0 and h.cast_anim <= 0.0:
+		h.face_dir = dir
 	h.moving = true
 	var slow_k := 1.0 if h.fear_t > 0.0 else (0.55 if h.slow_t > 0.0 else 1.0)
 	move_to(h, h.pos + dir * (speed_of(h) * speed_k * slow_k * dt))
@@ -2055,6 +2085,7 @@ func step_minion(m, dt: float) -> void:
 	if foe != null:
 		m.moving = false
 		m.facing = 1.0 if foe.pos.x >= m.pos.x else -1.0
+		m.face_dir = (foe.pos - m.pos).normalized()
 		if m.atk_timer <= 0.0:
 			m.atk_timer = m.atk_interval
 			m.atk_anim = 0.22
@@ -2085,6 +2116,8 @@ func step_minion(m, dt: float) -> void:
 		return
 	to = to / d
 	m.move_dir = to
+	if m.atk_anim <= 0.0:
+		m.face_dir = to
 	m.facing = 1.0 if to.x >= 0.0 else -1.0
 	m.moving = true
 	var slow_k := 0.55 if m.slow_t > 0.0 else 1.0
@@ -2394,23 +2427,55 @@ func _team_color(team: int) -> Color:
 
 
 func add_xp(h, add: float) -> void:
-	if h == null or add <= 0.0 or h.level >= 2:
+	if h == null or add <= 0.0 or h.level >= level_cap:
 		return
 	h.xp += add
-	if h.xp >= xp_to_level2:
-		h.level = 2
-		h.level2_time = clock
-		float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "二级解锁大招！", Color(1, 0.95, 0.6))
-		if h.is_player:
-			banner.emit("大招解锁！按右上的技能键放出来", 1.8)
-			sfx.emit("ult")
+	while h.level < level_cap and h.level - 1 < xp_levels.size() \
+			and h.xp >= float(xp_levels[h.level - 1]):
+		h.level += 1
+		_apply_level_growth(h)
+		if h.level == 2:
+			h.level2_time = clock
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "二级解锁大招！", Color(1, 0.95, 0.6))
+			if h.is_player:
+				banner.emit("大招解锁！按右上的技能键放出来", 1.8)
+				sfx.emit("ult")
+		elif five_v_five:
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "Lv%d 属性提升！" % h.level, Color(1, 0.95, 0.6))
 		level_up.emit(h)
+
+
+func _apply_level_growth(h) -> void:
+	# 属性成长只发生在 5v5；基础值取 def，不受难度增伤烘焙影响。
+	if not five_v_five:
+		return
+	var base_hp := float(h.def.get("hp", 900))
+	var base_dmg := float(h.def.get("dmg", 45))
+	var old_max: float = h.max_hp
+	h.max_hp = base_hp * (1.0 + hp_per_level * float(h.level - 1))
+	h.hp += h.max_hp - old_max
+	h.dmg = base_dmg * (1.0 + dmg_per_level * float(h.level - 1))
+
+
+func skill_power(h) -> float:
+	# 技能强度随等级成长；3v3 冻结为零成长，保持旧手感。
+	if not five_v_five or h == null:
+		return 1.0
+	return 1.0 + skill_per_level * float(h.level - 1)
+
+
+func xp_next(h) -> float:
+	# 下一级累计经验阈值；满级返回最后一级阈值，经验条恒满。
+	if h == null or xp_levels.is_empty():
+		return 0.0
+	return float(xp_levels[clampi(h.level - 1, 0, xp_levels.size() - 1)])
 
 
 func respawn(h) -> void:
 	h.hp = h.max_hp
 	h.pos = base_pos(h.team) + Vector2(150.0 if h.team == BLUE else -150.0, 0.0)
 	h.prev_pos = h.pos
+	h.face_dir = (base_pos(1 - h.team) - h.pos).normalized()
 	h.invuln_t = 1.6
 	h.stun_t = 0.0
 	h.slow_t = 0.0
@@ -2697,9 +2762,10 @@ func cast(h, s: Dictionary, index: int) -> void:
 		h.facing = 1.0 if aim_dir.x >= 0.0 else -1.0
 	if aim_dir.length_squared() < 0.001:
 		aim_dir = Vector2.RIGHT
+	h.face_dir = aim_dir
 
 	var color: Color = s.get("color_c", Color.WHITE)
-	var dmg := float(s.get("dmg", 0.0))
+	var dmg := float(s.get("dmg", 0.0)) * skill_power(h)
 	var radius := float(s.get("radius", 120.0))
 	var style := str(s.get("fx", "burst"))
 	var shot_style := str(s.get("shot_style", style))
@@ -3066,7 +3132,7 @@ func make_zone(pos: Vector2, radius: float, life: float, slow: float, team: int,
 func leap_land(h, dest: Vector2, s: Dictionary) -> void:
 	var color: Color = s.get("color_c", Color.WHITE)
 	var radius := float(s.get("radius", 235.0))
-	area_damage(dest, radius, float(s.get("dmg", 0.0)), h, h.team,
+	area_damage(dest, radius, float(s.get("dmg", 0.0)) * skill_power(h), h, h.team,
 		float(s.get("slow", 0.0)), float(s.get("stun", 0.0)), 26.0)
 	fx.emit("cast_" + str(s.get("fx", "quake")), Vector3(dest.x, 20.0, dest.y), color, radius)
 	fx.emit("ring", Vector3(dest.x, 6.0, dest.y), color, radius)

@@ -429,7 +429,7 @@ func _add_jungle(u) -> void:
 	jungle_nodes[u.uid] = {"root": root, "body": body}
 
 
-func _sync_jungle(u) -> void:
+func _sync_jungle(u, delta: float) -> void:
 	var item = jungle_nodes.get(u.uid)
 	if item == null:
 		_add_jungle(u)
@@ -440,6 +440,7 @@ func _sync_jungle(u) -> void:
 		return
 	var rp: Vector2 = sim.render_pos(u)
 	root.position = Vector3(rp.x, 0, rp.y)
+	_face_yaw(item, u, delta)
 	item["body"].rotation.y = sin(Time.get_ticks_msec() * 0.001 + float(u.uid)) * 0.08
 
 
@@ -455,7 +456,7 @@ func _add_boss(u) -> void:
 	boss_nodes[u.uid] = {"root": root, "body": body, "flight": flight}
 
 
-func _sync_boss(u) -> void:
+func _sync_boss(u, delta: float) -> void:
 	var item = boss_nodes.get(u.uid)
 	if item != null and bool(item.get("flight", false)) != bool(u.boss_flying):
 		(item["root"] as Node3D).queue_free()
@@ -478,8 +479,7 @@ func _sync_boss(u) -> void:
 		# 飞行形态一直悬停，翅膀微微上下起伏；地面形态只在走路时弹跳。
 		hover = sin(Time.get_ticks_msec() * 0.0024) * 4.0
 	root.position = Vector3(rp.x, air + hover + absf(sin(wt * 6.0)) * (5.0 if u.moving else 0.0), rp.y)
-	var yaw := PI * 0.5 - 0.34
-	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
+	_face_yaw(item, u, delta)
 	root.rotation.z = sin(Time.get_ticks_msec() * 0.0024 + 0.8) * 0.035 if u.boss_flying else 0.0
 	var s := 1.0
 	if u.atk_anim > 0.0:
@@ -554,13 +554,13 @@ func _sync_units(delta: float) -> void:
 	for u in sim.units:
 		live[u.uid] = true
 		if u.kind == sim.HERO:
-			_sync_hero(u)
+			_sync_hero(u, delta)
 		elif u.kind == sim.MINION:
-			_sync_minion(u)
+			_sync_minion(u, delta)
 		elif u.kind == sim.BOSS:
-			_sync_boss(u)
+			_sync_boss(u, delta)
 		elif u.kind == sim.JUNGLE:
-			_sync_jungle(u)
+			_sync_jungle(u, delta)
 		elif u.kind == sim.TOWER or u.kind == sim.BASE:
 			var item = structure_nodes.get(u.uid)
 			if item != null:
@@ -617,6 +617,20 @@ func _sync_units(delta: float) -> void:
 		minion_nodes.erase(uid)
 
 	_sync_potions()
+
+
+func _face_yaw(item: Dictionary, u, delta: float) -> void:
+	# 朝向跟随移动/攻击/施法方向（任意角度）；保留水平行走的 20° 露脸偏置，
+	# 纯竖直不偏。3v3 水平移动时与旧版 ±(90°-19.5°) 完全一致。
+	if not item.has("yaw"):
+		var y0 := PI * 0.5 - 0.34
+		item["yaw"] = y0 if u.facing >= 0.0 else -y0
+	var d: Vector2 = u.face_dir
+	if d.length_squared() > 0.0001:
+		d = d.normalized()
+		var yaw_target := atan2(d.x, d.y) - 0.34 * signf(d.x) * (1.0 - absf(d.y))
+		item["yaw"] = lerp_angle(float(item["yaw"]), yaw_target, 1.0 - exp(-12.0 * delta))
+	(item["root"] as Node3D).rotation.y = float(item["yaw"])
 
 
 func _sync_potions() -> void:
@@ -691,7 +705,7 @@ func _make_potion_node() -> Node3D:
 	return root
 
 
-func _sync_hero(u) -> void:
+func _sync_hero(u, delta: float) -> void:
 	var item = hero_nodes.get(u.uid)
 	if item == null:
 		_add_hero(u)
@@ -700,9 +714,7 @@ func _sync_hero(u) -> void:
 	var s: float = item["scale"]
 	var rp: Vector2 = sim.render_pos(u)
 	root.position = Vector3(rp.x, 0, rp.y)
-	# 侧视相机下给 20° 偏航，露出动物脸和涂装。
-	var yaw := PI * 0.5 - 0.34
-	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
+	_face_yaw(item, u, delta)
 	var step := 1.0 / 30.0
 	var wt: float = u.walk_t
 	if u.moving:
@@ -788,7 +800,7 @@ func _sync_hero(u) -> void:
 	tail.rotation.x = sin(phase * 3.1) * 0.12 - swing * 0.10
 
 
-func _sync_minion(u) -> void:
+func _sync_minion(u, delta: float) -> void:
 	var item = minion_nodes.get(u.uid)
 	if item == null:
 		_add_minion(u)
@@ -801,8 +813,7 @@ func _sync_minion(u) -> void:
 	if u.moving:
 		wt -= (1.0 - sim.interp_alpha) * step
 	root.position = Vector3(rp.x, absf(sin(wt * 8.0)) * (5.0 if u.moving else 0.0), rp.y)
-	var yaw := PI * 0.5 - 0.34
-	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
+	_face_yaw(item, u, delta)
 	var sxz := 1.0
 	var sy := 1.0
 	if u.atk_anim > 0.0:

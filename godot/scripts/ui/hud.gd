@@ -22,10 +22,14 @@ var rect_mm: MultiMesh
 var disc_mm: MultiMesh
 var rect_mm_fg: MultiMesh
 var disc_mm_fg: MultiMesh
+# 最上层圆盘：小地图英雄/BOSS/玩家标记，必须在所有批次矩形之后绘制。
+var disc_ui: MultiMesh
 var white_tex: Texture2D
 var disc_tex: Texture2D
 var rect_i := 0
 var disc_i := 0
+var disc_ui_i := 0
+var disc_ui_warned := false
 var front := false
 
 var lbl_plate_name: Label
@@ -223,13 +227,20 @@ func _make_batches() -> void:
 	disc_mm.transform_format = MultiMesh.TRANSFORM_2D
 	disc_mm.use_colors = true
 	disc_mm.mesh = quad
-	disc_mm.instance_count = 128
+	# 小地图要画英雄/BOSS/野怪圆点，给圆盘批次留足余量。
+	disc_mm.instance_count = 192
 
 	disc_mm_fg = MultiMesh.new()
 	disc_mm_fg.transform_format = MultiMesh.TRANSFORM_2D
 	disc_mm_fg.use_colors = true
 	disc_mm_fg.mesh = quad
-	disc_mm_fg.instance_count = 128
+	disc_mm_fg.instance_count = 192
+
+	disc_ui = MultiMesh.new()
+	disc_ui.transform_format = MultiMesh.TRANSFORM_2D
+	disc_ui.use_colors = true
+	disc_ui.mesh = quad
+	disc_ui.instance_count = 128
 
 
 func _make_disc_texture(size: int) -> ImageTexture:
@@ -270,6 +281,28 @@ func _add_box(r: Rect2, c: Color, t: float) -> void:
 	_add_rect(Rect2(r.end.x - t, r.position.y, t, r.size.y), c)
 
 
+func _add_rot_rect(center: Vector2, size: Vector2, angle: float, c: Color) -> void:
+	if size.x <= 0.0 or size.y <= 0.0:
+		return
+	var mm := rect_mm_fg if front else rect_mm
+	if rect_i >= mm.instance_count:
+		return
+	mm.set_instance_transform_2d(rect_i, Transform2D(angle, size, 0.0, center))
+	mm.set_instance_color(rect_i, c)
+	rect_i += 1
+
+
+func _add_seg(a: Vector2, b: Vector2, width: float, c: Color) -> void:
+	# 批次版折线：每段一个旋转矩形，两端各延长半个线宽，拐角不留缝。
+	var d := b - a
+	var l := d.length()
+	if l < 0.5 or width <= 0.0:
+		return
+	var dir := d / l
+	var mid := (a + b) * 0.5
+	_add_rot_rect(mid, Vector2(l + width, width), atan2(dir.y, dir.x), c)
+
+
 func _add_disc(center: Vector2, radius: float, c: Color) -> void:
 	var mm := disc_mm_fg if front else disc_mm
 	if disc_i >= mm.instance_count:
@@ -277,6 +310,18 @@ func _add_disc(center: Vector2, radius: float, c: Color) -> void:
 	mm.set_instance_transform_2d(disc_i, Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
 	mm.set_instance_color(disc_i, c)
 	disc_i += 1
+
+
+func _add_ui_disc(center: Vector2, radius: float, c: Color) -> void:
+	# 最上层圆盘：在所有批次矩形之后统一绘制，用于小地图标记。
+	if disc_ui_i >= disc_ui.instance_count:
+		if not disc_ui_warned:
+			disc_ui_warned = true
+			print("[HUD] minimap disc overlay overflow")
+		return
+	disc_ui.set_instance_transform_2d(disc_ui_i, Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
+	disc_ui.set_instance_color(disc_ui_i, c)
+	disc_ui_i += 1
 
 
 func _flush_batches() -> void:
@@ -606,11 +651,25 @@ func _time_text(t: float) -> String:
 	return "%d:%02d" % [floori(t / 60.0), floori(fmod(t, 60.0))]
 
 
+func _xp_progress(p) -> float:
+	# 级内经验进度：当前级阈值 → 下一级阈值；满级恒满。3v3 等价于旧的 2 级封顶。
+	if sim == null or p == null or sim.xp_levels.is_empty():
+		return 1.0
+	if p.level >= sim.level_cap:
+		return 1.0
+	var next: float = sim.xp_next(p)
+	var prev := 0.0
+	if p.level >= 2:
+		prev = float(sim.xp_levels[clampi(p.level - 2, 0, sim.xp_levels.size() - 1)])
+	return clampf((p.xp - prev) / maxf(0.01, next - prev), 0.0, 1.0)
+
+
 # ---- 绘制 ----
 
 func _draw() -> void:
 	if sim == null:
 		return
+	disc_ui_i = 0
 	var safe := _safe()
 	_begin_batch()
 	if sim.over:
@@ -631,15 +690,19 @@ func _draw() -> void:
 		_begin_batch(true)
 		_draw_battle_fg(safe)
 		_flush_batches()
+		# 小地图圆点标记最后画，保证压在底色与兵线之上。
+		disc_ui.visible_instance_count = disc_ui_i
+		draw_multimesh(disc_ui, disc_tex)
 
 
 func _draw_battle_bg(safe: Rect2) -> void:
 	var h := safe.size.y
+	# 世界血条先画，后面的所有 HUD 面板都压在它上面（血条不能盖住小地图）。
+	_draw_world_bars(safe, h)
 	_draw_player_plate_bg(safe, h)
 	_draw_score_bg(safe, h)
 	_draw_minimap(safe, h)
 	_draw_pause_button(safe, h)
-	_draw_world_bars(safe, h)
 	_draw_skill_bg(safe, h)
 	_draw_joystick(safe, h)
 	# 播报底框：独立一层，避免文字直接压在战场上，也把播报和比分/倒计时分开。
@@ -737,7 +800,7 @@ func _draw_player_plate_bg(safe: Rect2, h: float) -> void:
 
 	var xp_bar := Rect2(text_x, hp_bar.end.y + 5.0, name_w, plate.size.y * 0.075)
 	_add_rect(xp_bar, Color(0.09, 0.12, 0.10, 0.95))
-	var xp_k := 1.0 if p.level >= 2 else clampf(p.xp / sim.xp_to_level2, 0.0, 1.0)
+	var xp_k := _xp_progress(p)
 	_add_rect(Rect2(xp_bar.position, Vector2(xp_bar.size.x * xp_k, xp_bar.size.y)), GOLD)
 
 	var chip := _ult_chip_rect(plate)
@@ -832,53 +895,84 @@ func _draw_score_fg(safe: Rect2, h: float) -> void:
 
 
 func _draw_minimap(safe: Rect2, h: float) -> void:
-	var mini := Rect2(safe.end.x - safe.size.x * 0.205 - 12.0, safe.position.y + 12.0,
+	var box := Rect2(safe.end.x - safe.size.x * 0.205 - 12.0, safe.position.y + 12.0,
 		safe.size.x * 0.205, h * 0.175)
-	_panel(mini, Color("3f6b32"))
-	var inner := Rect2(mini.position + Vector2(4, 4), mini.size - Vector2(8, 8))
+	# 内区按地图真实宽高比适配：5v5 正方形、3v3 1.875:1，杜绝横向拉伸。
+	var k := minf(box.size.x / sim.map_w, box.size.y / sim.map_h)
+	var inner_size := Vector2(sim.map_w * k, sim.map_h * k)
+	var inner := Rect2(box.get_center() - inner_size * 0.5, inner_size)
+	var us := inner.size.y / 180.0
+	_panel(Rect2(inner.position - Vector2(4, 4), inner.size + Vector2(8, 8)), Color("3f6b32"))
 	_add_rect(inner, Color("4f8a3f"))
-	# 3v3 一条中路，5v5 三条对角兵线；河道用浅蓝折线。
+	# 3v3 一条中路，5v5 三条对角兵线；河道用浅蓝折线（批次线段，避免被批次覆盖）。
 	var mini_paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
 	if sim.five_v_five and sim.river.size() >= 2:
-		var river_pts := PackedVector2Array()
-		for p in sim.river:
-			river_pts.append(Vector2(inner.position.x + p.x / sim.map_w * inner.size.x,
-				inner.position.y + p.y / sim.map_h * inner.size.y))
-		draw_polyline(river_pts, Color("7fc4e8"), maxf(2.0, inner.size.y * 0.022), true)
+		var rw := maxf(2.0, inner.size.y * 0.022)
+		for i in range(sim.river.size() - 1):
+			_add_seg(_mini_pos(inner, sim.river[i]), _mini_pos(inner, sim.river[i + 1]), rw, Color("7fc4e8"))
+	var lw := maxf(2.0, inner.size.y * 0.030)
 	for path in mini_paths:
 		if path.size() < 2:
 			continue
-		var pts := PackedVector2Array()
-		for p in path:
-			pts.append(Vector2(inner.position.x + p.x / sim.map_w * inner.size.x,
-				inner.position.y + p.y / sim.map_h * inner.size.y))
-		draw_polyline(pts, Color("b09464"), maxf(2.0, inner.size.y * 0.030), true)
-	for u in sim.units:
-		if not u.is_alive() or u.kind == sim.MINION:
-			continue
-		var rp: Vector2 = sim.render_pos(u)
-		var px: float = inner.position.x + rp.x / sim.map_w * inner.size.x
-		var py: float = inner.position.y + rp.y / sim.map_h * inner.size.y
-		var c := BLUE if u.team == sim.BLUE else Color("f07a63")
-		if u.kind == sim.JUNGLE:
-			c = Color("e2c46a")
-		var s := 7.0 if u.kind == sim.BASE else (9.0 if u.kind == sim.BOSS else (4.0 if u.kind == sim.JUNGLE else 5.0))
-		_add_rect(Rect2(px - s * 0.5, py - s * 0.5, s, s), PANEL_DARK)
-		_add_rect(Rect2(px - s * 0.5 + 1, py - s * 0.5 + 1, s - 2, s - 2), c)
-	# 回血药剂：小地图上的绿色十字点。
+		for i in range(path.size() - 1):
+			_add_seg(_mini_pos(inner, path[i]), _mini_pos(inner, path[i + 1]), lw, Color("b09464"))
+
+	# ---- 标识分级（模仿王者荣耀式小地图的通用语言；批次内后加在上）----
+	var enemy_c := Color("f07a63")
+	# 野怪：小黄点，弱存在感。
+	for un in sim.units:
+		if un.is_alive() and un.kind == sim.JUNGLE:
+			_add_ui_disc(_mini_pos(inner, sim.render_pos(un)), 2.4 * us, Color("e2c46a"))
+	# 药剂：绿色十字。
 	for pt in sim.potions:
 		if not pt.active:
 			continue
-		var ppx: float = inner.position.x + pt.pos.x / sim.map_w * inner.size.x
-		var ppy: float = inner.position.y + pt.pos.y / sim.map_h * inner.size.y
-		_add_rect(Rect2(ppx - 4, ppy - 4, 8, 8), PANEL_DARK)
-		_add_rect(Rect2(ppx - 3, ppy - 1, 6, 2), Color(0.55, 1.0, 0.65))
-		_add_rect(Rect2(ppx - 1, ppy - 3, 2, 6), Color(0.55, 1.0, 0.65))
-	if sim.player != null:
-		var prp: Vector2 = sim.render_pos(sim.player)
-		var pp := Vector2(inner.position.x + prp.x / sim.map_w * inner.size.x,
-			inner.position.y + prp.y / sim.map_h * inner.size.y)
-		_add_box(Rect2(pp - Vector2(4, 4), Vector2(8, 8)), CREAM, 2.0)
+		var mp := _mini_pos(inner, pt.pos)
+		_add_rect(Rect2(mp.x - 4.0 * us, mp.y - 4.0 * us, 8.0 * us, 8.0 * us), PANEL_DARK)
+		_add_rect(Rect2(mp.x - 3.0 * us, mp.y - 1.0 * us, 6.0 * us, 2.0 * us), Color(0.55, 1.0, 0.65))
+		_add_rect(Rect2(mp.x - 1.0 * us, mp.y - 3.0 * us, 2.0 * us, 6.0 * us), Color(0.55, 1.0, 0.65))
+	# 塔：菱形；水晶：大方块，与英雄圆点形状区分。
+	for un in sim.units:
+		if not un.is_alive():
+			continue
+		var tc := BLUE if un.team == sim.BLUE else enemy_c
+		if un.kind == sim.TOWER:
+			_add_rot_rect(_mini_pos(inner, un.pos), Vector2(5.0 * us, 5.0 * us), PI * 0.25, tc)
+		elif un.kind == sim.BASE:
+			var mp := _mini_pos(inner, un.pos)
+			var s2 := 5.0 * us
+			_add_rect(Rect2(mp.x - s2 - us, mp.y - s2 - us, (s2 + us) * 2.0, (s2 + us) * 2.0), PANEL_DARK)
+			_add_rect(Rect2(mp.x - s2, mp.y - s2, s2 * 2.0, s2 * 2.0), tc)
+	# 英雄：队伍色圆点 + 深色描边（敌红我蓝，一眼可辨）。
+	for hh in sim.heroes:
+		if not hh.is_alive():
+			continue
+		var mp := _mini_pos(inner, sim.render_pos(hh))
+		_add_ui_disc(mp, 5.5 * us + 1.5 * us, PANEL_DARK)
+		_add_ui_disc(mp, 5.5 * us, BLUE if hh.team == sim.BLUE else enemy_c)
+	# BOSS：最大标记 + 金色双环 + 呼吸缩放，全场最醒目。
+	if sim.boss != null and sim.boss.is_alive():
+		var mp := _mini_pos(inner, sim.render_pos(sim.boss))
+		var pulse := 1.0 + sin(Time.get_ticks_msec() * 0.003) * 0.08
+		_add_ui_disc(mp, 12.0 * us * pulse, Color("ffd76a"))
+		_add_ui_disc(mp, 11.0 * us * pulse, PANEL_DARK)
+		_add_ui_disc(mp, 10.0 * us * pulse, Color("ffd76a"))
+		_add_ui_disc(mp, 8.0 * us * pulse, BLUE if sim.boss.team == sim.BLUE else enemy_c)
+	# 玩家：英雄点之上叠金色环 + 朝向小三角（针形），永远最上层。
+	if sim.player != null and sim.player.is_alive():
+		var mp := _mini_pos(inner, sim.render_pos(sim.player))
+		_add_ui_disc(mp, 8.0 * us, PANEL_DARK)
+		_add_ui_disc(mp, 7.0 * us, Color("ffd76a"))
+		_add_ui_disc(mp, 5.5 * us, BLUE if sim.player.team == sim.BLUE else enemy_c)
+		var fd: Vector2 = sim.player.face_dir
+		if fd.length_squared() > 0.0001:
+			fd = fd.normalized()
+			_add_seg(mp + fd * 7.0 * us, mp + fd * 13.5 * us, maxf(1.5, 2.4 * us), Color(1.0, 0.98, 0.88))
+
+
+func _mini_pos(inner: Rect2, p: Vector2) -> Vector2:
+	return Vector2(inner.position.x + p.x / sim.map_w * inner.size.x,
+		inner.position.y + p.y / sim.map_h * inner.size.y)
 
 
 func _draw_pause_button(safe: Rect2, h: float) -> void:
