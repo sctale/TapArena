@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 45），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 46），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
