@@ -8,12 +8,12 @@
 
 | 版本 | 位置 | 状态 |
 | --- | --- | --- |
-| **Godot 版（4.11.0-dev.1，唯一主线）** | `godot/` | Godot 4.7.2：粉彩方块像素风 + 15 位人形动物英雄 + 3v3/5v5 双模式 + 对角三路与河道野区 + 5v5 五级成长/8 分钟对局 + 全角度朝向 + 王者荣耀式小地图 + 32px 选人详情弹窗 + 纯逻辑 BattleSim + 60Hz 模拟 + 平滑位移 + 像素 HUD + 建筑遮挡抖动挖空 + 回血药剂 + 峡谷巨兽（地面/飞行两形态）+ 智能兵线/集火/塔下等兵 AI + 10 种差异化技能机制 + 全员结算 + 固定俯角/高度相机，1920×1080 UI 基准，出 Android APK |
+| **Godot 版（4.11.0-dev.2，唯一主线）** | `godot/` | Godot 4.7.2：粉彩方块像素风 + 15 位人形动物英雄 + 3v3/5v5 双模式 + 对角三路与河道野区 + 5v5 五级成长/8 分钟对局 + 全角度朝向 + 王者荣耀式小地图 + 实心不透明角色渲染 + 32px 选人详情弹窗 + 纯逻辑 BattleSim + 60Hz 模拟 + 平滑位移 + 像素 HUD + 建筑遮挡抖动挖空 + 回血药剂 + 峡谷巨兽（地面/飞行两形态）+ 智能兵线/集火/塔下等兵 AI + 10 种差异化技能机制 + 全员结算 + 固定俯角/高度相机，1920×1080 UI 基准，出 Android APK |
 | Web 版（1.3，冻结） | `www/`、`android/` | 历史存档，封存在 git 标签 `web-v1.3.0` |
 
 备份：`D:/V-Coding/TapArena-web-v1.3.0-backup.zip`（含全部源码与素材，2.6MB）。
 
-## Godot 版（4.11.0-dev.1，唯一主线）
+## Godot 版（4.11.0-dev.2，唯一主线）
 
 Godot 4.7.2 工程在 `godot/`。这一版把美术整体重做成**粉彩方块像素风**：16×16 像素图集、体素盒子模型、像素数字与像素图标；10 位英雄为**人形动物**，用耳朵、尾巴、面部涂装、围巾/背心/靴子体现动物特色。4.6.2 按 `reference/` 概念图把灰石换成暖奶油石，草地/树冠提亮，天空改为青蓝→近白渐变，蓝方青蓝、红方珊瑚橙，体素侧面不再死黑。4.7.0 给峡谷巨兽加了裂地重击、巨兽咆哮、野蛮冲撞，并让双方 AI 每次决策重新评估兵线、残血英雄和塔下安全。4.8.0 新增美西螈与小鹿，选人页改为 10 人 5×2 卡片并弹出人物/技能详情，头像升级为 32×32 半身像，冲刺/后跃/跳跃改为连续路径。首页选人、难度选择、程序合成音效、英雄肢体动画与水晶破碎演出已接入。
 
@@ -89,7 +89,7 @@ godot --path godot
 powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1
 ```
 
-产物：`TapArena-v4.11.0-dev.1.apk`（27,503,790 字节，versionCode 49，arm64-v8a，签名 `CN=TapArena`，SHA-256 `1163F417BC662468C90CEEAA1E50EC404A20710F0747FA79F8E1A9D14F5A98D6`，与历史版本同一把 release keystore，可覆盖升级）。
+产物：`TapArena-v4.11.0-dev.2.apk`（27,503,790 字节，versionCode 50，arm64-v8a，签名 `CN=TapArena`，SHA-256 `C0FBE2A9AF85BC802CD633D55E7A81A197F7CE56CD24FDE49B785866A3AD77C6`，与历史版本同一把 release keystore，可覆盖升级）。
 
 调试参数（写在 `--` 之后）：`--skip-home` 跳过首页、`--mode=5v5` 进入三路 5v5、`--hero=frog` 指定英雄、`--auto-run` 自动向右推进（录制用）、`--walk=up-right` 按固定方向走（四向/斜向拍图）、`--dash` 配合 `--auto-run` 在移动中反复放 1 技能检查位移手感、`--boss-fly` 直接看飞行巨兽、`--top` 全图俯瞰、`--look-base` 看蓝方基地、`--look-red` 看红方基地、`--look-lane` 看兵线、`--look-tower` 看红方外塔、`--ruins` 拆掉双方外塔看废墟、`--boss` 直接触发峡谷巨兽（3v3 3:00 / 5v5 5:00）、`--lv=3` 直接进指定等级、`--victory` 直接摧毁红方水晶看胜利演出、`--victory-minion` 用小兵最后一击验证结束动画、`--behind` 检查建筑半透明、`--ult` 检查大招冷却、`--fx` 把当前英雄大招定在屏幕中心播放、`--no-hud` 隐藏 HUD、`--pause` 直接打开暂停、`--result` 直接看结算、`--detail` 直接打开选人详情弹窗。
 
@@ -155,10 +155,12 @@ Godot 版的方块模型、像素图集、图标与应用图标均为本项目�
 
 ## 安卓版（Godot 主线）
 
-安装 `TapArena-v4.11.0-dev.1.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 4.11.0-dev.1（versionCode 49），最低 Android 7.0（API 24），targetSdk 36。
+- **实心渲染（4.11.0-dev.2）**：体素着色器不再写 ALPHA，英雄/小兵/野怪/巨兽全部走不透明队列——从背后不再透看到正脸，身体各部件也不再互相透叠；建筑遮挡仍保留抖动裁剪。
+
+安装 `TapArena-v4.11.0-dev.2.apk` 即可，首次启动不需要任何权限。应用包名 `com.sctale.taparena`，版本 4.11.0-dev.2（versionCode 50），最低 Android 7.0（API 24），targetSdk 36。
 
 - 签名：`CN=TapArena, OU=Games, O=sctale, C=CN`（与历史版本同一把 release keystore，可直接覆盖安装）
-- SHA-256：`1163F417BC662468C90CEEAA1E50EC404A20710F0747FA79F8E1A9D14F5A98D6`
+- SHA-256：`C0FBE2A9AF85BC802CD633D55E7A81A197F7CE56CD24FDE49B785866A3AD77C6`
 - 体积：27,503,790 字节（26.2MiB）
 
 - 横屏锁定；支持刘海屏；全屏沉浸式。

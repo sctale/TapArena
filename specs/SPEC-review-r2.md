@@ -41,3 +41,14 @@
 | V2-3 | 桌面性能 | 5v5 自动推进 15s：稳态 FPS ≥58、`[VIEW] sync_ms` ≤2.0 |
 | V2-4 | 清理 | `git status` 无临时探针；`godot/shots` 不存在；未跟踪文件只剩交付截图与规格文档 |
 | V2-5 | 回归 | 构建脚本内置 `SIM_OK`/`RULE_OK`/`FLOW_OK` 全绿；最终 APK 重新核验 code/证书/SHA |
+
+## 4. 用户实机反馈追加（4.11.0-dev.2）
+
+- **现象**：人物整体有点半透明，斜着走时感觉正脸透到了后脑勺。
+- **根因**：`shaders/voxel.gdshader` 在 fragment 里写 `ALPHA = 1.0`。Godot 只要写 ALPHA 就把材质归入透明队列：
+  不写深度、双面渲染（`cull_disabled`）、按物体排序。于是从背面能透看到正面的眼睛/嘴，身体/头部/四肢
+  多个 MeshInstance 之间也会互相透叠，整只看起来发虚。
+- **修改**：移除 `ALPHA` 写入与 `depth_draw_opaque`，改为纯不透明着色器。需要半透明的地方各自保留：
+  建筑遮挡 `voxel_fade.gdshader`、药瓶/技能圈/水面 `_alpha_material`、弹体与特效材质。
+- **验收**：桌面实拍向正上（背视）头部深色像素占比 1.3%，向正下（正视）12.3%——背后不再看到脸；
+  截图 `shots/opaque-up.png` / `shots/opaque-down.png`。构建门禁全绿 + Android 覆盖安装复测。
