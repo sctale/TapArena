@@ -67,6 +67,7 @@ class Unit:
 
 	var atk_anim: float = 0.0
 	var cast_anim: float = 0.0
+	var cast_total: float = 0.5
 	var hurt_anim: float = 0.0
 	var die_t: float = 0.0
 	var respawn_t: float = 0.0
@@ -1319,16 +1320,32 @@ func ally_engaged(h, foe) -> bool:
 	return false
 
 
+func count_units_at(pos: Vector2, team: int, radius: float) -> int:
+	var n := 0
+	for u in units:
+		if not u.is_alive() or u.team != team:
+			continue
+		if u.kind != HERO and u.kind != MINION:
+			continue
+		if pos.distance_to(u.pos) <= radius + u.radius:
+			n += 1
+	return n
+
+
 func tower_safe_for(h, t) -> bool:
-	# 近战没兵不要越塔；远程能站在塔射程外，允许直接点塔。
+	# 没有敌方英雄/小兵守塔时，近战也直接拆，不能站在塔前空等兵线；
+	# 有守军时再看己方兵线和血量。
 	if t == null or not t.is_alive():
 		return true
 	if h.attack_range > t.attack_range + 30.0:
 		return true
-	if h.hp / maxf(h.max_hp, 1.0) < 0.55:
-		return false
+	var defenders := count_units_at(t.pos, t.team, t.attack_range + 90.0)
+	if defenders == 0:
+		return true
 	if t.hp / maxf(t.max_hp, 1.0) < 0.15:
 		return true
+	if h.hp / maxf(h.max_hp, 1.0) < 0.55:
+		return false
 	for m in minions:
 		if m.is_alive() and m.team == h.team \
 				and m.pos.distance_to(t.pos) <= t.attack_range + 100.0:
@@ -1816,7 +1833,9 @@ func try_cast(h, index: int) -> void:
 	if h.cds[index] > 0.0:
 		return
 	h.cds[index] = float(s.get("cd", 6.0))
-	h.cast_anim = 0.5
+	# 小技能收招更快：技能 1/2 的施法姿势 0.34 秒，大招保留 0.5 秒。
+	h.cast_total = 0.34 if index < 2 else 0.5
+	h.cast_anim = h.cast_total
 	sfx.emit(("ult_" if index == 2 else "cast_") + h.hero_id)
 	if h.is_player and index == 2:
 		fx.emit("punch", Vector3(h.pos.x, 40.0, h.pos.y), Color.WHITE, 0.0)

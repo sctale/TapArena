@@ -28,6 +28,7 @@ var sprout_items: Array = []
 var shot_mats: Dictionary = {}
 var shot_meshes: Dictionary = {}
 var alpha_mats: Dictionary = {}
+var fx_mesh_cache: Dictionary = {}
 var model_cache: Dictionary = {}
 var mesh_mats: Dictionary = {}
 var fade_mats: Dictionary = {}
@@ -613,7 +614,7 @@ func _sync_hero(u) -> void:
 			arm_l_x = 0.35 * punch
 
 	if u.cast_anim > 0.0:
-		var ck: float = 1.0 - u.cast_anim / 0.5
+		var ck: float = 1.0 - u.cast_anim / maxf(0.01, u.cast_total)
 		var raise := sin(ck * PI)
 		arm_l_x = -2.35 * raise
 		arm_r_x = -2.35 * raise
@@ -845,11 +846,18 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 
 func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void:
 	var node := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = radius * 0.90
-	torus.outer_radius = radius
-	torus.rings = 32
-	torus.ring_segments = 6
+	var rkey := "fx_ring_%d" % int(round(radius))
+	var torus: Mesh
+	if fx_mesh_cache.has(rkey):
+		torus = fx_mesh_cache[rkey]
+	else:
+		var tm := TorusMesh.new()
+		tm.inner_radius = radius * 0.90
+		tm.outer_radius = radius
+		tm.rings = 32
+		tm.ring_segments = 6
+		fx_mesh_cache[rkey] = tm
+		torus = tm
 	node.mesh = torus
 	node.position = Vector3(pos.x, 1.6, pos.z)
 	node.material_override = _alpha_material(Color(color.r, color.g, color.b, 0.85))
@@ -860,8 +868,14 @@ func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void
 
 func _spawn_burst(pos: Vector3, color: Color, life: float) -> void:
 	var node := MeshInstance3D.new()
-	var cube := BoxMesh.new()
-	cube.size = Vector3(20, 20, 20)
+	var cube: Mesh
+	if fx_mesh_cache.has("fx_burst"):
+		cube = fx_mesh_cache["fx_burst"]
+	else:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(20, 20, 20)
+		fx_mesh_cache["fx_burst"] = bm
+		cube = bm
 	node.mesh = cube
 	node.position = Vector3(pos.x, maxf(pos.y, 10.0), pos.z)
 	node.material_override = _alpha_material(Color(color.r, color.g, color.b, 0.92))
@@ -872,8 +886,14 @@ func _spawn_burst(pos: Vector3, color: Color, life: float) -> void:
 
 func _spawn_slash(pos: Vector3, color: Color) -> void:
 	var node := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(96, 8, 18)
+	var box: Mesh
+	if fx_mesh_cache.has("fx_slash"):
+		box = fx_mesh_cache["fx_slash"]
+	else:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(96, 8, 18)
+		fx_mesh_cache["fx_slash"] = bm
+		box = bm
 	node.mesh = box
 	node.position = Vector3(pos.x, 34.0, pos.z)
 	node.rotation_degrees = Vector3(0, 0, 22)
@@ -884,11 +904,23 @@ func _spawn_slash(pos: Vector3, color: Color) -> void:
 
 
 func _fx_mat(c: Color, a := 0.9) -> StandardMaterial3D:
+	var key := "fx_" + c.to_html() + "_" + str(a)
+	if alpha_mats.has(key):
+		return alpha_mats[key]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(c.r, c.g, c.b, a)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	alpha_mats[key] = m
+	return m
+
+
+func _fx_mesh(key: String, factory: Callable) -> Mesh:
+	if fx_mesh_cache.has(key):
+		return fx_mesh_cache[key]
+	var m: Mesh = factory.call()
+	fx_mesh_cache[key] = m
 	return m
 
 
@@ -964,8 +996,14 @@ func _spawn_slashes(pos: Vector3, color: Color, count: int, radius: float) -> vo
 
 func _spawn_stars(pos: Vector3, color: Color, count: int, radius: float) -> void:
 	var mat := _fx_mat(color, 0.95)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(15, 15, 4)
+	var mesh: Mesh
+	if fx_mesh_cache.has("fx_star"):
+		mesh = fx_mesh_cache["fx_star"]
+	else:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(15, 15, 4)
+		fx_mesh_cache["fx_star"] = bm
+		mesh = bm
 	for i in range(count):
 		var ang := TAU * float(i) / float(count)
 		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (18.0 + radius * 0.18)
@@ -976,8 +1014,14 @@ func _spawn_stars(pos: Vector3, color: Color, count: int, radius: float) -> void
 
 func _spawn_leaves(pos: Vector3, color: Color, radius: float) -> void:
 	var mat := _fx_mat(color, 0.90)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(11, 3, 19)
+	var mesh: Mesh
+	if fx_mesh_cache.has("fx_leaf"):
+		mesh = fx_mesh_cache["fx_leaf"]
+	else:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(11, 3, 19)
+		fx_mesh_cache["fx_leaf"] = bm
+		mesh = bm
 	for i in range(7):
 		var ang := TAU * float(i) / 7.0
 		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.45)
@@ -1339,11 +1383,17 @@ func _spawn_moon(pos: Vector3, color: Color, radius: float) -> void:
 
 func _spawn_bubbles(pos: Vector3, color: Color, radius: float) -> void:
 	var mat := _fx_mat(color, 0.50)
-	var sphere := SphereMesh.new()
-	sphere.radius = 10.0
-	sphere.height = 20.0
-	sphere.radial_segments = 10
-	sphere.rings = 5
+	var sphere: Mesh
+	if fx_mesh_cache.has("fx_bubble"):
+		sphere = fx_mesh_cache["fx_bubble"]
+	else:
+		var sm := SphereMesh.new()
+		sm.radius = 10.0
+		sm.height = 20.0
+		sm.radial_segments = 10
+		sm.rings = 5
+		fx_mesh_cache["fx_bubble"] = sm
+		sphere = sm
 	for i in range(7):
 		var ang := TAU * float(i) / 7.0
 		var at := pos + Vector3(cos(ang), 0, sin(ang)) * (radius * 0.18 + float(i % 3) * 18.0)
