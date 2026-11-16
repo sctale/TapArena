@@ -33,7 +33,7 @@ func _ready() -> void:
 		add_child(p)
 		_players.append(p)
 	_bgm = AudioStreamPlayer.new()
-	_bgm.volume_db = -19.0
+	_bgm.volume_db = -8.0
 	add_child(_bgm)
 	_build()
 	_bgm.stream = _make_bgm()
@@ -59,7 +59,7 @@ func play(key: String, volume_db := 0.0) -> void:
 
 func set_enabled(on: bool) -> void:
 	enabled = on
-	_bgm.volume_db = -19.0 if on else -80.0
+	_bgm.volume_db = -8.0 if on else -80.0
 	if on and not _bgm.playing:
 		_bgm.play()
 
@@ -237,40 +237,77 @@ func _make_shoot_variant(id: String) -> AudioStreamWAV:
 	return _wav(b)
 
 
+func _bell(buf: PackedFloat32Array, start: float, dur: float, freq: float,
+		vol: float, rate := RATE) -> void:
+	# 柔和钟琴/木琴音色：基音 + 少量二三次谐波，快速起音、自然衰减。
+	var i0 := int(start * float(rate))
+	var n := maxi(1, int(dur * float(rate)))
+	var phase := 0.0
+	for k in range(n):
+		var i := i0 + k
+		if i < 0 or i >= buf.size():
+			continue
+		var t := float(k) / float(n)
+		phase += TAU * freq / float(rate)
+		var s := sin(phase) + 0.24 * sin(phase * 2.0) + 0.10 * sin(phase * 3.0)
+		var env := minf(1.0, t * 24.0) * exp(-4.6 * t)
+		buf[i] += s * vol * env
+
+
 func _make_bgm() -> AudioStreamWAV:
-	# 原创 4 小节循环：C - G - Am - F，芯片音色 + 轻量鼓点。
-	# BGM 用 11kHz 合成，缩短启动耗时，芯片音色听感几乎无差别。
-	var br := 11025
-	var bpm := 112.0
+	# 儿童向的明亮 8 小节循环：C - F - G - C，钟琴主旋律 + 温柔低音和轻拍手。
+	# 100 BPM、C 大调、无小调；音量留出余量，避免连续播放刺耳。
+	var br := 16000
+	var bpm := 100.0
 	var beat := 60.0 / bpm
-	var bars := 4
+	var bars := 8
 	var total := beat * 4.0 * float(bars)
 	var buf := _buf(total, br)
+
 	var chords := [
-		[261.63, 329.63, 392.0],
-		[196.0, 246.94, 293.66],
-		[220.0, 261.63, 329.63],
-		[174.61, 220.0, 261.63],
+		[261.63, 329.63, 392.0], [349.23, 440.0, 523.25],
+		[392.0, 493.88, 587.33], [261.63, 329.63, 392.0],
+		[261.63, 329.63, 392.0], [349.23, 440.0, 523.25],
+		[392.0, 493.88, 587.33], [261.63, 329.63, 392.0],
 	]
+	var roots := [261.63, 349.23, 392.0, 261.63, 261.63, 349.23, 392.0, 261.63]
+	# 八个八分音符一栏；0 表示休止，旋律尽量级进、可跟唱。
 	var melody := [
-		523.25, 659.25, 783.99, 659.25, 587.33, 659.25, 523.25, 440.0,
-		523.25, 587.33, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33,
-		659.25, 587.33, 523.25, 440.0, 392.0, 440.0, 523.25, 587.33,
-		659.25, 783.99, 880.0, 1046.5, 880.0, 783.99, 659.25, 523.25,
+		[659.25, 783.99, 880.0, 783.99, 659.25, 587.33, 523.25, 0.0],
+		[698.46, 880.0, 1046.5, 880.0, 783.99, 698.46, 659.25, 0.0],
+		[587.33, 783.99, 987.77, 783.99, 880.0, 783.99, 698.46, 587.33],
+		[523.25, 659.25, 783.99, 1046.5, 987.77, 783.99, 659.25, 0.0],
+		[783.99, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33, 523.25],
+		[880.0, 1046.5, 880.0, 783.99, 698.46, 783.99, 880.0, 0.0],
+		[987.77, 1174.66, 987.77, 783.99, 880.0, 987.77, 783.99, 587.33],
+		[1046.5, 783.99, 659.25, 783.99, 659.25, 587.33, 523.25, 0.0],
 	]
+
 	for bar in range(bars):
+		var at := float(bar) * 4.0 * beat
 		var ch: Array = chords[bar]
 		for b in range(4):
-			var at := (float(bar) * 4.0 + float(b)) * beat
-			_tone(buf, at, beat * 0.88, ch[0] * 0.5, ch[0] * 0.5, 0.15, "square", br)
+			var bt := at + float(b) * beat
+			# 低音：每小节第 1、3 拍，三角波，温暖不轰头。
 			if b % 2 == 0:
+				_tone(buf, bt, beat * 0.86, roots[bar] * 0.5, roots[bar] * 0.5, 0.168, "triangle", br)
+			# 和弦垫：轻三角波，长音铺底。
+			if b == 0:
 				for tone in ch:
-					_tone(buf, at, beat * 1.85, tone, tone, 0.042, "triangle", br)
-				_noise(buf, at, 0.05, 0.05, 3.0, br)
-			_noise(buf, at + beat * 0.5, 0.03, 0.035, 4.0, br)
-			for e in range(2):
-				var idx := bar * 8 + b * 2 + e
-				if idx < melody.size():
-					var f: float = melody[idx]
-					_tone(buf, at + float(e) * beat * 0.5, beat * 0.44, f, f, 0.075, "square", br)
+					_tone(buf, bt, beat * 3.6, tone, tone, 0.029, "sine", br)
+			# 轻拍手：2、4 拍，很轻的噪声短点。
+			if b == 1 or b == 3:
+				_noise(buf, bt, 0.028, 0.042, 4.5, br)
+			# 木鱼/木块：给小朋友一个清楚的拍点。
+			_tone(buf, bt, 0.035, 920.0, 660.0, 0.035, "sine", br)
+
+		for step in range(8):
+			var f: float = melody[bar][step]
+			if f <= 0.0:
+				continue
+			_bell(buf, at + float(step) * beat * 0.5, beat * 0.58, f, 0.125, br)
+
+		# 每小节开头轻轻起一下，循环衔接更自然。
+		_tone(buf, at, 0.07, 120.0, 72.0, 0.048, "sine", br)
+
 	return _wav(buf, true, br)
