@@ -35,6 +35,8 @@ func tex(name: String) -> ImageTexture:
 		return _cache[name]
 	if name.begins_with("hero_"):
 		push_warning("缺少英雄头像：" + name)
+	if name == "skill_backstep":
+		return tex("skill_dash")
 	if name.begins_with("skill_"):
 		return tex("skill_aoe")
 	return tex("ui_star")
@@ -132,6 +134,26 @@ func hero_portrait(hero_id: String, fur: Color, cream: Color, dark: Color, accen
 			_add(ops, _poly_mask([Vector2(6.5, 8), Vector2(9.5, 8), Vector2(8, 11)]), accent)
 			_add(ops, _rect_mask(4, 12, 8, 4), cream)
 			_add(ops, _diamond_mask(8, 14, 2), accent)
+		"axolotl":
+			for k in range(3):
+				var gy := 5 + k * 2
+				_add(ops, _rect_mask(2, gy, 2, 1), _lighter_col(fur, 0.04 + k * 0.02))
+				_add(ops, _rect_mask(12, gy, 2, 1), _lighter_col(fur, 0.04 + k * 0.02))
+			_add(ops, _rect_mask(5, 9, 6, 3), cream)
+			_add(ops, _rect_mask(7, 9, 2, 2), dark)
+			_add(ops, _rect_mask(2, 12, 12, 4), accent)
+		"deer":
+			for sx in [-1, 1]:
+				var x0 := 4 if sx < 0 else 10
+				_add(ops, _rect_mask(x0, 0, 1, 5), accent)
+				_add(ops, _rect_mask(x0 - 1 if sx < 0 else x0 + 1, 1, 2, 1), accent)
+				_add(ops, _rect_mask(x0, 2, 2, 1), accent)
+				_add(ops, _rect_mask(5 if sx < 0 else 10, 0, 1, 4), cream)
+			_add(ops, _rect_mask(5, 6, 2, 2), dark)
+			_add(ops, _rect_mask(9, 6, 2, 2), dark)
+			_add(ops, _rect_mask(6, 9, 4, 3), cream)
+			_add(ops, _rect_mask(7, 9, 2, 2), dark)
+			_add(ops, _rect_mask(2, 12, 12, 4), accent)
 		_:
 			_add(ops, _rect_mask(5, 6, 2, 2), dark)
 			_add(ops, _rect_mask(9, 6, 2, 2), dark)

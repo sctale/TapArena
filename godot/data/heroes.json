@@ -487,6 +487,135 @@
           "unlock_at_2": true
         }
       ]
+    },
+    {
+      "id": "axolotl",
+      "name": "绒绒",
+      "title": "水波小螈",
+      "role": "法坦",
+      "blurb": "把伤害变成回复，站在水纹里越打越稳。",
+      "model_id": "",
+      "hp": 1150,
+      "dmg": 42,
+      "range": 300,
+      "atk_interval": 0.8,
+      "move_speed": 248,
+      "radius": 35,
+      "height": 76,
+      "difficulty": 2,
+      "fur": "#F3A6B5",
+      "dark": "#A95870",
+      "cream": "#FFF0F2",
+      "accent": "#5FD5C8",
+      "skills": [
+        {
+          "name": "水波抚慰",
+          "hint": "自己与附近队友回血，水纹圈持续闪烁",
+          "kind": "heal",
+          "fx": "bubble",
+          "cd": 9,
+          "dmg": 0,
+          "radius": 380,
+          "color": "#9FF3E8",
+          "heal_pct": 0.16
+        },
+        {
+          "name": "滑水冲刺",
+          "hint": "向前滑一段，留下减速水纹",
+          "kind": "dash",
+          "fx": "wave",
+          "cd": 10,
+          "dmg": 48,
+          "radius": 120,
+          "color": "#7FE3FF",
+          "range": 250,
+          "slow": 1.0,
+          "zone": true
+        },
+        {
+          "name": "再生水域",
+          "hint": "两片水域落下，伤敌并治疗队友",
+          "kind": "multi",
+          "fx": "waterfall",
+          "cd": 28,
+          "dmg": 45,
+          "radius": 180,
+          "color": "#8FF0E0",
+          "count": 2,
+          "range": 460,
+          "delay": 0.5,
+          "heal_pct": 0.1,
+          "slow": 0.8,
+          "unlock_at_2": true
+        }
+      ]
+    },
+    {
+      "id": "deer",
+      "name": "角角",
+      "title": "林间小鹿",
+      "role": "射手",
+      "blurb": "跳开再回身三箭，专治贴脸。",
+      "model_id": "",
+      "hp": 880,
+      "dmg": 54,
+      "range": 560,
+      "atk_interval": 0.78,
+      "move_speed": 262,
+      "radius": 30,
+      "height": 72,
+      "difficulty": 3,
+      "fur": "#C98A5A",
+      "dark": "#6B4A32",
+      "cream": "#F6EBDD",
+      "accent": "#E8B44A",
+      "skills": [
+        {
+          "name": "三叉鹿角箭",
+          "hint": "扇形射出三支会穿透的鹿角箭",
+          "kind": "projectile",
+          "fx": "leaf",
+          "cd": 5.2,
+          "dmg": 42,
+          "radius": 0,
+          "color": "#F6D27A",
+          "count": 3,
+          "speed": 700,
+          "range": 580,
+          "pierce": 1,
+          "slow": 0.5
+        },
+        {
+          "name": "后跃散射",
+          "hint": "向后跃开，回身射出三箭",
+          "kind": "backstep",
+          "fx": "leaf",
+          "cd": 12,
+          "dmg": 38,
+          "radius": 0,
+          "color": "#9BE06A",
+          "count": 3,
+          "speed": 700,
+          "range": 220,
+          "slow": 0.8,
+          "shot_style": "arrow"
+        },
+        {
+          "name": "林间箭雨",
+          "hint": "三片箭雨落下，减速敌人",
+          "kind": "multi",
+          "fx": "leafsmash",
+          "cd": 30,
+          "dmg": 55,
+          "radius": 135,
+          "color": "#B6E86A",
+          "count": 3,
+          "range": 600,
+          "delay": 0.35,
+          "slow": 1.0,
+          "unlock_at_2": true
+        }
+      ]
     }
   ]
 }

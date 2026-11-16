@@ -6,6 +6,7 @@ extends Node3D
 
 const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
+	"panda": 88.0, "owl": 88.0, "axolotl": 88.0, "deer": 88.0,
 }
 
 var sim = null
@@ -562,6 +563,12 @@ func _sync_hero(u) -> void:
 		wt -= (1.0 - sim.interp_alpha) * step
 	var bob := absf(sin(wt * 9.0)) * (4.0 if u.moving else 0.0)
 	root.position.y = bob
+	if u.move_skill_total > 0.0:
+		var mk := 1.0 - clampf(u.move_skill_t / u.move_skill_total, 0.0, 1.0)
+		if u.move_skill_kind == "leap":
+			root.position.y += sin(mk * PI) * 72.0
+		elif u.move_skill_kind == "backstep":
+			root.position.y += sin(mk * PI) * 18.0
 	var sxz := 1.0
 	var sy := 1.0
 	if u.atk_anim > 0.0:

@@ -1,0 +1,253 @@
+class_name HeroPortraits
+extends RefCounted
+
+# 32×32 英雄半身头像：比 HUD 用的 16×16 图标多一层明暗、耳/角/鳃和围巾细节。
+# 选人卡片、详情弹窗与应用图标共用同一套形状，保持像素风。
+
+const S := 32
+const OUTLINE := Color("221a12")
+
+var _cache: Dictionary = {}
+
+
+func portrait(hero_id: String, fur: Color, cream: Color, dark: Color, accent: Color,
+		with_bg := true) -> ImageTexture:
+	var key := "portrait32_" + hero_id + ("_bg" if with_bg else "_nobg")
+	if _cache.has(key):
+		return _cache[key]
+	var ops: Array = []
+	if with_bg:
+		_bg(ops, dark)
+	_bust(ops, hero_id, fur, cream, dark, accent)
+	var t := _compose(ops)
+	_cache[key] = t
+	return t
+
+
+func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent: Color) -> void:
+	# 肩/领/脖子/头的基础半身。坐标以 32×32 为画布。
+	_add(ops, _rect(5, 25, 22, 7), accent)
+	_add(ops, _rect(7, 25, 18, 2), _lighter(accent, 0.12))
+	_add(ops, _rect(13, 21, 6, 6), fur)
+	_add(ops, _rect(10, 5, 12, 18), fur)
+	_add(ops, _rect(8, 8, 2, 11), fur)
+	_add(ops, _rect(22, 8, 2, 11), fur)
+	_add(ops, _rect(10, 4, 12, 3), _lighter(fur, 0.12))
+	_add(ops, _rect(12, 20, 8, 3), _lighter(cream, 0.02))
+	_add(ops, _rect(11, 11, 4, 4), Color("fbf8ef"))
+	_add(ops, _rect(17, 11, 4, 4), Color("fbf8ef"))
+	_add(ops, _rect(12, 12, 2, 2), dark)
+	_add(ops, _rect(18, 12, 2, 2), dark)
+	_add(ops, _rect(12, 12, 1, 1), Color.WHITE)
+	_add(ops, _rect(18, 12, 1, 1), Color.WHITE)
+	_add(ops, _rect(12, 17, 8, 5), cream)
+	_add(ops, _rect(15, 17, 2, 2), dark)
+	_add(ops, _rect(8, 15, 2, 2), _lighter(accent, 0.04))
+	_add(ops, _rect(22, 15, 2, 2), _lighter(accent, 0.04))
+	# 围巾/领口：每个角色的 accent 色在胸口形成一条识别带。
+	_add(ops, _rect(8, 24, 16, 3), accent)
+	_add(ops, _rect(13, 26, 6, 2), _lighter(accent, 0.10))
+
+	match id:
+		"tiger":
+			_add(ops, _disc(9, 5, 3), _darker(fur, 0.92))
+			_add(ops, _disc(23, 5, 3), _darker(fur, 0.92))
+			_add(ops, _disc(9, 5, 1.4), cream)
+			_add(ops, _disc(23, 5, 1.4), cream)
+			for x in [10, 20]:
+				_add(ops, _rect(x, 7, 1, 6), dark)
+			_add(ops, _rect(13, 6, 1, 3), dark)
+			_add(ops, _rect(18, 6, 1, 3), dark)
+			_add(ops, _rect(15, 17, 2, 2), Color("5b3a28"))
+		"fox":
+			_add(ops, _poly([Vector2(10, 6), Vector2(10, 0), Vector2(15, 5)]), fur)
+			_add(ops, _poly([Vector2(22, 6), Vector2(22, 0), Vector2(17, 5)]), fur)
+			_add(ops, _poly([Vector2(11.5, 4.5), Vector2(11.5, 1.5), Vector2(14, 4.5)]), cream)
+			_add(ops, _poly([Vector2(20.5, 4.5), Vector2(20.5, 1.5), Vector2(18, 4.5)]), cream)
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(15, 16, 2, 2), dark)
+			_add(ops, _diamond(24, 18, 2), accent)
+		"rabbit":
+			_add(ops, _rect(10, 0, 4, 8), cream)
+			_add(ops, _rect(18, 0, 4, 8), cream)
+			_add(ops, _rect(11, 1, 2, 6), Color("f2a6c0"))
+			_add(ops, _rect(19, 1, 2, 6), Color("f2a6c0"))
+			_add(ops, _rect(14, 17, 4, 3), Color("eca0ba"))
+			_add(ops, _rect(15, 17, 2, 2), dark)
+		"bear":
+			_add(ops, _disc(9, 5, 3.2), _darker(fur, 0.9))
+			_add(ops, _disc(23, 5, 3.2), _darker(fur, 0.9))
+			_add(ops, _disc(9, 5, 1.5), cream)
+			_add(ops, _disc(23, 5, 1.5), cream)
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(14, 17, 4, 2), Color("3a2a20"))
+		"frog":
+			_add(ops, _disc(8, 7, 4.2), fur)
+			_add(ops, _disc(24, 7, 4.2), fur)
+			_add(ops, _disc(8, 7, 2.2), cream)
+			_add(ops, _disc(24, 7, 2.2), cream)
+			_add(ops, _rect(7, 13, 18, 2), dark)
+			_add(ops, _rect(10, 15, 12, 4), cream)
+			_add(ops, _rect(12, 17, 8, 2), Color("3a5a34"))
+		"cat":
+			_add(ops, _poly([Vector2(10, 6), Vector2(10, 0), Vector2(15, 5)]), fur)
+			_add(ops, _poly([Vector2(22, 6), Vector2(22, 0), Vector2(17, 5)]), fur)
+			_add(ops, _poly([Vector2(11.5, 4.5), Vector2(11.5, 1.5), Vector2(14, 4.5)]), accent)
+			_add(ops, _poly([Vector2(20.5, 4.5), Vector2(20.5, 1.5), Vector2(18, 4.5)]), accent)
+			for y in [15, 18]:
+				_add(ops, _rect(5, y, 5, 1), cream)
+				_add(ops, _rect(22, y, 5, 1), cream)
+			_add(ops, _rect(15, 17, 2, 2), Color("e888a8"))
+		"panda":
+			_add(ops, _disc(9, 5, 3.2), dark)
+			_add(ops, _disc(23, 5, 3.2), dark)
+			_add(ops, _rect(9, 10, 5, 5), dark)
+			_add(ops, _rect(18, 10, 5, 5), dark)
+			_add(ops, _rect(11, 11, 2, 2), Color.WHITE)
+			_add(ops, _rect(19, 11, 2, 2), Color.WHITE)
+			_add(ops, _rect(13, 17, 6, 4), cream)
+			_add(ops, _rect(15, 17, 2, 2), dark)
+		"owl":
+			_add(ops, _poly([Vector2(9, 7), Vector2(9, 0), Vector2(14, 5)]), dark)
+			_add(ops, _poly([Vector2(23, 7), Vector2(23, 0), Vector2(18, 5)]), dark)
+			_add(ops, _disc(11, 11, 4), cream)
+			_add(ops, _disc(21, 11, 4), cream)
+			_add(ops, _disc(11, 11, 2), dark)
+			_add(ops, _disc(21, 11, 2), dark)
+			_add(ops, _poly([Vector2(14, 17), Vector2(18, 17), Vector2(16, 21)]), accent)
+			_add(ops, _rect(10, 24, 12, 4), cream)
+		"axolotl":
+			for sx in [-1, 1]:
+				for k in range(3):
+					var gy := 9 + k * 4
+					var gx := 4 - k if sx < 0 else 26 + k
+					_add(ops, _rect(gx, gy, 3, 2), _lighter(fur, 0.04 + k * 0.02))
+			_add(ops, _rect(10, 6, 12, 2), _lighter(fur, 0.15))
+			_add(ops, _rect(13, 17, 6, 4), cream)
+			_add(ops, _rect(15, 17, 2, 2), dark)
+			_add(ops, _rect(11, 24, 10, 2), _lighter(accent, 0.12))
+		"deer":
+			for sx in [-1, 1]:
+				_add(ops, _rect(10 if sx < 0 else 20, 0, 2, 8), accent)
+				_add(ops, _rect(7 if sx < 0 else 23, 2, 4, 2), accent)
+				_add(ops, _rect(9 if sx < 0 else 21, 6, 4, 2), accent)
+				_add(ops, _rect(9 if sx < 0 else 21, 7, 2, 8), fur)
+				_add(ops, _rect(9 if sx < 0 else 21, 8, 1, 5), cream)
+			_add(ops, _rect(12, 17, 8, 5), cream)
+			_add(ops, _rect(15, 17, 2, 2), dark)
+			_add(ops, _rect(7, 20, 2, 2), cream)
+			_add(ops, _rect(23, 20, 2, 2), cream)
+			_add(ops, _diamond(8, 26, 2), accent)
+
+
+func _bg(ops: Array, dark: Color) -> void:
+	# 深色底 + 上方一点主题色光晕，卡片/弹窗缩放时仍能看清轮廓。
+	var base := Color(dark.r * 0.30, dark.g * 0.30, dark.b * 0.30, 1.0)
+	_add(ops, _rect(0, 0, S, S), base)
+	_add(ops, _disc(16, 12, 15), Color(base.r * 1.22, base.g * 1.22, base.b * 1.22, 1.0))
+	_add(ops, _rect(0, 27, S, 5), Color(base.r * 0.72, base.g * 0.72, base.b * 0.72, 1.0))
+
+
+func _compose(ops: Array) -> ImageTexture:
+	var img := Image.create(S, S, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var union := _empty()
+	for op in ops:
+		var mask: PackedByteArray = op["mask"]
+		for i in range(S * S):
+			if mask[i] == 1:
+				union[i] = 1
+	for y in range(S):
+		for x in range(S):
+			var i := y * S + x
+			if union[i] != 1:
+				continue
+			var color := Color(0, 0, 0, 0)
+			for op in ops:
+				var mask: PackedByteArray = op["mask"]
+				if mask[i] == 1:
+					color = op["color"]
+			img.set_pixel(x, y, color)
+	for y in range(S):
+		for x in range(S):
+			var i := y * S + x
+			if union[i] == 1:
+				continue
+			if (x > 0 and union[i - 1] == 1) or (x < S - 1 and union[i + 1] == 1) \
+					or (y > 0 and union[i - S] == 1) or (y < S - 1 and union[i + S] == 1):
+				img.set_pixel(x, y, OUTLINE)
+	return ImageTexture.create_from_image(img)
+
+
+func _add(ops: Array, mask: PackedByteArray, color: Color) -> void:
+	ops.append({"mask": mask, "color": color})
+
+
+func _empty() -> PackedByteArray:
+	var m := PackedByteArray()
+	m.resize(S * S)
+	m.fill(0)
+	return m
+
+
+func _plot(m: PackedByteArray, x: int, y: int) -> void:
+	if x < 0 or y < 0 or x >= S or y >= S:
+		return
+	m[y * S + x] = 1
+
+
+func _rect(x0: int, y0: int, w: int, h: int) -> PackedByteArray:
+	var m := _empty()
+	for y in range(y0, y0 + h):
+		for x in range(x0, x0 + w):
+			_plot(m, x, y)
+	return m
+
+
+func _disc(cx: float, cy: float, r: float) -> PackedByteArray:
+	var m := _empty()
+	for y in range(S):
+		for x in range(S):
+			var dx := float(x) + 0.5 - cx
+			var dy := float(y) + 0.5 - cy
+			if dx * dx + dy * dy <= r * r:
+				_plot(m, x, y)
+	return m
+
+
+func _poly(pts: Array) -> PackedByteArray:
+	var m := _empty()
+	for y in range(S):
+		for x in range(S):
+			if _inside(Vector2(float(x) + 0.5, float(y) + 0.5), pts):
+				_plot(m, x, y)
+	return m
+
+
+func _diamond(cx: int, cy: int, r: int) -> PackedByteArray:
+	var m := _empty()
+	for y in range(cy - r, cy + r + 1):
+		for x in range(cx - r, cx + r + 1):
+			if absi(x - cx) + absi(y - cy) <= r:
+				_plot(m, x, y)
+	return m
+
+
+func _inside(p: Vector2, pts: Array) -> bool:
+	var inside := false
+	var j := pts.size() - 1
+	for i in range(pts.size()):
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[j]
+		if ((a.y > p.y) != (b.y > p.y)) and (p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x):
+			inside = not inside
+		j = i
+	return inside
+
+
+func _lighter(c: Color, k: float) -> Color:
+	return Color(minf(1.0, c.r + k), minf(1.0, c.g + k), minf(1.0, c.b + k), c.a)
+
+
+func _darker(c: Color, k: float) -> Color:
+	return Color(c.r * k, c.g * k, c.b * k, c.a)

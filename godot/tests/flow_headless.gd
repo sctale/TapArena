@@ -19,9 +19,14 @@ func _process(_delta: float) -> bool:
 		if main.home == null:
 			failures.append("启动后没有首页")
 		else:
-			if main.home.heroes.size() != 8:
-				failures.append("首页英雄数量不是 8")
+			if main.home.heroes.size() != 10:
+				failures.append("首页英雄数量不是 10")
 			main.home._tap(main.home.card_rect(1).get_center())
+			if not main.home.detail_open:
+				failures.append("选中卡片后没有弹出人物介绍")
+	elif frame == 4:
+		if main.home != null and main.home.detail_open:
+			main.home._tap(main.home.detail_close_rect().get_center())
 	elif frame == 6:
 		if main.home != null:
 			main.home._tap(main.home.challenge_rect().get_center())

@@ -166,6 +166,39 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 44, 10.6), Vector3(4, 4, 1), "flat", accent)
 			_b(boxes, Vector3(0, 30, -13), Vector3(12, 12, 10), "fur", dark)
 			_b(boxes, Vector3(0, 36, -21), Vector3(8, 8, 8), "fur", _darker(fur, 0.8))
+		"axolotl":
+			# 美西螈：两侧三簇外鳃 + 奶油肚皮 + 青色围巾 + 扁尾鳍
+			for sx in [-1, 1]:
+				for k in range(3):
+					var gy := 66.0 + float(k) * 5.2
+					_b(boxes, Vector3((15.5 + float(k) * 1.1) * sx, gy, -1.0),
+						Vector3(7, 3, 5), "flat", _lighter(fur, 0.04 + float(k) * 0.02))
+					_b(boxes, Vector3((18.5 + float(k) * 1.4) * sx, gy + 1.2, -1.0),
+						Vector3(4, 2, 3), "flat", accent)
+				_b(boxes, Vector3(8.5 * sx, 69, 12.7), Vector3(5, 4, 2), "flat", dark)
+			_b(boxes, Vector3(0, 58, 12.7), Vector3(19, 7, 2), "flat", cream)
+			_b(boxes, Vector3(0, 44, 10.3), Vector3(18, 13, 1), "flat", cream)
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(10, 34, -14), Vector3(8, 10, 12), "fur", accent)
+			_b(boxes, Vector3(10, 28, -24), Vector3(14, 3, 12), "flat", _lighter(accent, 0.10))
+		"deer":
+			# 小鹿：分叉鹿角 + 长耳 + 白斑点 + 叶绿围巾 + 短尾
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9.0 * sx, 76, 0), Vector3(4, 8, 4), "flat", accent)
+				_b(boxes, Vector3(9.0 * sx, 83, 0), Vector3(3, 7, 3), "flat", _lighter(accent, 0.08))
+				_b(boxes, Vector3(13.0 * sx, 81, 0), Vector3(6, 3, 3), "flat", _lighter(accent, 0.08))
+				_b(boxes, Vector3(6.0 * sx, 85, 0), Vector3(5, 3, 3), "flat", _lighter(accent, 0.08))
+				_b(boxes, Vector3(8.0 * sx, 70, 0), Vector3(6, 13, 5), "fur", fur)
+				_b(boxes, Vector3(8.0 * sx, 72, 2.8), Vector3(3, 9, 2), "flat", cream)
+				_b(boxes, Vector3(8.0 * sx, 66, 12.7), Vector3(5, 4, 2), "flat", dark)
+			_b(boxes, Vector3(0, 59, 12.7), Vector3(17, 6, 2), "flat", cream)
+			_b(boxes, Vector3(0, 61, 13.2), Vector3(5, 2, 1), "flat", dark)
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(0, 44, 10.2), Vector3(8, 9, 1), "flat", cream)
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(6.5 * sx, 36, 10.3), Vector3(3, 3, 1), "flat", cream)
+				_b(boxes, Vector3(9.5 * sx, 30, 10.3), Vector3(2, 2, 1), "flat", cream)
+			_b(boxes, Vector3(9, 32, -13), Vector3(7, 7, 9), "fur", cream)
 		_:
 			pass
 	return boxes

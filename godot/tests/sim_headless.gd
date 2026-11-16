@@ -4,7 +4,7 @@ extends SceneTree
 # 运行：godot --headless --path godot --script res://tests/sim_headless.gd
 
 const BattleSimScript = preload("res://scripts/core/battle_sim.gd")
-const HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl"]
+const HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl", "deer"]
 const MATCHES := 10
 const DT := 1.0 / 60.0
 const MAX_SIM_SECONDS := 320.0
@@ -261,6 +261,10 @@ func _rule_checks() -> Array:
 	dash_hero.move_dir = Vector2(-1, 0)
 	var dash_x: float = dash_hero.pos.x
 	sim6.try_cast(dash_hero, 0)
+	for k in range(30):
+		sim6.step_hero(dash_hero, 0.0167)
+		if dash_hero.move_skill_t <= 0.0:
+			break
 	if dash_hero.pos.x > dash_x - 40.0:
 		issues.append("位移技能没有朝移动方向")
 
@@ -321,8 +325,14 @@ func _rule_checks() -> Array:
 	sim8.step_hero(p8, 0.0167)
 	if p8.cds[0] <= 0.0:
 		issues.append("移动中的技能输入被丢弃")
+	if p8.move_skill_t <= 0.0:
+		issues.append("位移没有进入平滑位移状态")
+	for k in range(40):
+		sim8.step_hero(p8, 0.0167)
+		if p8.move_skill_t <= 0.0:
+			break
 	if p8.pos.x < before_x + 150.0:
-		issues.append("技能没有在移动当帧释放")
+		issues.append("平滑位移结束后没有到达目标")
 	if p8.dash_t <= 0.0:
 		issues.append("位移后没有记录位移状态")
 	stop_count[0] = 0
@@ -331,6 +341,7 @@ func _rule_checks() -> Array:
 	if stop_count[0] != 0:
 		issues.append("位移期间触发了顿帧")
 	p8.dash_t = 0.0
+	p8.move_skill_t = 0.0
 	sim8.hit_with_fx(dummy, 120.0, p8)
 	if stop_count[0] != 1:
 		issues.append("位移结束后没有恢复顿帧")

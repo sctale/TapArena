@@ -52,6 +52,13 @@ class Unit:
 	var slow_t: float = 0.0
 	var invuln_t: float = 0.0
 	var dash_t: float = 0.0
+	# 平滑位移：冲刺/后跃/跳跃分多帧走完，避免一帧瞬移造成镜头和模型跳变。
+	var move_skill_t: float = 0.0
+	var move_skill_total: float = 0.0
+	var move_skill_from := Vector2.ZERO
+	var move_skill_to := Vector2.ZERO
+	var move_skill_kind: String = ""
+	var move_skill_data: Dictionary = {}
 	var hurt_t: float = 0.0
 	var shield: float = 0.0
 	var shield_t: float = 0.0
@@ -306,11 +313,11 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	var allies: Array = []
 	var player_front := player_hero == "tiger" or player_hero == "bear"
 	if not player_front:
-		allies.append(take_preferred(others, ["bear", "tiger"]))
-		allies.append(take_preferred(others, ["rabbit", "frog", "cat", "fox"]))
+		allies.append(take_preferred(others, ["bear", "tiger", "panda"]))
+		allies.append(take_preferred(others, ["rabbit", "axolotl", "frog", "cat", "deer", "fox"]))
 	else:
-		allies.append(take_preferred(others, ["cat", "fox", "rabbit", "frog"]))
-		allies.append(take_preferred(others, ["rabbit", "frog", "fox", "cat"]))
+		allies.append(take_preferred(others, ["deer", "cat", "fox", "rabbit", "axolotl", "frog"]))
+		allies.append(take_preferred(others, ["axolotl", "rabbit", "frog", "deer", "fox", "cat"]))
 
 	var blue_ids: Array = [player_hero, allies[0], allies[1]]
 	var red_ids: Array = others
@@ -906,6 +913,9 @@ func step_unit(u, dt: float) -> void:
 
 
 func step_hero(h, dt: float) -> void:
+	if h.move_skill_t > 0.0:
+		_step_move_skill(h, dt)
+		return
 	if h.is_player:
 		# 技能最高优先级：先消费技能输入，再处理移动，保证一边跑一边放技能不丢输入，
 		# 位移技能也能用当帧的摇杆方向。
@@ -937,6 +947,74 @@ func step_hero(h, dt: float) -> void:
 			hit_with_fx(target, h.dmg, h, 0.0)
 
 
+func _start_move_skill(h, to: Vector2, duration: float, kind: String, data: Dictionary) -> void:
+	to.x = clampf(to.x, 60.0, map_w - 60.0)
+	to.y = clampf(to.y, 60.0, map_h - 60.0)
+	h.move_skill_from = h.pos
+	h.move_skill_to = to
+	h.move_skill_total = maxf(duration, 0.05)
+	h.move_skill_t = h.move_skill_total
+	h.move_skill_kind = kind
+	h.move_skill_data = data
+	h.moving = true
+	h.dash_t = maxf(h.dash_t, h.move_skill_total + 0.08)
+	h.invuln_t = maxf(h.invuln_t, 0.12)
+
+
+func _step_move_skill(h, dt: float) -> void:
+	var k := 1.0 - clampf(h.move_skill_t / h.move_skill_total, 0.0, 1.0)
+	move_to(h, h.move_skill_from.lerp(h.move_skill_to, k))
+	h.walk_t += dt
+	h.moving = true
+	if h.move_skill_kind == "backstep":
+		h.facing = float(h.move_skill_data.get("face", h.facing))
+	else:
+		var d: Vector2 = h.move_skill_to - h.move_skill_from
+		if absf(d.x) > 0.1:
+			h.facing = 1.0 if d.x >= 0.0 else -1.0
+	h.move_skill_t = maxf(0.0, h.move_skill_t - dt)
+	if h.move_skill_t > 0.0:
+		return
+	var kind: String = str(h.move_skill_kind)
+	var data: Dictionary = h.move_skill_data
+	h.move_skill_t = 0.0
+	h.move_skill_total = 0.0
+	h.move_skill_kind = ""
+	h.move_skill_data = {}
+	h.moving = false
+	_finish_move_skill(h, kind, data)
+
+
+func _finish_move_skill(h, kind: String, data: Dictionary) -> void:
+	var s: Dictionary = data.get("skill", {})
+	var color: Color = data.get("color", Color.WHITE)
+	match kind:
+		"dash":
+			var dmg := float(s.get("dmg", 0.0))
+			var radius := float(s.get("radius", 120.0))
+			if dmg > 0.0:
+				area_damage(h.pos, radius, dmg, h, h.team,
+					float(s.get("slow", 0.0)), 0.0, float(s.get("knock", 0.0)))
+				fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
+			if s.get("zone", false):
+				zones.append(make_zone(h.pos, 90.0, 2.6, float(s.get("slow", 0.9)), h.team, color))
+			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
+		"leap":
+			leap_land(h, h.pos, s)
+		"backstep":
+			var foe = data.get("foe")
+			var dir := Vector2(h.facing, 0.0)
+			if foe != null and foe.is_alive():
+				dir = (foe.pos - h.pos).normalized()
+			var count := int(maxf(1.0, float(s.get("count", 3))))
+			for i in range(count):
+				var ang := atan2(dir.y, dir.x) + (float(i) - float(count - 1) * 0.5) * 0.16
+				shoot(h, Vector2(cos(ang), sin(ang)), float(s.get("dmg", 0.0)), color,
+					float(s.get("speed", 700.0)), float(s.get("slow", 0.0)), 0.0, 0.0,
+					int(s.get("pierce", 0)), false, null, str(s.get("shot_style", "arrow")))
+			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
+
+
 func hero_shot_style(id: String) -> String:
 	# 普攻弹道也带角色特色：星星、叶子、水泡、箭矢、月刃。
 	match id:
@@ -950,6 +1028,10 @@ func hero_shot_style(id: String) -> String:
 			return "arrow"
 		"owl":
 			return "moon"
+		"axolotl":
+			return "bubble"
+		"deer":
+			return "arrow"
 	return "cube"
 
 
@@ -1086,6 +1168,8 @@ func step_hero_skills(h, hp_p: float, retreat: bool) -> void:
 				use = nearest_hero(h, float(s.get("range", 300))) != null and rng.randf() < 0.32
 			"multi":
 				use = nearest_hero(h, float(s.get("range", 260))) != null and rng.randf() < 0.34
+			"backstep":
+				use = nearest_hero(h, 330.0) != null and hp_p < 0.90
 			"radial":
 				var radial_n := count_enemies_around(h, float(s.get("range", 152)), -1.0)
 				use = radial_n >= 2 or nearest_hero(h, float(s.get("range", 152))) != null
@@ -1263,7 +1347,7 @@ func count_team_heroes(team: int, pos: Vector2, radius: float) -> int:
 func has_healer_near(h, radius: float) -> bool:
 	for a in heroes:
 		if a != h and a.is_alive() and a.team == h.team \
-				and a.hero_id == "rabbit" and a.pos.distance_to(h.pos) <= radius:
+				and (a.hero_id == "rabbit" or a.hero_id == "axolotl") and a.pos.distance_to(h.pos) <= radius:
 			return true
 	return false
 
@@ -1475,6 +1559,10 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 func kill(target, killer) -> void:
 	target.hp = 0.0
 	target.die_t = 0.0
+	target.move_skill_t = 0.0
+	target.move_skill_total = 0.0
+	target.move_skill_kind = ""
+	target.move_skill_data = {}
 	fx.emit("burst", Vector3(target.pos.x, target.height * 0.5, target.pos.y), Color(1, 0.9, 0.7), 0.0)
 
 	if target.kind == HERO:
@@ -1767,6 +1855,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 	var dmg := float(s.get("dmg", 0.0))
 	var radius := float(s.get("radius", 120.0))
 	var style := str(s.get("fx", "burst"))
+	var shot_style := str(s.get("shot_style", style))
 	if kind != "leap" and kind != "pull" and kind != "multi":
 		# 每个英雄的施法都有专属形状：爪痕、星星、叶子、水泡、箭雨、竹子、月光…
 		fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
@@ -1784,7 +1873,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 					dir = Vector2(cos(angle_spread), sin(angle_spread))
 				shoot(h, dir, dmg, color, float(s.get("speed", 620.0)),
 					float(s.get("slow", 0.0)), 0.0, 0.0, int(s.get("pierce", 0)),
-					false, null, style)
+					false, null, shot_style)
 		"splash":
 			var p = Projectile.new()
 			p.pos = h.pos
@@ -1810,18 +1899,22 @@ func cast(h, s: Dictionary, index: int) -> void:
 			var dash_to: Vector2 = h.pos + aim_dir * float(s.get("range", 230.0))
 			if not h.is_player:
 				dash_to = clamp_to_front(h, dash_to)
-			move_to(h, dash_to)
-			h.invuln_t = maxf(h.invuln_t, 0.12)
-			# 位移期间不触发顿帧，否则瞬移瞬间会明显卡一下。
-			h.dash_t = maxf(h.dash_t, 0.25)
+			# 位移拆成约 0.1–0.2 秒的连续路径，镜头和模型不再一帧瞬移。
+			var dash_dur := clampf(float(s.get("range", 230.0)) / 1800.0, 0.10, 0.22)
+			_start_move_skill(h, dash_to, dash_dur, "dash",
+				{"skill": s, "color": color, "from": dash_from})
 			fx.emit("burst", Vector3(dash_from.x, 24.0, dash_from.y), color, 0.0)
-			fx.emit("burst", Vector3(h.pos.x, 24.0, h.pos.y), color, 0.0)
-			fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
-			if dmg > 0.0:
-				area_damage(h.pos, radius, dmg, h, h.team, float(s.get("slow", 0.0)), 0.0, float(s.get("knock", 0.0)))
-				fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
-			if s.get("zone", false):
-				zones.append(make_zone(h.pos, 90.0, 2.6, float(s.get("slow", 0.9)), h.team, color))
+		"backstep":
+			var foe = nearest_hero(h, float(s.get("range", 220.0)) + 220.0)
+			var back := Vector2(-h.facing, 0.0)
+			if foe != null and foe.is_alive():
+				back = (h.pos - foe.pos).normalized()
+			var face_x: float = h.facing
+			if foe != null and foe.is_alive():
+				face_x = 1.0 if foe.pos.x >= h.pos.x else -1.0
+			h.facing = face_x
+			_start_move_skill(h, h.pos + back * float(s.get("range", 220.0)), 0.18, "backstep",
+				{"skill": s, "color": color, "foe": foe, "face": face_x})
 		"aoe":
 			area_damage(h.pos, radius, dmg, h, h.team, float(s.get("slow", 0.0)),
 				float(s.get("stun", 0.0)), float(s.get("knock", 0.0)))
@@ -1881,8 +1974,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 			var dest: Vector2 = leap_target.pos if leap_target != null else h.pos + aim_dir * 220.0
 			if not h.is_player:
 				dest = clamp_to_front(h, dest)
-			move_to(h, dest)
-			leap_land(h, dest, s)
+			# 跳跃用 0.32 秒弧线走完，落地再结算范围伤害。
+			_start_move_skill(h, dest, 0.32, "leap", {"skill": s, "color": color})
 		"multi":
 			var multi_target = nearest_enemy(h, float(s.get("range", 600.0)))
 			var center: Vector2 = multi_target.pos if multi_target != null else h.pos + aim_dir * 200.0

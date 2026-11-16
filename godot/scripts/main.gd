@@ -294,7 +294,7 @@ func _on_hitstop(seconds: float) -> void:
 	# 重入保护：两段顿帧重叠会把 time_scale 卡在 0.18。
 	if hitstop_until_ms > Time.get_ticks_msec():
 		return
-	Engine.time_scale = 0.18
+	Engine.time_scale = 0.35
 	hitstop_until_ms = Time.get_ticks_msec() + int(seconds * 1000.0)
 
 
