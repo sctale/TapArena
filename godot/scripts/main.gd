@@ -247,15 +247,15 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	sim.match_ended.connect(_on_match_ended)
 	sim.banner.connect(_on_banner)
 
-	# 调试：直接触发峡谷巨兽（5v5 为 5:00，3v3 为 3:00），检查模型与推进。
+	# 调试：直接触发峡谷巨兽（5v5 为 4:00，3v3 为 3:00），检查模型与推进。
 	if "--boss" in OS.get_cmdline_user_args():
-		sim.clock = sim.sudden_death_time - 0.1
+		sim.clock = sim.boss_time - 0.1
 		sim.step(0.2)
 		for i in range(60):
 			sim.step(1.0 / 60.0)
 	# 调试：直接看巨兽第二形态（翅膀 + 陨石/旋风），不用等它先被打倒一次。
 	if "--boss-fly" in OS.get_cmdline_user_args():
-		sim.clock = sim.sudden_death_time - 0.1
+		sim.clock = sim.boss_time - 0.1
 		sim.step(0.2)
 		if sim.boss != null:
 			sim.boss.boss_phase = 2
@@ -270,6 +270,14 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	if "--pause" in OS.get_cmdline_user_args():
 		_toggle_pause()
 	if "--result" in OS.get_cmdline_user_args():
+		if "--result-demo" in OS.get_cmdline_user_args():
+			# 结算排版压测：填入 4–5 位输出与不同等级，验证十行数字不会被批上限截断。
+			for i in range(sim.heroes.size()):
+				var u = sim.heroes[i]
+				u.kills = 3 + i % 5
+				u.deaths = 1 + i % 4
+				u.level = 2 + i % 4
+				u.damage_dealt = 12345.0 + float(i) * 789.0
 		sim.end_match(sim.BLUE, "调试结算")
 	# 开发用：直接摧毁红方水晶，检查结束动画与结算页。
 	var vargs := OS.get_cmdline_user_args()

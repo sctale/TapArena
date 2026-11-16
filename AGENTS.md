@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 50），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 51），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -58,6 +58,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 ## 4. 版本与文档规则
 
 - 版本号只改 `godot/project.godot` 的 `config/version`；`versionCode` 只在构建命令里传。
+- 版本号必须是纯 `X.Y.Z`，不带 `-dev`、`-beta`、`-rc` 等后缀；历史 CHANGELOG 条目不改写。
 - 语义化版本：新功能 + 次版本号，Bug 修复 + 修订号，破坏性更新 + 主版本号。
 - 每次改动必须同步：
   - `CHANGELOG.md`：版本号 + 日期 + 分类（新增/修复/优化/验证），写清"为什么"。
@@ -89,11 +90,11 @@ godot --path godot -- --skip-home --auto-run
 
 - `battle_sim.gd` 保持纯逻辑：不引用 `Node`、`Camera3D`、UI、音频；表现层只通过信号订阅。
 - 建筑保护层级严格为 **外塔 → 内塔 → 水晶**：前序建筑未毁时后续建筑完全免疫伤害，AI 不得绕过前塔。
-- 节奏固定：3v3 为 3:00 终极对决 + 峡谷巨兽，4:00 起 45 秒结算倒计时，4:45 兜底结算；5v5 为 5:00 终极对决 + 峡谷巨兽，8:00 上限，最后 45 秒防御塔停火。
+- 节奏固定：3v3 为 3:00 终极对决 + 峡谷巨兽，4:00 起 45 秒结算倒计时，4:45 兜底结算；5v5 为 4:00 峡谷巨兽、5:00 终极对决，8:00 上限，最后 45 秒防御塔停火。巨兽与终极对决由 `boss_time` / `sudden_death_time` 两个字段控制，3v3 默认同帧。
 - 5v5 为 2400×2400 对角三路：上路沿左/上边、中路对角、下路沿下/右边，河道斜穿野区；每方 3 座路塔，拆掉 2 座后水晶失去保护；野区 6 个营地（野猪/灰狼/河蟹，狼营给增伤、蟹营给加速），双方各一名打野只刷本方野区；终极对决只放大建筑伤害，塔/水晶保护层级全程有效。
-- 结算页必须展示双方 6 名玩家的完整战绩（击杀/死亡/输出），不能只显示玩家本人。
+- 结算页必须展示双方全部玩家的完整战绩（3v3 六人 / 5v5 十人：头像/姓名/等级/击杀·死亡/输出），不能只显示玩家本人，也不能出现只有底色的空行。
 - 相机：机位高度、俯角、朝向为常量；推镜/打击感只改 `fov`，震屏只平移机位、不重新对准。
-- 播报条固定位于 `h*0.245`，宽度 0.52w；3 分钟事件合并为一条播报，避免同帧多条互相覆盖。
+- 播报条固定位于 `h*0.245`，宽度 0.52w；3v3 巨兽与终极对决同帧，合并为一条播报；5v5 巨兽 4:00 单独播报，5:00 终极对决不再叠一条横幅。
 - HUD 以 1920×1080 为基准，必须适配 Android 安全区；触摸热区不小于 44vp。
 - 像素美术、音效均为项目自制或运行时合成；不引入任何第三方游戏素材。
 - GDScript 用 Tab 缩进，注释用中文；数值改 `data/*.json`，不要散落在脚本里。
@@ -102,11 +103,11 @@ godot --path godot -- --skip-home --auto-run
 ## 7. 调试参数（写在 `--` 之后）
 
 - `--skip-home` 跳过首页；`--hero=frog` 指定英雄；`--mode=5v5` 进入三路 5v5；`--auto-run` 自动向右推进
-- `--dash` 移动中反复放 1 技能；`--boss` 直接触发峡谷巨兽（3v3 3:00 / 5v5 5:00，含播报/震屏）；`--boss-fly` 直接看飞行第二形态
+- `--dash` 移动中反复放 1 技能；`--boss` 直接触发峡谷巨兽（3v3 3:00 / 5v5 4:00，含播报/震屏）；`--boss-fly` 直接看飞行第二形态
 - `--walk=up|down|left|right|up-right|down-left…` 按固定方向走，用于核对角色朝向
 - `--ult` 检查大招冷却；`--lv=3` 直接把玩家升到指定等级（2–5，经验条停在该级中段）；`--fx=waterfall_ult` 居中播放指定大招；`--no-hud` 隐藏 HUD
 - `--top` 全图俯瞰；`--look-base` / `--look-red` / `--look-lane` / `--look-tower` 定点镜头
-- `--behind` 检查建筑遮挡挖空；`--ruins` 检查废墟；`--pause` / `--result` / `--victory` 检查界面
+- `--behind` 检查建筑遮挡挖空；`--ruins` 检查废墟；`--pause` / `--result` / `--victory` 检查界面；`--result-demo` 配合 `--result` 填入 4–5 位输出，压测十行结算数字不被批上限截断
 - 录制画面：`godot --path godot --write-movie <目录>/shot.png --fixed-fps 30 --quit-after <帧数> -- <参数>`
 
 ## 8. 禁止事项

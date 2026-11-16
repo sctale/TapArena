@@ -229,6 +229,8 @@ var rng := RandomNumberGenerator.new()
 var map_w: float = 3000.0
 var map_h: float = 1600.0
 var sudden_death_time: float = 180.0
+# 巨兽出场时间与终极对决解耦：3v3 默认同帧（180s），5v5 由 mode_5v5 覆盖为 240s。
+var boss_time: float = 180.0
 var match_cap: float = 285.0
 var respawn_time: float = 5.5
 var base_heal_per_sec: float = 0.15
@@ -316,6 +318,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	map_w = float(rules.get("map_w", 3000))
 	map_h = float(rules.get("map_h", 1600))
 	sudden_death_time = float(rules.get("sudden_death_time", 180))
+	boss_time = float(rules.get("boss_time", sudden_death_time))
 	match_cap = float(rules.get("match_cap", 285))
 	respawn_time = float(rules.get("respawn_time", 5.5))
 	base_heal_per_sec = float(rules.get("base_heal_per_sec", 0.15))
@@ -355,6 +358,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 		team_size = int(mode_cfg.get("team_size", 5))
 		match_cap = float(mode_cfg.get("match_cap", match_cap))
 		sudden_death_time = float(mode_cfg.get("sudden_death_time", sudden_death_time))
+		boss_time = float(mode_cfg.get("boss_time", boss_time))
 		keep_protection = bool(mode_cfg.get("keep_protection_in_sudden_death", true))
 		# 5v5 五级成长：阈值与增幅全部来自 rules.json，便于按节奏调整。
 		level_cap = int(mode_cfg.get("level_cap", 5))
@@ -909,7 +913,11 @@ func spawn_boss(team: int) -> void:
 		u.lane_index = 0 if team == BLUE else lane.size() - 1
 	boss = u
 	boss_team = team
-	banner.emit("终极对决！%s峡谷巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
+	if boss_time < sudden_death_time - 0.01:
+		# 5v5：巨兽 4:00 先出场，终极对决 5:00 只是状态切换。
+		banner.emit("峡谷巨兽出现！%s巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
+	else:
+		banner.emit("终极对决！%s峡谷巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	sfx.emit("ult")
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(team), 200.0)
 
@@ -1284,10 +1292,10 @@ func step(dt: float) -> void:
 
 	if not sudden_death and clock >= sudden_death_time:
 		sudden_death = true
-		# 「终极对决」与巨兽出场同一帧发生，播报合并到 spawn_boss 里只出一条，
-		# 否则两条长提示会互相覆盖，看起来像文字叠在一起。
+		# 3v3 巨兽与终极对决同帧，播报合并到 spawn_boss 里只出一条，避免横幅叠字；
+		# 5v5 巨兽 4:00 先出场，终极对决 5:00 只切状态（HUD 常驻提示），不再发横幅。
 		sfx.emit("ult")
-	if not boss_spawned and clock >= sudden_death_time:
+	if not boss_spawned and clock >= boss_time:
 		boss_spawned = true
 		spawn_boss(leading_team())
 	if not warned_45 and clock >= match_cap - 45.0:

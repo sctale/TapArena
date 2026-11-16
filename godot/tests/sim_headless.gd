@@ -1148,21 +1148,32 @@ func _fix_checks() -> Array:
 	s3.step(0.01)
 	if absf(s3.wave_t - 9.0) > 0.5:
 		issues.append("5v5 440s 兵线没有加速 wave_t=%.1f" % s3.wave_t)
-	# 5v5 节奏：5:00 出巨兽与终极对决，8:00 结算；3v3 保持 3:00 / 4:45。
-	if absf(s3.match_cap - 480.0) > 0.01 or absf(s3.sudden_death_time - 300.0) > 0.01:
-		issues.append("5v5 节奏不是 300/480 cap=%.1f sd=%.1f" % [s3.match_cap, s3.sudden_death_time])
+	# 5v5 节奏：4:00 出巨兽、5:00 终极对决、8:00 结算；3v3 保持 3:00 / 4:45。
+	if absf(s3.match_cap - 480.0) > 0.01 or absf(s3.sudden_death_time - 300.0) > 0.01 \
+			or absf(s3.boss_time - 240.0) > 0.01:
+		issues.append("5v5 节奏不是 240/300/480 boss=%.1f cap=%.1f sd=%.1f" %
+			[s3.boss_time, s3.match_cap, s3.sudden_death_time])
 	var s3b = BattleSimScript.new()
 	s3b.setup("fox", 0, 9812, true)
-	s3b.clock = 299.0
+	s3b.clock = 239.0
 	s3b.step(0.2)
 	if s3b.boss != null or s3b.sudden_death:
-		issues.append("5v5 299s 提前进入终极对决")
+		issues.append("5v5 239s 提前出现巨兽/终极对决")
 	var s3c = BattleSimScript.new()
 	s3c.setup("fox", 0, 9813, true)
-	s3c.clock = 299.9
+	s3c.clock = 239.9
 	s3c.step(0.2)
-	if s3c.boss == null or not s3c.sudden_death:
-		issues.append("5v5 300s 没有出现巨兽/终极对决")
+	if s3c.boss == null:
+		issues.append("5v5 240s 没有出现巨兽")
+	if s3c.sudden_death:
+		issues.append("5v5 240s 巨兽与终极对决没有解耦")
+	s3c.clock = 299.9
+	var boss_before = s3c.boss
+	s3c.step(0.2)
+	if not s3c.sudden_death:
+		issues.append("5v5 300s 没有进入终极对决")
+	if s3c.boss != boss_before:
+		issues.append("5v5 终极对决重复生成巨兽")
 	# 狼嚎只标记单位，不打塔。
 	var s4 = BattleSimScript.new()
 	s4.setup("wolf", 0, 9803, true)

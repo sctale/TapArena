@@ -39,6 +39,8 @@ var lbl_mode3: Label
 var lbl_mode5: Label
 var lbl_foot: Label
 var lbl_hint: Label
+var lbl_mode_tag: Label
+var lbl_diff_tag: Label
 var hero_name_labels: Array = []
 var hero_blurb_labels: Array = []
 
@@ -118,16 +120,45 @@ func _apply_mode() -> void:
 
 # ---- 布局 ----
 
+func _brand_rect() -> Rect2:
+	var safe := _safe()
+	return Rect2(safe.position.x + safe.size.x * 0.045, safe.position.y + safe.size.y * 0.022,
+		safe.size.x * 0.46, safe.size.y * 0.128)
+
+
 func _title_rect() -> Rect2:
 	var safe := _safe()
-	return Rect2(safe.position.x, safe.position.y + safe.size.y * 0.055,
-		safe.size.x, safe.size.y * 0.145)
+	return Rect2(safe.position.x + safe.size.x * 0.062, safe.position.y + safe.size.y * 0.028,
+		safe.size.x * 0.42, safe.size.y * 0.082)
+
+
+func _sub_rect() -> Rect2:
+	var safe := _safe()
+	return Rect2(safe.position.x + safe.size.x * 0.062, safe.position.y + safe.size.y * 0.110,
+		safe.size.x * 0.43, safe.size.y * 0.032)
+
+
+func _version_rect() -> Rect2:
+	var safe := _safe()
+	return Rect2(safe.end.x - safe.size.x * 0.235, safe.position.y + safe.size.y * 0.045,
+		safe.size.x * 0.19, safe.size.y * 0.036)
+
+
+func _version_badge_rect() -> Rect2:
+	var r := _version_rect()
+	return Rect2(r.position - Vector2(10.0, 3.0), r.size + Vector2(20.0, 6.0))
 
 
 func _grid_rect() -> Rect2:
 	var safe := _safe()
-	return Rect2(safe.position.x + safe.size.x * 0.05, safe.position.y + safe.size.y * 0.245,
-		safe.size.x * 0.90, safe.size.y * 0.49)
+	return Rect2(safe.position.x + safe.size.x * 0.045, safe.position.y + safe.size.y * 0.183,
+		safe.size.x * 0.91, safe.size.y * 0.545)
+
+
+func _bar_rect() -> Rect2:
+	var safe := _safe()
+	return Rect2(safe.position.x + safe.size.x * 0.045, safe.position.y + safe.size.y * 0.750,
+		safe.size.x * 0.91, safe.size.y * 0.188)
 
 
 func card_rect(i: int) -> Rect2:
@@ -143,31 +174,50 @@ func card_rect(i: int) -> Rect2:
 
 
 func mode3_rect() -> Rect2:
-	var safe := _safe()
-	return Rect2(safe.position.x + safe.size.x * 0.06, safe.end.y - safe.size.y * 0.255,
-		safe.size.x * 0.095, safe.size.y * 0.060)
+	var b := _bar_rect()
+	return Rect2(b.position.x + b.size.x * 0.02, b.position.y + b.size.y * 0.30,
+		b.size.x * 0.075, b.size.y * 0.58)
 
 
 func mode5_rect() -> Rect2:
 	var r := mode3_rect()
-	return Rect2(r.end.x + 10.0, r.position.y, r.end.x - r.position.x, r.size.y)
+	return Rect2(r.end.x + r.size.x * 0.10, r.position.y, r.size.x, r.size.y)
 
 
 func easy_rect() -> Rect2:
-	var safe := _safe()
-	return Rect2(safe.position.x + safe.size.x * 0.06, safe.end.y - safe.size.y * 0.155,
-		safe.size.x * 0.13, safe.size.y * 0.082)
+	var b := _bar_rect()
+	return Rect2(b.position.x + b.size.x * 0.30, b.position.y + b.size.y * 0.30,
+		b.size.x * 0.095, b.size.y * 0.58)
 
 
 func challenge_rect() -> Rect2:
 	var r := easy_rect()
-	return Rect2(r.end.x + 10.0, r.position.y, r.size.x, r.size.y)
+	return Rect2(r.end.x + r.size.x * 0.08, r.position.y, r.size.x, r.size.y)
 
 
 func start_rect() -> Rect2:
-	var safe := _safe()
-	return Rect2(safe.end.x - safe.size.x * 0.255, safe.end.y - safe.size.y * 0.165,
-		safe.size.x * 0.205, safe.size.y * 0.10)
+	var b := _bar_rect()
+	var w := b.size.x * 0.22
+	return Rect2(b.end.x - b.size.x * 0.02 - w, b.position.y + b.size.y * 0.30,
+		w, b.size.y * 0.58)
+
+
+func hint_rect() -> Rect2:
+	var b := _bar_rect()
+	return Rect2(b.position.x + b.size.x * 0.515, b.position.y + b.size.y * 0.36,
+		b.size.x * 0.225, b.size.y * 0.46)
+
+
+func mode_tag_rect() -> Rect2:
+	var b := _bar_rect()
+	return Rect2(b.position.x + b.size.x * 0.02, b.position.y + b.size.y * 0.06,
+		b.size.x * 0.15, b.size.y * 0.20)
+
+
+func diff_tag_rect() -> Rect2:
+	var b := _bar_rect()
+	return Rect2(b.position.x + b.size.x * 0.30, b.position.y + b.size.y * 0.06,
+		b.size.x * 0.15, b.size.y * 0.20)
 
 
 func detail_rect() -> Rect2:
@@ -229,15 +279,17 @@ func _mk_label(size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) ->
 
 func _make_labels() -> void:
 	var h := _safe().size.y
-	lbl_title = _mk_label(int(h * 0.072), GOLD)
-	lbl_sub = _mk_label(int(h * 0.026), Color(1, 0.97, 0.88, 0.92))
+	lbl_title = _mk_label(int(h * 0.072), GOLD, HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_sub = _mk_label(int(h * 0.026), Color(1, 0.97, 0.88, 0.92), HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_start = _mk_label(int(h * 0.040), INK)
 	lbl_easy = _mk_label(int(h * 0.028), INK)
 	lbl_challenge = _mk_label(int(h * 0.028), INK)
 	lbl_mode3 = _mk_label(int(h * 0.022), INK)
 	lbl_mode5 = _mk_label(int(h * 0.022), INK)
-	lbl_hint = _mk_label(int(h * 0.021), Color(1, 1, 1, 0.72))
-	lbl_foot = _mk_label(int(h * 0.018), Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_RIGHT)
+	lbl_hint = _mk_label(int(h * 0.019), Color(1, 1, 1, 0.68))
+	lbl_mode_tag = _mk_label(int(h * 0.020), Color(1, 1, 1, 0.62), HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_diff_tag = _mk_label(int(h * 0.020), Color(1, 1, 1, 0.62), HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_foot = _mk_label(int(h * 0.020), Color(1, 1, 1, 0.72), HORIZONTAL_ALIGNMENT_RIGHT)
 	for i in range(all_heroes.size()):
 		hero_name_labels.append(_mk_label(int(h * 0.028), CREAM, HORIZONTAL_ALIGNMENT_CENTER))
 		var blurb := _mk_label(int(h * 0.018), Color(0.92, 0.96, 0.90, 0.82), HORIZONTAL_ALIGNMENT_LEFT)
@@ -269,9 +321,9 @@ func _place(l: Label, r: Rect2) -> void:
 func _refresh_labels() -> void:
 	var safe := _safe()
 	var h := safe.size.y
-	_place(lbl_title, Rect2(safe.position.x, safe.position.y + h * 0.035, safe.size.x, h * 0.095))
+	_place(lbl_title, _title_rect())
 	lbl_title.text = "萌兽峡谷"
-	_place(lbl_sub, Rect2(safe.position.x, safe.position.y + h * 0.135, safe.size.x, h * 0.040))
+	_place(lbl_sub, _sub_rect())
 	lbl_sub.text = "选一只小动物 · 点开卡片看技能 · 推掉对面的蘑菇塔"
 
 	for i in range(heroes.size()):
@@ -300,14 +352,17 @@ func _refresh_labels() -> void:
 	_place(lbl_challenge, challenge_rect())
 	lbl_challenge.text = "挑战"
 	lbl_challenge.add_theme_color_override("font_color", INK if difficulty == 1 else CREAM)
+	_place(lbl_mode_tag, mode_tag_rect())
+	lbl_mode_tag.text = "模式"
+	_place(lbl_diff_tag, diff_tag_rect())
+	lbl_diff_tag.text = "难度"
 	_place(lbl_start, start_rect())
 	lbl_start.text = "开始冒险"
-	_place(lbl_hint, Rect2(safe.position.x + safe.size.x * 0.06, easy_rect().end.y + 6.0,
-		safe.size.x * 0.38, h * 0.034))
-	lbl_hint.text = ("5v5 对角三路 · 河道野区 · 15 位英雄" if mode_5v5 else "3v3 单路：10 位英雄") + 		(" · 轻松" if difficulty == 0 else " · 挑战")
-	_place(lbl_foot, Rect2(safe.end.x - safe.size.x * 0.30, safe.end.y - h * 0.045,
-		safe.size.x * 0.26, h * 0.032))
-	lbl_foot.text = "v%s · Godot" % str(ProjectSettings.get_setting("application/config/version", "dev"))
+	_place(lbl_hint, hint_rect())
+	lbl_hint.text = ("15 位英雄" if mode_5v5 else "10 位英雄") + " · 点卡片看技能"
+	_place(lbl_foot, _version_rect())
+	lbl_foot.text = "v%s · Godot 4.7.2" % str(
+		ProjectSettings.get_setting("application/config/version", "dev"))
 
 	var dsel: Dictionary = heroes[sel_index]
 	var dr := detail_rect()
@@ -352,7 +407,8 @@ func _refresh_labels() -> void:
 	lbl_detail_start.text = "带它出发"
 
 	var main_visible := not detail_open
-	for l in [lbl_title, lbl_sub, lbl_start, lbl_easy, lbl_challenge, lbl_mode3, lbl_mode5, lbl_hint, lbl_foot]:
+	for l in [lbl_title, lbl_sub, lbl_start, lbl_easy, lbl_challenge, lbl_mode3, lbl_mode5,
+			lbl_hint, lbl_foot, lbl_mode_tag, lbl_diff_tag]:
 		l.visible = main_visible
 	for l in hero_name_labels:
 		l.visible = main_visible
@@ -386,9 +442,8 @@ func _draw() -> void:
 		draw_rect(Rect2(bx, by, vp.x * 0.035, vp.y * 0.008), Color("7fbf5a"))
 
 	var safe := _safe()
-	var tr := _title_rect()
-	_panel(Rect2(tr.position.x + safe.size.x * 0.22, tr.position.y, safe.size.x * 0.56,
-		tr.size.y * 0.62), PANEL_FILL)
+	_panel(_brand_rect(), PANEL_FILL)
+	_panel(_version_badge_rect(), PANEL_DEEP)
 
 	for i in range(heroes.size()):
 		var card := card_rect(i)
@@ -410,6 +465,8 @@ func _draw() -> void:
 		# 卡底职业色条
 		draw_rect(Rect2(card.position.x + 8, card.end.y - 8, card.size.x - 16, 3),
 			d.get("accent_c", GOLD))
+
+	_panel(_bar_rect(), PANEL_DEEP)
 
 	var start := start_rect()
 	draw_rect(start, GOLD)

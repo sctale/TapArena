@@ -23,6 +23,7 @@
     "team_size": 5,
     "match_cap": 480.0,
     "sudden_death_time": 300.0,
+    "boss_time": 240.0,
     "level_cap": 5,
     "xp_levels": [110, 380, 900, 1500],
     "hp_per_level": 0.09,
