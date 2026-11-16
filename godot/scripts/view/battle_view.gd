@@ -340,6 +340,10 @@ func _sync_boss(u) -> void:
 	if u.atk_anim > 0.0:
 		var k: float = 1.0 - u.atk_anim / 0.32
 		s = 1.0 + sin(k * PI) * 0.08
+	if u.cast_anim > 0.0:
+		# 技能前摇：巨兽先吸气鼓起，再砸/吼/撞出去。
+		var ck: float = clampf(1.0 - u.cast_anim / 0.70, 0.0, 1.0)
+		s += sin(ck * PI) * 0.10
 	root.scale = Vector3(s, 1.0, s)
 
 

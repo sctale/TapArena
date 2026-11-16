@@ -132,7 +132,7 @@ func _init() -> void:
 
 	var rule_issues := _rule_checks()
 	if rule_issues.is_empty():
-		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash/boss")
+		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash/boss/boss_skills")
 	else:
 		failures += 1
 		for issue in rule_issues:
@@ -283,6 +283,30 @@ func _rule_checks() -> Array:
 		sim7.step_unit(sim7.boss, 26.0)
 		if not sim7.boss.is_alive() or sim7.boss.hp < sim7.boss.max_hp:
 			issues.append("峡谷巨兽 25 秒后没有复活")
+
+	# 峡谷巨兽技能：有敌方单位时会先起手，伤害命中并进入冷却。
+	var sim9 = BattleSimScript.new()
+	sim9.setup("tiger", 0, 784)
+	sim9.clock = 179.9
+	sim9.step(0.2)
+	if sim9.boss == null:
+		issues.append("巨兽技能测试没有生成巨兽")
+	else:
+		var b = sim9.boss
+		var foe = sim9.heroes[3] if b.team == BattleSimScript.BLUE else sim9.player
+		b.pos = foe.pos + Vector2(-40.0, 0.0)
+		b.cds = [0.0, 0.0, 0.0]
+		b.atk_timer = 0.0
+		foe.invuln_t = 0.0
+		var hp0: float = foe.hp
+		sim9.step_boss(b, 0.016)
+		if b.boss_cast_t <= 0.0:
+			issues.append("巨兽技能没有前摇")
+		sim9.step_boss(b, 1.0)
+		if foe.hp >= hp0:
+			issues.append("巨兽技能没有造成伤害")
+		if b.cds[0] <= 0.0:
+			issues.append("巨兽技能没有进入冷却")
 
 	# 技能最高优先级：移动过程中按技能当帧生效；位移期间不触发顿帧。
 	var sim8 = BattleSimScript.new()

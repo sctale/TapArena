@@ -71,6 +71,14 @@ class Unit:
 	var ai_target = null
 	var lane_index: int = 0
 
+	# BOSS 技能状态：前摇、冲撞、施法目标。普通英雄不用这些字段。
+	var boss_skill: String = ""
+	var boss_cast_t: float = 0.0
+	var boss_charge_t: float = 0.0
+	var boss_charge_dir := Vector2.ZERO
+	var boss_charge_hit: Dictionary = {}
+	var boss_target = null
+
 	var skills: Array = []
 	var cds: Array = [0.0, 0.0, 0.0]
 
@@ -182,6 +190,7 @@ var minion_cfg: Dictionary = {}
 var comeback_cfg: Dictionary = {}
 var potion_cfg: Dictionary = {}
 var boss_cfg: Dictionary = {}
+var ai_cfg: Dictionary = {}
 
 var ai_think_base: float = 0.22
 var ai_skill_mul: float = 1.0
@@ -257,6 +266,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	comeback_cfg = rules.get("comeback", {})
 	potion_cfg = rules.get("potion", {})
 	boss_cfg = rules.get("boss", {})
+	ai_cfg = rules.get("ai", {})
 	boss_respawn = float(boss_cfg.get("respawn", 25.0))
 	var hs: Dictionary = rules.get("hitstop", {})
 	hitstop_threshold = float(hs.get("threshold", 45))
@@ -473,6 +483,12 @@ func spawn_boss(team: int) -> void:
 	u.radius = float(boss_cfg.get("radius", 58))
 	u.height = float(boss_cfg.get("height", 132))
 	u.atk_timer = 0.5
+	u.cds = [3.0, 6.0, 9.0]
+	u.boss_skill = ""
+	u.boss_cast_t = 0.0
+	u.boss_charge_t = 0.0
+	u.boss_charge_hit.clear()
+	u.boss_target = null
 	u.lane_index = 0 if team == BLUE else lane.size() - 1
 	boss = u
 	boss_team = team
@@ -493,6 +509,12 @@ func respawn_boss(u) -> void:
 	u.slow_t = 0.0
 	u.shield = 0.0
 	u.atk_timer = 0.4
+	u.cds = [3.0, 6.0, 9.0]
+	u.boss_skill = ""
+	u.boss_cast_t = 0.0
+	u.boss_charge_t = 0.0
+	u.boss_charge_hit.clear()
+	u.boss_target = null
 	banner.emit("峡谷巨兽再次出发！", 2.6)
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(u.team), 180.0)
 
@@ -500,7 +522,42 @@ func respawn_boss(u) -> void:
 func step_boss(u, dt: float) -> void:
 	if u.stun_t > 0.0:
 		return
+
+	# 技能前摇：站定蓄力，结束后统一结算。
+	if u.boss_cast_t > 0.0:
+		u.boss_cast_t = maxf(0.0, u.boss_cast_t - dt)
+		u.moving = false
+		if u.boss_cast_t <= 0.0:
+			_resolve_boss_cast(u)
+		return
+
+	# 冲撞进行中：沿朝向高速推进，撞到谁算谁。
+	if u.boss_charge_t > 0.0:
+		_step_boss_charge(u, dt)
+		return
+
+	var skills: Dictionary = boss_cfg.get("skills", {})
+	var slam: Dictionary = skills.get("slam", {})
+	var roar: Dictionary = skills.get("roar", {})
+	var charge: Dictionary = skills.get("charge", {})
+
+	# 裂地重击：身边有英雄/小兵才用，避免对空塔浪费。
+	if u.cds[0] <= 0.0 and count_enemy_units_near(u, float(slam.get("radius", 250.0))) > 0:
+		_begin_boss_cast(u, "slam", slam, 0)
+		return
+	# 巨兽咆哮：范围更大，先减速再追。
+	if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(roar.get("radius", 330.0))) > 0:
+		_begin_boss_cast(u, "roar", roar, 1)
+		return
+	# 野蛮冲撞：离前塔还远时直接撞过去。
 	var front = front_structure(u.team)
+	if u.cds[2] <= 0.0 and front != null and front.is_alive():
+		var fd: float = u.pos.distance_to(front.pos)
+		if fd >= float(charge.get("min_range", 260.0)) and fd <= float(charge.get("range", 620.0)):
+			_begin_boss_cast(u, "charge", charge, 2, front)
+			return
+
+	# 其余时间保持原来的普攻推进。
 	var target = nearest_enemy(u, u.attack_range + 90.0)
 	if target != null and u.pos.distance_to(target.pos) <= u.attack_range + target.radius:
 		u.moving = false
@@ -527,6 +584,156 @@ func step_boss(u, dt: float) -> void:
 			hit_with_fx(front, u.dmg * mul, u, 0.2)
 		return
 	move_ai(u, to, dt, 0.92)
+
+
+func count_enemy_units_near(from, radius: float) -> int:
+	var n := 0
+	for o in units:
+		if not o.is_alive() or o.team == from.team:
+			continue
+		if o.kind != HERO and o.kind != MINION:
+			continue
+		if from.pos.distance_to(o.pos) <= radius + o.radius:
+			n += 1
+	return n
+
+
+func nearest_enemy_unit(from, radius: float):
+	var best = null
+	var bd := radius
+	for o in units:
+		if not o.is_alive() or o.team == from.team:
+			continue
+		if o.kind != HERO and o.kind != MINION:
+			continue
+		var d: float = from.pos.distance_to(o.pos)
+		if d <= bd:
+			bd = d
+			best = o
+	return best
+
+
+func _begin_boss_cast(u, kind: String, cfg: Dictionary, index: int, target = null) -> void:
+	u.boss_skill = kind
+	u.boss_target = target
+	var windup := float(cfg.get("windup", 0.6))
+	u.boss_cast_t = windup
+	u.cast_anim = windup
+	u.moving = false
+	u.cds[index] = float(cfg.get("cd", 8.0))
+
+	var col := _team_color(u.team)
+	var label := "裂地重击！"
+	var style := "quake"
+	var telegraph := float(cfg.get("radius", 250.0)) * 0.72
+	if kind == "roar":
+		label = "巨兽咆哮！"
+		style = "roar"
+		telegraph = float(cfg.get("radius", 330.0)) * 0.75
+	elif kind == "charge":
+		label = "野蛮冲撞！"
+		telegraph = 90.0
+	if target != null and target.is_alive():
+		u.facing = 1.0 if target.pos.x >= u.pos.x else -1.0
+	else:
+		var foe = nearest_enemy_unit(u, 420.0)
+		if foe != null:
+			u.facing = 1.0 if foe.pos.x >= u.pos.x else -1.0
+	float_text.emit(Vector3(u.pos.x, u.height + 34.0, u.pos.y), label, col)
+	fx.emit("cast_" + style, Vector3(u.pos.x, 20.0, u.pos.y), col, telegraph)
+	fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, telegraph)
+	sfx.emit("boom" if kind == "slam" else "ult")
+
+
+func _resolve_boss_cast(u) -> void:
+	var kind: String = str(u.boss_skill)
+	var skills: Dictionary = boss_cfg.get("skills", {})
+	var cfg: Dictionary = skills.get(kind, {})
+	var col := _team_color(u.team)
+	u.cast_anim = 0.0
+	u.moving = false
+
+	match kind:
+		"slam":
+			var radius := float(cfg.get("radius", 250.0))
+			area_damage(u.pos, radius, float(cfg.get("dmg", 150.0)), u, u.team, 0.0,
+				float(cfg.get("stun", 0.35)), float(cfg.get("knock", 45.0)), true)
+			fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
+			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
+			fx.emit("debris", Vector3(u.pos.x, 24.0, u.pos.y), col, radius)
+			sfx.emit("boom")
+		"roar":
+			var radius := float(cfg.get("radius", 330.0))
+			for o in units:
+				if not o.is_alive() or o.team == u.team:
+					continue
+				if o.kind != HERO and o.kind != MINION:
+					continue
+				if u.pos.distance_to(o.pos) > radius + o.radius:
+					continue
+				deal_damage(o, float(cfg.get("dmg", 55.0)), u)
+				o.slow_t = maxf(o.slow_t, float(cfg.get("slow", 1.8)))
+			u.shield = maxf(u.shield, u.max_hp * float(cfg.get("shield_pct", 0.10)))
+			u.shield_t = maxf(u.shield_t, float(cfg.get("shield_time", 5.0)))
+			for a in units:
+				if a.team == u.team and a.kind == MINION and a.is_alive() \
+						and u.pos.distance_to(a.pos) <= radius + a.radius:
+					a.hp = minf(a.max_hp, a.hp + a.max_hp * 0.10)
+			fx.emit("cast_roar", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
+			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
+			sfx.emit("ult")
+		"charge":
+			var dur := float(cfg.get("duration", 0.5))
+			u.boss_charge_t = dur
+			u.boss_charge_hit.clear()
+			var dir := Vector2(u.facing, 0.0)
+			if u.boss_target != null and u.boss_target.is_alive():
+				var to: Vector2 = u.boss_target.pos - u.pos
+				if to.length_squared() > 0.01:
+					dir = to.normalized()
+			u.boss_charge_dir = dir
+			u.boss_skill = ""
+			return
+
+	u.boss_skill = ""
+	u.boss_target = null
+
+
+func _step_boss_charge(u, dt: float) -> void:
+	var cfg: Dictionary = boss_cfg.get("skills", {}).get("charge", {})
+	u.boss_charge_t = maxf(0.0, u.boss_charge_t - dt)
+	u.moving = true
+	u.walk_t += dt
+	u.facing = 1.0 if u.boss_charge_dir.x >= 0.0 else -1.0
+	var speed := float(cfg.get("speed", 700.0))
+	var dmg := float(cfg.get("dmg", 120.0))
+	var stun := float(cfg.get("stun", 0.25))
+	var knock := float(cfg.get("knock", 50.0))
+	var struct_mul := float(boss_cfg.get("structure_damage_mul", 1.6))
+	move_to(u, u.pos + u.boss_charge_dir * speed * dt)
+
+	for o in units:
+		if not o.is_alive() or o.team == u.team:
+			continue
+		if u.boss_charge_hit.has(o.uid):
+			continue
+		if u.pos.distance_to(o.pos) > u.radius + o.radius + 32.0:
+			continue
+		var amount := dmg * (struct_mul if (o.kind == TOWER or o.kind == BASE) else 1.0)
+		hit_with_fx(o, amount, u, stun)
+		if knock > 0.0 and o.kind != TOWER and o.kind != BASE:
+			move_to(o, o.pos + u.boss_charge_dir * knock)
+		u.boss_charge_hit[o.uid] = true
+
+	if u.boss_target != null and u.boss_target.is_alive() \
+			and u.pos.distance_to(u.boss_target.pos) <= u.radius + u.boss_target.radius + 50.0:
+		u.boss_charge_t = 0.0
+
+	if u.boss_charge_t <= 0.0:
+		u.boss_charge_t = 0.0
+		u.moving = false
+		u.boss_target = null
+		fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), _team_color(u.team), 90.0)
 
 
 func make_hero(id: String, team: int, slot: int):
@@ -748,13 +955,22 @@ func hero_shot_style(id: String) -> String:
 
 func step_hero_ai(h, dt: float) -> void:
 	var hp_p: float = h.hp / h.max_hp
-	var retreat: bool = hp_p < 0.3
+	var foe_heroes := count_team_heroes(1 - h.team, h.pos, 460.0)
+	var ally_heroes := count_team_heroes(h.team, h.pos, 460.0)
+	var enemy_near := enemy_hero_near(h, 430.0)
+	var retreat_hp := float(ai_cfg.get("retreat_hp", 0.24))
+	var retreat_enemy_hp := float(ai_cfg.get("retreat_with_enemy_hp", 0.40))
+	var outnumbered_hp := float(ai_cfg.get("outnumbered_hp", 0.56))
+	var retreat: bool = hp_p < retreat_hp \
+		or (hp_p < retreat_enemy_hp and enemy_near and not has_healer_near(h, 380.0)) \
+		or (hp_p < outnumbered_hp and foe_heroes >= ally_heroes + 2)
 
 	h.ai_think -= dt
 	var think: bool = h.ai_think <= 0.0
 	if think:
 		h.ai_think = ai_think_base + float(h.uid % 5) * 0.025
-	if h.ai_target == null or not h.ai_target.is_alive():
+	# 每次决策都重新打分，避免锁定一座塔后一路无视路上的兵和英雄。
+	if think or h.ai_target == null or not h.ai_target.is_alive():
 		h.ai_target = ai_target(h)
 	var t = h.ai_target
 	var front = front_structure(h.team)
@@ -779,9 +995,27 @@ func step_hero_ai(h, dt: float) -> void:
 		return
 
 	if t == null:
-		# 没有近处目标时，走向「最靠前的敌方建筑」，不要直接奔向水晶。
+		# 没有可打目标时，先等兵线；近战没兵不要空手越塔。
 		if front != null and front.is_alive():
-			move_ai(h, front.pos - h.pos, dt, 0.9)
+			if front.kind == TOWER and not tower_safe_for(h, front):
+				var stand: Vector2 = front.pos + Vector2(-1.0 if h.team == BLUE else 1.0, 0.0) \
+					* (front.attack_range + float(ai_cfg.get("tower_standoff", 100.0)))
+				if h.pos.distance_to(stand) > 45.0:
+					move_ai(h, stand - h.pos, dt, 0.85)
+				else:
+					h.moving = false
+			else:
+				move_ai(h, front.pos - h.pos, dt, 0.9)
+		else:
+			h.moving = false
+		return
+
+	# 近战无兵不越塔：站在塔射程外等下一波兵；远程能点塔时照常输出。
+	if t.kind == TOWER and not tower_safe_for(h, t):
+		var stand: Vector2 = t.pos + Vector2(-1.0 if h.team == BLUE else 1.0, 0.0) \
+			* (t.attack_range + float(ai_cfg.get("tower_standoff", 100.0)))
+		if h.pos.distance_to(stand) > 45.0:
+			move_ai(h, stand - h.pos, dt, 0.85)
 		else:
 			h.moving = false
 		return
@@ -842,19 +1076,22 @@ func step_hero_skills(h, hp_p: float, retreat: bool) -> void:
 				use = hp_p < 0.75 and enemy_hero_near(h, 420.0) and rng.randf() < 0.5
 			"dash":
 				var td = h.ai_target
-				if td != null:
+				if td != null and td.kind == HERO:
 					var d: float = h.pos.distance_to(td.pos)
 					use = d > float(s.get("range", 230)) * 0.9 and d < float(s.get("range", 230)) * 1.7 and rng.randf() < 0.4
 			"cone":
-				use = count_enemies_around(h, float(s.get("range", 132)), 0.2) > 0 and rng.randf() < 0.5
+				var cone_n := count_enemies_around(h, float(s.get("range", 132)), 0.2)
+				use = cone_n >= 2 or (cone_n > 0 and nearest_hero(h, float(s.get("range", 132))) != null)
 			"pull", "leap":
 				use = nearest_hero(h, float(s.get("range", 300))) != null and rng.randf() < 0.32
 			"multi":
-				use = nearest_enemy(h, float(s.get("range", 260))) != null and rng.randf() < 0.34
+				use = nearest_hero(h, float(s.get("range", 260))) != null and rng.randf() < 0.34
 			"radial":
-				use = nearest_enemy(h, float(s.get("range", 152))) != null and rng.randf() < 0.42
+				var radial_n := count_enemies_around(h, float(s.get("range", 152)), -1.0)
+				use = radial_n >= 2 or nearest_hero(h, float(s.get("range", 152))) != null
 			"aoe":
-				use = count_enemies_around(h, float(s.get("radius", 180)), -1.0) > 0 and rng.randf() < 0.42
+				var aoe_n := count_enemies_around(h, float(s.get("radius", 180)), -1.0)
+				use = aoe_n >= 2 or (aoe_n > 0 and nearest_hero(h, float(s.get("radius", 180))) != null)
 			_:
 				use = nearest_enemy(h, maxf(float(s.get("range", 260)), h.attack_range)) != null and rng.randf() < 0.36
 
@@ -918,7 +1155,14 @@ func ai_target(h):
 	var front = front_structure(h.team)
 	var tower_alive: bool = front != null and front.kind == TOWER and front.is_alive()
 	var best = null
-	var bd := 900.0
+	var best_score := -1.0e20
+	var hero_w := float(ai_cfg.get("hero_weight", 330.0))
+	var minion_w := float(ai_cfg.get("minion_weight", 240.0))
+	var tower_w := float(ai_cfg.get("tower_weight", 160.0))
+	var base_w := float(ai_cfg.get("base_weight", 120.0))
+	var focus := float(ai_cfg.get("focus_hp_bonus", 150.0))
+	var sticky := float(ai_cfg.get("target_sticky", 45.0))
+
 	for o in units:
 		if not o.is_alive() or o.team == h.team:
 			continue
@@ -933,15 +1177,95 @@ func ai_target(h):
 			if h.team == RED and o.pos.x < front.pos.x - 20.0:
 				continue
 		var d: float = h.pos.distance_to(o.pos)
-		var w := d + (-40.0 if o.kind == HERO else 0.0)
-		if o == front:
-			w -= 160.0
-		if sudden_death and o.kind == BASE:
-			w -= 1200.0
-		if w < bd:
-			bd = w
+		if d > 900.0:
+			continue
+		var score := 0.0
+		match o.kind:
+			HERO:
+				score = hero_w - d * 0.42
+				score += (1.0 - clampf(o.hp / maxf(o.max_hp, 1.0), 0.0, 1.0)) * focus
+				if d <= h.attack_range + 90.0:
+					score += 80.0
+				if o.attack_range > 250.0 and d <= o.attack_range + 120.0:
+					score += 25.0
+				if ally_engaged(h, o):
+					score += 45.0
+			MINION:
+				score = minion_w - d * 0.62
+				if d <= h.attack_range + 70.0:
+					score += 55.0
+				if front != null and o.pos.distance_to(front.pos) < 260.0:
+					score += 20.0
+			TOWER:
+				score = tower_w - d * 0.18
+				if o == front:
+					score += 70.0
+				if not tower_safe_for(h, o):
+					score -= 190.0
+				if count_enemies_at(o.pos, o.team, 280.0) > 0:
+					score -= 80.0
+			BASE:
+				score = base_w - d * 0.08
+				if sudden_death:
+					score += 500.0
+		if o == h.ai_target:
+			score += sticky
+		if score > best_score:
+			best_score = score
 			best = o
 	return best
+
+
+func count_enemies_at(pos: Vector2, team: int, radius: float) -> int:
+	var n := 0
+	for u in units:
+		if not u.is_alive() or u.team == team:
+			continue
+		if u.kind != HERO and u.kind != MINION:
+			continue
+		if pos.distance_to(u.pos) <= radius + u.radius:
+			n += 1
+	return n
+
+
+func ally_engaged(h, foe) -> bool:
+	for a in heroes:
+		if a != h and a.is_alive() and a.team == h.team and a.pos.distance_to(foe.pos) <= 260.0:
+			return true
+	return false
+
+
+func tower_safe_for(h, t) -> bool:
+	# 近战没兵不要越塔；远程能站在塔射程外，允许直接点塔。
+	if t == null or not t.is_alive():
+		return true
+	if h.attack_range > t.attack_range + 30.0:
+		return true
+	if h.hp / maxf(h.max_hp, 1.0) < 0.55:
+		return false
+	if t.hp / maxf(t.max_hp, 1.0) < 0.15:
+		return true
+	for m in minions:
+		if m.is_alive() and m.team == h.team \
+				and m.pos.distance_to(t.pos) <= t.attack_range + 100.0:
+			return true
+	return false
+
+
+func count_team_heroes(team: int, pos: Vector2, radius: float) -> int:
+	var n := 0
+	for h in heroes:
+		if h.is_alive() and h.team == team and h.pos.distance_to(pos) <= radius:
+			n += 1
+	return n
+
+
+func has_healer_near(h, radius: float) -> bool:
+	for a in heroes:
+		if a != h and a.is_alive() and a.team == h.team \
+				and a.hero_id == "rabbit" and a.pos.distance_to(h.pos) <= radius:
+			return true
+	return false
 
 
 func step_minion(m, dt: float) -> void:
@@ -1240,9 +1564,11 @@ func respawn(h) -> void:
 
 
 func area_damage(center: Vector2, radius: float, dmg: float, src, team: int,
-		slow: float, stun: float, knock: float) -> void:
+		slow: float, stun: float, knock: float, unit_only := false) -> void:
 	for u in units:
 		if not u.is_alive() or u.team == team:
+			continue
+		if unit_only and (u.kind == TOWER or u.kind == BASE):
 			continue
 		if center.distance_to(u.pos) > radius + u.radius:
 			continue

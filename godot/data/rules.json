@@ -54,7 +54,49 @@
     "radius": 58,
     "height": 132,
     "respawn": 25,
-    "structure_damage_mul": 1.6
+    "structure_damage_mul": 1.6,
+    "skills": {
+      "slam": {
+        "cd": 7.5,
+        "windup": 0.65,
+        "radius": 250,
+        "dmg": 150,
+        "stun": 0.35,
+        "knock": 45
+      },
+      "roar": {
+        "cd": 13.0,
+        "windup": 0.55,
+        "radius": 330,
+        "dmg": 55,
+        "slow": 1.8,
+        "shield_pct": 0.10,
+        "shield_time": 5.0
+      },
+      "charge": {
+        "cd": 11.0,
+        "windup": 0.50,
+        "duration": 0.50,
+        "speed": 700,
+        "dmg": 120,
+        "knock": 50,
+        "stun": 0.25,
+        "min_range": 260,
+        "range": 620
+      }
+    }
+  },
+  "ai": {
+    "hero_weight": 330,
+    "minion_weight": 240,
+    "tower_weight": 160,
+    "base_weight": 120,
+    "focus_hp_bonus": 150,
+    "target_sticky": 45,
+    "retreat_hp": 0.24,
+    "retreat_with_enemy_hp": 0.40,
+    "outnumbered_hp": 0.56,
+    "tower_standoff": 100
   },
   "lane": [
     [300, 800],
