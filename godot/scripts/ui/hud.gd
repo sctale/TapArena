@@ -373,7 +373,7 @@ func _make_labels() -> void:
 	lbl_res_head_k = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65))
 	lbl_res_head_d = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65))
 	lbl_res_head_dmg = _mk_label(int(h * 0.018), Color(1, 0.96, 0.86, 0.65), HORIZONTAL_ALIGNMENT_RIGHT)
-	for i in range(6):
+	for i in range(10):
 		lbl_res_names.append(_mk_label(int(h * 0.021), CREAM, HORIZONTAL_ALIGNMENT_LEFT))
 	lbl_res_btn = _mk_label(int(h * 0.030), INK)
 	lbl_res_home = _mk_label(int(h * 0.028), CREAM)
@@ -546,7 +546,8 @@ func _update_panel_labels() -> void:
 		_set_label(lbl_pause_sound, "音效：开" if sound_on else "音效：关")
 		lbl_pause_sound.add_theme_color_override("font_color", CREAM if sound_on else Color(1, 1, 1, 0.55))
 		_place(lbl_pause_goal, Rect2(p.position.x, p.position.y + p.size.y * 0.66, p.size.x, h * 0.045))
-		_set_label(lbl_pause_goal, "往右走 → 拆外塔、拆内塔，再点亮水晶")
+		_set_label(lbl_pause_goal, "三路推进 → 拆掉两座塔，再点亮水晶" if sim.five_v_five
+			else "往右走 → 拆外塔、拆内塔，再点亮水晶")
 		_place(lbl_pause_foot, Rect2(p.position.x, p.end.y - h * 0.08, p.size.x, h * 0.04))
 		_set_label(lbl_pause_foot, "萌兽峡谷 · Godot 4.3.1")
 	elif show_result:
@@ -565,7 +566,8 @@ func _update_panel_labels() -> void:
 			[_time_text(sim.clock), sim.score_blue, sim.score_red])
 
 		var table := _result_table_rect()
-		var row_h := table.size.y / 6.0
+		var res_rows := maxi(1, sim.heroes.size())
+		var row_h := table.size.y / float(res_rows)
 		var hy := p.position.y + p.size.y * 0.225
 		var hh := p.size.y * 0.045
 		var hx := table.position.x
@@ -579,9 +581,11 @@ func _update_panel_labels() -> void:
 		_place(lbl_res_head_dmg, Rect2(hx + hw * 0.82, hy, hw * 0.155, hh), true)
 		_set_label(lbl_res_head_dmg, "输出")
 
-		for i in range(mini(6, sim.heroes.size())):
+		var row_font := int(_safe().size.y * (0.021 if res_rows <= 6 else 0.0165))
+		for i in range(mini(10, sim.heroes.size())):
 			var u = sim.heroes[i]
 			var l: Label = lbl_res_names[i]
+			l.add_theme_font_size_override("font_size", row_font)
 			var ry := table.position.y + row_h * float(i)
 			_place(l, Rect2(hx + hw * 0.095, ry, hw * 0.30, row_h), true)
 			var nm := str(u.def.get("name", "?"))
@@ -787,10 +791,11 @@ func _draw_score_bg(safe: Rect2, h: float) -> void:
 	_add_rect(red_chip, Color("f07a63"))
 	_add_box(red_chip, PANEL_DARK, 2.0)
 	# 小比分条贴在本方半区，不再挤在正中间。
-	var pip_w := panel.size.x * 0.022
+	var tower_slots := mini(6, sim.towers_blue.size())
+	var pip_w := panel.size.x * 0.022 * 2.0 / float(maxi(1, tower_slots))
 	var pip_h := h * 0.012
 	var pip_y := panel.end.y - h * 0.022
-	for i in range(2):
+	for i in range(tower_slots):
 		var bx := panel.position.x + panel.size.x * 0.15 + float(i) * (pip_w + 4.0)
 		var br := Rect2(bx, pip_y, pip_w, pip_h)
 		_add_rect(Rect2(br.position - Vector2(1, 1), br.size + Vector2(2, 2)), PANEL_DARK)
@@ -832,9 +837,18 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 	_panel(mini, Color("3f6b32"))
 	var inner := Rect2(mini.position + Vector2(4, 4), mini.size - Vector2(8, 8))
 	_add_rect(inner, Color("4f8a3f"))
-	var lane_y := inner.position.y + inner.size.y * 0.5
-	_add_rect(Rect2(inner.position.x, lane_y - inner.size.y * 0.10, inner.size.x, inner.size.y * 0.20),
-		Color("b09464"))
+	# 3v3 画一条中路，5v5 画三条并行兵线；野区营地用金色点标出。
+	var mini_paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
+	for path in mini_paths:
+		if path.is_empty():
+			continue
+		var lane_y := 0.0
+		for p in path:
+			lane_y += p.y
+		lane_y /= float(path.size())
+		var lane_px: float = inner.position.y + lane_y / sim.map_h * inner.size.y
+		_add_rect(Rect2(inner.position.x, lane_px - inner.size.y * 0.055,
+			inner.size.x, inner.size.y * 0.11), Color("b09464"))
 	for u in sim.units:
 		if not u.is_alive() or u.kind == sim.MINION:
 			continue
@@ -842,7 +856,9 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 		var px: float = inner.position.x + rp.x / sim.map_w * inner.size.x
 		var py: float = inner.position.y + rp.y / sim.map_h * inner.size.y
 		var c := BLUE if u.team == sim.BLUE else Color("f07a63")
-		var s := 7.0 if u.kind == sim.BASE else (9.0 if u.kind == sim.BOSS else 5.0)
+		if u.kind == sim.JUNGLE:
+			c = Color("e2c46a")
+		var s := 7.0 if u.kind == sim.BASE else (9.0 if u.kind == sim.BOSS else (4.0 if u.kind == sim.JUNGLE else 5.0))
 		_add_rect(Rect2(px - s * 0.5, py - s * 0.5, s, s), PANEL_DARK)
 		_add_rect(Rect2(px - s * 0.5 + 1, py - s * 0.5 + 1, s - 2, s - 2), c)
 	# 回血药剂：小地图上的绿色十字点。
@@ -1058,9 +1074,10 @@ func _draw_result_bg(safe: Rect2) -> void:
 
 	# 6 人战绩表：按蓝队 3 人、红队 3 人排列，玩家一行用金色边框标出。
 	var table := _result_table_rect()
-	var row_h := table.size.y / 6.0
-	var dpx := maxf(2.4, safe.size.y * 0.0048)
-	var count := mini(6, sim.heroes.size())
+	var row_count := maxi(1, sim.heroes.size())
+	var row_h := table.size.y / float(row_count)
+	var dpx := maxf(2.2, safe.size.y * 0.0042)
+	var count := mini(10, sim.heroes.size())
 	_add_rect(Rect2(table.position.x, table.position.y - 8.0, table.size.x, 2), Color(1, 1, 1, 0.22))
 	for i in range(count):
 		var u = sim.heroes[i]
@@ -1088,8 +1105,9 @@ func _draw_result_bg(safe: Rect2) -> void:
 
 func _draw_result_icons(_safe_rect: Rect2) -> void:
 	var table := _result_table_rect()
-	var row_h := table.size.y / 6.0
-	var count := mini(6, sim.heroes.size())
+	var row_count := maxi(1, sim.heroes.size())
+	var row_h := table.size.y / float(row_count)
+	var count := mini(10, sim.heroes.size())
 	var best = null
 	for u in sim.heroes:
 		if best == null or u.damage_dealt > best.damage_dealt:

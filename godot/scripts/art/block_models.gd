@@ -199,6 +199,67 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 				_b(boxes, Vector3(6.5 * sx, 36, 10.3), Vector3(3, 3, 1), "flat", cream)
 				_b(boxes, Vector3(9.5 * sx, 30, 10.3), Vector3(2, 2, 1), "flat", cream)
 			_b(boxes, Vector3(9, 32, -13), Vector3(7, 7, 9), "fur", cream)
+		"turtle":
+			# 小龟：背甲 + 腹甲 + 小头 + 蹼手
+			_b(boxes, Vector3(0, 24, -14), Vector3(32, 34, 13), "stone", _darker(fur, 0.72))
+			_b(boxes, Vector3(0, 27, -20), Vector3(24, 24, 3), "flat", accent)
+			_b(boxes, Vector3(0, 44, 10.3), Vector3(22, 15, 1), "flat", cream)
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(8.0 * sx, 66, 12.7), Vector3(5, 4, 2), "flat", dark)
+				_b(boxes, Vector3(15.0 * sx, 23, 0), Vector3(7, 10, 12), "fur", _darker(fur, 0.88))
+			_b(boxes, Vector3(0, 59, 12.9), Vector3(6, 4, 1), "flat", dark)
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(8, 30, -13), Vector3(8, 7, 8), "fur", _darker(fur, 0.8))
+		"hedgehog":
+			# 刺猬：头背尖刺 + 奶油脸 + 红围巾
+			for sx in [-1, 1]:
+				for k in range(3):
+					_b(boxes, Vector3((12.0 + k * 2.0) * sx, 65.0 + k * 5.0, -3.0),
+						Vector3(6, 9, 6), "flat", dark)
+				_b(boxes, Vector3(13.0 * sx, 34, -8), Vector3(8, 12, 9), "flat", dark)
+			for k in range(3):
+				_b(boxes, Vector3(float(k - 1) * 11.0, 48.0 + float(k % 2) * 6.0, -14),
+					Vector3(8, 10, 8), "flat", _darker(dark, 0.9))
+			_b(boxes, Vector3(0, 58, 12.7), Vector3(18, 8, 2), "flat", cream)
+			_b(boxes, Vector3(0, 61, 13.2), Vector3(6, 3, 1), "flat", dark)
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(8, 30, -13), Vector3(8, 8, 8), "flat", dark)
+		"redpanda":
+			# 小熊猫：红棕身体 + 深色四肢 + 环纹大尾 + 金围巾
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9.0 * sx, 74, 0), Vector3(8, 10, 7), "fur", dark)
+				_b(boxes, Vector3(9.0 * sx, 76, 3.5), Vector3(4, 4, 2), "flat", cream)
+				_b(boxes, Vector3(20.0 * sx, 12, 0), Vector3(10, 18, 10), "flat", dark)
+				_b(boxes, Vector3(8.0 * sx, 0, 0), Vector3(13, 16, 13), "flat", dark)
+			_b(boxes, Vector3(0, 58, 12.7), Vector3(19, 9, 2), "flat", cream)
+			_b(boxes, Vector3(0, 61, 13.2), Vector3(6, 3, 1), "flat", dark)
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(0, 42, 10.2), Vector3(12, 9, 1), "flat", cream)
+			_b(boxes, Vector3(10, 32, -14), Vector3(9, 9, 16), "fur", fur)
+			_b(boxes, Vector3(10, 39, -27), Vector3(9, 9, 11), "fur", dark)
+		"wolf":
+			# 小狼：尖耳 + 灰毛 + 深色吻部 + 长尾
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(8.5 * sx, 75, 0), Vector3(7, 13, 7), "fur", dark)
+				_b(boxes, Vector3(8.5 * sx, 77, 3.6), Vector3(3, 8, 2), "flat", cream)
+				_b(boxes, Vector3(8.0 * sx, 66, 12.7), Vector3(4, 4, 2), "flat", dark)
+			_b(boxes, Vector3(0, 59, 12.7), Vector3(17, 7, 2), "flat", cream)
+			_b(boxes, Vector3(0, 61, 13.2), Vector3(5, 3, 1), "flat", dark)
+			_b(boxes, Vector3(0, 52, 0), Vector3(28, 4, 22), "flat", accent)
+			_b(boxes, Vector3(0, 44, 10.2), Vector3(9, 10, 1), "flat", cream)
+			_b(boxes, Vector3(9, 34, -14), Vector3(9, 9, 15), "fur", fur)
+			_b(boxes, Vector3(9, 38, -27), Vector3(8, 8, 11), "fur", dark)
+		"crane":
+			# 小鹤：白羽 + 红顶 + 长喙 + 黑翅尖 + 细腿
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9.0 * sx, 68, 0), Vector3(8, 14, 7), "fur", fur)
+				_b(boxes, Vector3(20.0 * sx, 30, 0), Vector3(11, 24, 12), "fur", cream)
+				_b(boxes, Vector3(20.0 * sx, 28, 8), Vector3(6, 6, 2), "flat", dark)
+			_b(boxes, Vector3(0, 78, 2), Vector3(7, 4, 5), "flat", accent)
+			_b(boxes, Vector3(0, 60, 14.2), Vector3(5, 3, 7), "flat", accent)
+			_b(boxes, Vector3(0, 58, 12.7), Vector3(16, 7, 2), "flat", cream)
+			_b(boxes, Vector3(0, 44, 10.2), Vector3(8, 10, 1), "flat", cream)
+			_b(boxes, Vector3(0, 30, -13), Vector3(8, 10, 8), "fur", cream)
 		_:
 			pass
 	return boxes
@@ -220,6 +281,39 @@ static func _humanoid_base(boxes: Array, fur: Color, cream: Color, dark: Color, 
 	for sx in [-1, 1]:
 		_b(boxes, Vector3(5.5 * sx, 68, 12.7), Vector3(4, 4, 2), "flat", dark)
 	_b(boxes, Vector3(0, 61, 13.1), Vector3(6, 2, 1), "flat", dark)
+
+
+static func jungle_monster(atlas: PixelAtlas, kind: String) -> ArrayMesh:
+	var boxes: Array = []
+	if kind == "crab":
+		_b(boxes, Vector3(0, 4, 0), Vector3(32, 18, 28), "stone", Color("d86a4a"))
+		_b(boxes, Vector3(0, 8, 0), Vector3(24, 12, 22), "flat", Color("f09060"))
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(20 * sx, 8, 4), Vector3(12, 8, 8), "stone", Color("c85a3a"))
+			_b(boxes, Vector3(10 * sx, 20, 12), Vector3(5, 5, 5), "flat", Color("1c1b1a"))
+		_b(boxes, Vector3(0, 4, 15), Vector3(8, 3, 4), "flat", Color("f5d08a"))
+	elif kind == "wolf":
+		_b(boxes, Vector3(0, 8, 0), Vector3(24, 20, 42), "fur", Color("8c98a8"))
+		_b(boxes, Vector3(0, 22, 18), Vector3(18, 16, 16), "fur", Color("a8b2be"))
+		_b(boxes, Vector3(0, 25, 27), Vector3(10, 8, 8), "flat", Color("e8edf3"))
+		_b(boxes, Vector3(0, 28, 30), Vector3(4, 3, 3), "flat", Color("1c1b1a"))
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(6 * sx, 32, 18), Vector3(5, 8, 5), "fur", Color("4a5260"))
+			_b(boxes, Vector3(6 * sx, 0, 12), Vector3(5, 10, 5), "fur", Color("4a5260"))
+			_b(boxes, Vector3(6 * sx, 0, -12), Vector3(5, 10, 5), "fur", Color("4a5260"))
+		_b(boxes, Vector3(0, 18, -22), Vector3(8, 8, 16), "fur", Color("6b7685"))
+	else:
+		_b(boxes, Vector3(0, 4, 0), Vector3(36, 22, 30), "fur", Color("8a5a3b"))
+		_b(boxes, Vector3(0, 20, 13), Vector3(18, 16, 14), "fur", Color("a06a45"))
+		_b(boxes, Vector3(0, 22, 22), Vector3(10, 7, 6), "flat", Color("c98a63"))
+		_b(boxes, Vector3(0, 24, 25), Vector3(4, 3, 3), "flat", Color("1c1b1a"))
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(6 * sx, 24, 20), Vector3(4, 4, 4), "flat", Color("1c1b1a"))
+			_b(boxes, Vector3(12 * sx, 5, 8), Vector3(8, 3, 3), "flat", Color("f5eedc"))
+			_b(boxes, Vector3(7 * sx, 0, 12), Vector3(5, 8, 5), "fur", Color("6b4227"))
+			_b(boxes, Vector3(7 * sx, 0, -12), Vector3(5, 8, 5), "fur", Color("6b4227"))
+		_b(boxes, Vector3(0, 20, -16), Vector3(5, 5, 8), "fur", Color("6b4227"))
+	return VoxelModel.mesh(atlas, boxes)
 
 
 static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) -> ArrayMesh:
@@ -267,7 +361,7 @@ static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) ->
 	return VoxelModel.mesh(atlas, boxes)
 
 
-static func boss(atlas: PixelAtlas, color: Color, team: int) -> ArrayMesh:
+static func boss(atlas: PixelAtlas, color: Color, team: int, flight := false) -> ArrayMesh:
 	# 3 分钟后出场的峡谷巨兽：石甲、金角、胸口团队色核心。
 	var boxes: Array = []
 	var stone := Color("8f8f9c")
@@ -302,6 +396,13 @@ static func boss(atlas: PixelAtlas, color: Color, team: int) -> ArrayMesh:
 			Vector3(9, 16, 9), "stone", dark)
 		_b(boxes, Vector3(float(i - 1) * 16.0, 87.0 + float(i % 2) * 10.0, -21.0),
 			Vector3(5, 5, 5), "glow", glow)
+	if flight:
+		# 第二形态：展开一对石翼，飞在空中。
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(32.0 * sx, 62, -12), Vector3(30, 7, 24), "stone", Color("8f8f9c"))
+			_b(boxes, Vector3(58.0 * sx, 66, -20), Vector3(28, 5, 30), "stone", Color("b8b2c2"))
+			_b(boxes, Vector3(80.0 * sx, 72, -28), Vector3(20, 4, 22), "flat", Color("d8d2e0"))
+			_b(boxes, Vector3(34.0 * sx, 54, -10), Vector3(20, 4, 14), "flat", Color("ffd76a"))
 	return VoxelModel.mesh(atlas, boxes)
 
 

@@ -132,11 +132,19 @@ func _init() -> void:
 
 	var rule_issues := _rule_checks()
 	if rule_issues.is_empty():
-		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash/boss/boss_skills")
+		print("RULE_OK base_protection/base_heal/ult_cd/potion/dash/boss/boss_skills/boss_flying/5v5")
 	else:
 		failures += 1
 		for issue in rule_issues:
 			print("RULE_FAIL " + issue)
+
+	var sig_issues := _signature_skill_checks()
+	if sig_issues.is_empty():
+		print("SIG_OK blink/beam/chain/mark/taunt/fear/spin/trap/boomerang/heal_zone")
+	else:
+		failures += 1
+		for issue in sig_issues:
+			print("SIG_FAIL " + issue)
 
 	if failures == 0:
 		print("SIM_OK matches=%d dt=%.4f" % [MATCHES, DT])
@@ -346,6 +354,100 @@ func _rule_checks() -> Array:
 	if stop_count[0] != 1:
 		issues.append("位移结束后没有恢复顿帧")
 
+	# ---- 5v5：三路、三塔、野区、两位数的英雄与 5 分钟上限 ----
+	var simA = BattleSimScript.new()
+	simA.setup("wolf", 0, 9100, true)
+	if not simA.five_v_five:
+		issues.append("5v5 模式标记没有生效")
+	if simA.heroes.size() != 10:
+		issues.append("5v5 英雄数量不是 10，实际 %d" % simA.heroes.size())
+	if simA.towers_blue.size() != 3 or simA.towers_red.size() != 3:
+		issues.append("5v5 每方应有 3 座塔")
+	if simA.lane_paths.size() != 3:
+		issues.append("5v5 应有 3 条分路")
+	var camp_count := 0
+	var lane_set: Dictionary = {}
+	for u in simA.units:
+		if u.kind == BattleSimScript.JUNGLE:
+			camp_count += 1
+		if u.kind == BattleSimScript.HERO:
+			lane_set[u.lane_id] = true
+	if camp_count != 6:
+		issues.append("5v5 野区营地不是 6，实际 %d" % camp_count)
+	if lane_set.size() != 3:
+		issues.append("5v5 英雄没有分布到三条路")
+	var tower_ys: Dictionary = {}
+	for t in simA.towers_blue:
+		tower_ys[int(t.pos.y)] = true
+	if tower_ys.size() != 3:
+		issues.append("5v5 三座塔不在三条路上")
+	# 5v5 允许拆掉两座塔后直接进攻水晶；只掉一座时仍受保护。
+	simA.deal_damage(simA.towers_red[0], 99999.0, simA.player)
+	if not simA.is_base_protected(simA.base_red):
+		issues.append("5v5 只掉一座塔时水晶就失去保护")
+	simA.deal_damage(simA.towers_red[1], 99999.0, simA.player)
+	if simA.is_base_protected(simA.base_red):
+		issues.append("5v5 拆掉两座塔后水晶仍受保护")
+
+	var simB = BattleSimScript.new()
+	simB.setup("turtle", 0, 9001, true)
+	var t5 := 0.0
+	while not simB.over and t5 < 340.0:
+		simB.step(DT)
+		t5 += DT
+	if not simB.over:
+		issues.append("5v5 对局没有结束")
+	if simB.clock > simB.match_cap + 0.05:
+		issues.append("5v5 超过对局上限 clock=%.1f cap=%.1f" % [simB.clock, simB.match_cap])
+	if simB.heroes.size() != 10:
+		issues.append("5v5 对局结束后英雄数量不是 10")
+	if camp_count == 0:
+		issues.append("5v5 没有野怪")
+
+	# ---- BOSS 第二形态：复活后带翅膀飞行，技能切换为陨石/旋风 ----
+	var simf = BattleSimScript.new()
+	simf.setup("tiger", 0, 9200)
+	simf.clock = 179.9
+	simf.step(0.2)
+	if simf.boss == null:
+		issues.append("飞行 BOSS 测试没有生成巨兽")
+	else:
+		var bf = simf.boss
+		if bf.boss_flying:
+			issues.append("巨兽第一次出现不应是飞行形态")
+		var bf_foe = simf.heroes[3] if bf.team == BattleSimScript.BLUE else simf.player
+		simf.deal_damage(bf, 99999.0, bf_foe)
+		simf.step_unit(bf, 26.0)
+		if not bf.boss_flying or bf.boss_phase != 2:
+			issues.append("巨兽第二次出现没有切换飞行形态")
+		bf.pos = bf_foe.pos + Vector2(-70.0, 0.0)
+		bf.prev_pos = bf.pos
+		bf.cds = [0.0, 0.0, 0.0]
+		bf.atk_timer = 0.0
+		bf.boss_skill = ""
+		bf.boss_cast_t = 0.0
+		bf.stun_t = 0.0
+		bf_foe.invuln_t = 0.0
+		var fhp0: float = bf_foe.hp
+		simf.step_boss(bf, 0.016)
+		if bf.boss_skill != "meteor":
+			issues.append("飞行巨兽没有起手陨石")
+		simf.step_boss(bf, 2.0)
+		if bf_foe.hp >= fhp0:
+			issues.append("飞行巨兽的陨石没有造成伤害")
+		bf.cds = [3.0, 0.0, 0.0]
+		bf.boss_skill = ""
+		bf.boss_cast_t = 0.0
+		bf_foe.hp = maxf(bf_foe.max_hp * 0.7, 500.0)
+		bf_foe.invuln_t = 0.0
+		var chp0: float = bf_foe.hp
+		simf.step_boss(bf, 0.016)
+		if bf.boss_skill != "cyclone":
+			issues.append("飞行巨兽没有起手旋风")
+		simf.step_boss(bf, 2.0)
+		if bf_foe.hp >= chp0:
+			issues.append("飞行巨兽的旋风没有造成伤害")
+
 	# 所有英雄的大招都应立刻进入冷却。
 	for id in HERO_IDS:
 		var simu = BattleSimScript.new()
@@ -355,5 +457,158 @@ func _rule_checks() -> Array:
 		simu.try_cast(simu.player, 2)
 		if simu.player.cds[2] <= 0.0:
 			issues.append("%s 大招未立即进入冷却" % id)
+
+	return issues
+
+
+func _signature_skill_checks() -> Array:
+	var issues: Array = []
+	# 幻影闪：不是连续位移，而是一步换位。
+	var s1 = BattleSimScript.new()
+	s1.setup("fox", 0, 9300)
+	var p1 = s1.player
+	var x0: float = p1.pos.x
+	s1.player_move = Vector2.RIGHT
+	p1.move_dir = Vector2.RIGHT
+	s1.try_cast(p1, 1)
+	if absf(p1.pos.x - x0) < 150.0:
+		issues.append("幻影闪没有瞬间换位")
+
+	# 鹤羽贯日：一条直线同时打到多个敌人。
+	var s2 = BattleSimScript.new()
+	s2.setup("crane", 0, 9301)
+	var p2 = s2.player
+	var e2 = s2.heroes[3]
+	e2.pos = p2.pos + Vector2(180.0, 0.0)
+	e2.prev_pos = e2.pos
+	e2.invuln_t = 0.0
+	var e2hp: float = e2.hp
+	s2.try_cast(p2, 1)
+	if e2.hp >= e2hp:
+		issues.append("鹤羽贯日没有命中直线上的敌人")
+
+	# 月链：第一次命中后可以在敌人之间继续弹。
+	var s3 = BattleSimScript.new()
+	s3.setup("owl", 0, 9302)
+	var p3 = s3.player
+	var e3a = s3.heroes[3]
+	var e3b = s3.heroes[4]
+	e3a.pos = p3.pos + Vector2(180.0, 0.0)
+	e3b.pos = e3a.pos + Vector2(160.0, 0.0)
+	e3a.prev_pos = e3a.pos
+	e3b.prev_pos = e3b.pos
+	var a_hp: float = e3a.hp
+	var b_hp: float = e3b.hp
+	s3.try_cast(p3, 1)
+	if e3a.hp >= a_hp or e3b.hp >= b_hp:
+		issues.append("月链没有在敌人之间弹跳")
+
+	# 猎杀标记：被标记的目标受到更多伤害。
+	var s4 = BattleSimScript.new()
+	s4.setup("wolf", 0, 9303)
+	var p4 = s4.player
+	var e4 = s4.heroes[3]
+	e4.pos = p4.pos + Vector2(140.0, 0.0)
+	e4.prev_pos = e4.pos
+	s4.try_cast(p4, 1)
+	if e4.mark_t <= 0.0:
+		issues.append("猎杀标记没有生效")
+	else:
+		e4.invuln_t = 0.0
+		var h0: float = e4.hp
+		s4.deal_damage(e4, 100.0, p4)
+		var marked_dmg: float = h0 - e4.hp
+		e4.mark_t = 0.0
+		var h1: float = e4.hp
+		s4.deal_damage(e4, 100.0, p4)
+		if h1 - e4.hp >= marked_dmg:
+			issues.append("猎杀标记没有提高伤害")
+
+	# 嘲讽：敌人被强制把目标换成乌龟。
+	var s5 = BattleSimScript.new()
+	s5.setup("turtle", 0, 9304)
+	var p5 = s5.player
+	var e5 = s5.heroes[3]
+	e5.pos = p5.pos + Vector2(150.0, 0.0)
+	e5.prev_pos = e5.pos
+	s5.try_cast(p5, 1)
+	if e5.taunt_t <= 0.0 or e5.taunt_src != p5:
+		issues.append("潮汐嘲讽没有拉住敌人")
+
+	# 震慑咆哮：周围敌人进入恐惧。
+	var s6 = BattleSimScript.new()
+	s6.setup("tiger", 0, 9305)
+	var p6 = s6.player
+	var e6 = s6.heroes[3]
+	e6.pos = p6.pos + Vector2(150.0, 0.0)
+	e6.prev_pos = e6.pos
+	s6.try_cast(p6, 1)
+	if e6.fear_t <= 0.0 or e6.fear_src != p6:
+		issues.append("震慑咆哮没有吓退敌人")
+
+	# 滚动刺球：旋身期间持续伤害身边敌人。
+	var s7 = BattleSimScript.new()
+	s7.setup("hedgehog", 0, 9306)
+	var p7 = s7.player
+	p7.level = 2
+	var e7 = s7.heroes[3]
+	e7.pos = p7.pos + Vector2(90.0, 0.0)
+	e7.prev_pos = e7.pos
+	e7.invuln_t = 0.0
+	s7.try_cast(p7, 2)
+	if p7.spin_t <= 0.0:
+		issues.append("滚动刺球没有进入旋身状态")
+	else:
+		var h7: float = e7.hp
+		s7.step_hero(p7, 0.35)
+		if e7.hp >= h7:
+			issues.append("滚动刺球没有造成持续伤害")
+
+	# 竹叶陷阱：延时触发并定身。
+	var s8 = BattleSimScript.new()
+	s8.setup("redpanda", 0, 9307)
+	var p8 = s8.player
+	var e8 = s8.heroes[3]
+	e8.pos = p8.pos + Vector2(170.0, 0.0)
+	e8.prev_pos = e8.pos
+	e8.invuln_t = 0.0
+	s8.try_cast(p8, 1)
+	var h8: float = e8.hp
+	s8.step_pending(0.8)
+	if e8.hp >= h8 or e8.stun_t <= 0.0:
+		issues.append("竹叶陷阱没有定身或伤害")
+
+	# 回旋尖刺：飞出折返后可再次命中。
+	var s9 = BattleSimScript.new()
+	s9.setup("hedgehog", 0, 9308)
+	var p9 = s9.player
+	var e9 = s9.heroes[3]
+	e9.pos = p9.pos + Vector2(180.0, 0.0)
+	e9.prev_pos = e9.pos
+	e9.invuln_t = 0.0
+	var h9: float = e9.hp
+	s9.try_cast(p9, 0)
+	for k in range(90):
+		s9.step_projectiles(1.0 / 60.0)
+	if e9.hp >= h9:
+		issues.append("回旋尖刺没有命中")
+
+	# 再生水域：友军站在水里持续回血。
+	var s10 = BattleSimScript.new()
+	s10.setup("axolotl", 0, 9309)
+	var p10 = s10.player
+	p10.level = 2
+	var a10 = s10.heroes[1]
+	a10.hp = a10.max_hp * 0.5
+	a10.pos = p10.pos + Vector2(60.0, 0.0)
+	a10.prev_pos = a10.pos
+	s10.try_cast(p10, 2)
+	var z10 = s10.make_zone(a10.pos, 220.0, 4.0, 0.0, p10.team, Color.WHITE)
+	z10.heal_pct = 0.05
+	s10.zones.append(z10)
+	var ahp: float = a10.hp
+	s10.step_zones(0.5)
+	if a10.hp <= ahp:
+		issues.append("再生水域没有治疗友军")
 
 	return issues

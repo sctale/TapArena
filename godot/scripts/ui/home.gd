@@ -4,10 +4,11 @@ extends Control
 # 像素风首页：标题、10 只英雄选人卡片、难度切换、开始按钮。
 # 点卡片弹出人物介绍与三技能详情；头像使用 32×32 半身像。
 
-signal start_requested(hero_id: String, difficulty: int)
+signal start_requested(hero_id: String, difficulty: int, mode_5v5: bool)
 signal ui_click
 
 const HeroPortraitsScript = preload("res://scripts/art/hero_portraits.gd")
+const BASE_HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl", "deer"]
 const GOLD := Color("f5c542")
 const CREAM := Color("f5eedc")
 const PANEL_FILL := Color("2b3531")
@@ -19,9 +20,11 @@ const GREEN := Color("5aa83c")
 const SKY := Color("9fd9f2")
 const GRASS := Color("7fc45c")
 
+var all_heroes: Array = []
 var heroes: Array = []
 var sel_index := 0
 var difficulty := 0
+var mode_5v5 := false
 var font: Font = null
 var icons = null
 var portraits = null
@@ -32,6 +35,8 @@ var lbl_sub: Label
 var lbl_start: Label
 var lbl_easy: Label
 var lbl_challenge: Label
+var lbl_mode3: Label
+var lbl_mode5: Label
 var lbl_foot: Label
 var lbl_hint: Label
 var hero_name_labels: Array = []
@@ -92,12 +97,23 @@ func _load_heroes() -> void:
 	if parsed == null:
 		push_error("首页加载 heroes.json 失败")
 		return
-	heroes = parsed.get("heroes", [])
-	for d in heroes:
+	all_heroes = parsed.get("heroes", [])
+	for d in all_heroes:
 		d["fur_c"] = Color.from_string(str(d.get("fur", "#FFFFFF")), Color.WHITE)
 		d["dark_c"] = Color.from_string(str(d.get("dark", "#000000")), Color.BLACK)
 		d["cream_c"] = Color.from_string(str(d.get("cream", "#FFFFFF")), Color.WHITE)
 		d["accent_c"] = Color.from_string(str(d.get("accent", "#FFFFFF")), Color.WHITE)
+	_apply_mode()
+
+
+func _apply_mode() -> void:
+	heroes.clear()
+	for d in all_heroes:
+		var hid := str(d.get("id", ""))
+		if mode_5v5 or BASE_HERO_IDS.has(hid):
+			heroes.append(d)
+	sel_index = clampi(sel_index, 0, maxi(0, heroes.size() - 1))
+	detail_open = false
 
 
 # ---- 布局 ----
@@ -124,6 +140,17 @@ func card_rect(i: int) -> Rect2:
 	var col := i % cols
 	var row := i / cols
 	return Rect2(g.position + Vector2(float(col) * (cw + gap), float(row) * (ch + gap)), Vector2(cw, ch))
+
+
+func mode3_rect() -> Rect2:
+	var safe := _safe()
+	return Rect2(safe.position.x + safe.size.x * 0.06, safe.end.y - safe.size.y * 0.255,
+		safe.size.x * 0.095, safe.size.y * 0.060)
+
+
+func mode5_rect() -> Rect2:
+	var r := mode3_rect()
+	return Rect2(r.end.x + 10.0, r.position.y, r.end.x - r.position.x, r.size.y)
 
 
 func easy_rect() -> Rect2:
@@ -207,9 +234,11 @@ func _make_labels() -> void:
 	lbl_start = _mk_label(int(h * 0.040), INK)
 	lbl_easy = _mk_label(int(h * 0.028), INK)
 	lbl_challenge = _mk_label(int(h * 0.028), INK)
+	lbl_mode3 = _mk_label(int(h * 0.022), INK)
+	lbl_mode5 = _mk_label(int(h * 0.022), INK)
 	lbl_hint = _mk_label(int(h * 0.021), Color(1, 1, 1, 0.72))
 	lbl_foot = _mk_label(int(h * 0.018), Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_RIGHT)
-	for i in range(heroes.size()):
+	for i in range(all_heroes.size()):
 		hero_name_labels.append(_mk_label(int(h * 0.028), CREAM, HORIZONTAL_ALIGNMENT_CENTER))
 		var blurb := _mk_label(int(h * 0.018), Color(0.92, 0.96, 0.90, 0.82), HORIZONTAL_ALIGNMENT_LEFT)
 		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -256,7 +285,15 @@ func _refresh_labels() -> void:
 		hero_name_labels[i].add_theme_color_override("font_color",
 			GOLD if i == sel_index else CREAM)
 		hero_blurb_labels[i].visible = false
+	for i in range(heroes.size(), hero_name_labels.size()):
+		hero_name_labels[i].visible = false
 
+	_place(lbl_mode3, mode3_rect())
+	lbl_mode3.text = "3v3"
+	lbl_mode3.add_theme_color_override("font_color", INK if not mode_5v5 else CREAM)
+	_place(lbl_mode5, mode5_rect())
+	lbl_mode5.text = "5v5"
+	lbl_mode5.add_theme_color_override("font_color", INK if mode_5v5 else CREAM)
 	_place(lbl_easy, easy_rect())
 	lbl_easy.text = "轻松"
 	lbl_easy.add_theme_color_override("font_color", INK if difficulty == 0 else CREAM)
@@ -267,7 +304,7 @@ func _refresh_labels() -> void:
 	lbl_start.text = "开始冒险"
 	_place(lbl_hint, Rect2(safe.position.x + safe.size.x * 0.06, easy_rect().end.y + 6.0,
 		safe.size.x * 0.38, h * 0.034))
-	lbl_hint.text = "轻松：电脑更慢，适合第一次玩" if difficulty == 0 else "挑战：电脑更凶，会抢技能"
+	lbl_hint.text = ("5v5 三路：多 5 位英雄 + 野区" if mode_5v5 else "3v3 单路：10 位英雄") + 		(" · 轻松" if difficulty == 0 else " · 挑战")
 	_place(lbl_foot, Rect2(safe.end.x - safe.size.x * 0.30, safe.end.y - h * 0.045,
 		safe.size.x * 0.26, h * 0.032))
 	lbl_foot.text = "v%s · Godot" % str(ProjectSettings.get_setting("application/config/version", "dev"))
@@ -286,7 +323,7 @@ func _refresh_labels() -> void:
 	_place(lbl_detail_blurb, Rect2(tx, dr.position.y + dr.size.y * 0.165, right_w, h * 0.052))
 	lbl_detail_blurb.text = str(dsel.get("blurb", ""))
 	_place(lbl_detail_tip, Rect2(tx, dr.end.y - h * 0.045, right_w * 0.55, h * 0.030))
-	lbl_detail_tip.text = "关闭后可点其他卡片 · 开始后进入 3v3"
+	lbl_detail_tip.text = "关闭后可点其他卡片 · 开始后进入 %s" % ("5v5 三路" if mode_5v5 else "3v3 单路")
 
 	var skills: Array = dsel.get("skills", [])
 	for i in range(3):
@@ -315,7 +352,7 @@ func _refresh_labels() -> void:
 	lbl_detail_start.text = "带它出发"
 
 	var main_visible := not detail_open
-	for l in [lbl_title, lbl_sub, lbl_start, lbl_easy, lbl_challenge, lbl_hint, lbl_foot]:
+	for l in [lbl_title, lbl_sub, lbl_start, lbl_easy, lbl_challenge, lbl_mode3, lbl_mode5, lbl_hint, lbl_foot]:
 		l.visible = main_visible
 	for l in hero_name_labels:
 		l.visible = main_visible
@@ -385,6 +422,12 @@ func _draw() -> void:
 	])
 	draw_colored_polygon(tri, PANEL_DARK)
 
+	var m3 := mode3_rect()
+	draw_rect(m3, GOLD if not mode_5v5 else Color("4a5a50"))
+	_outline(m3, PANEL_DARK, 3.0)
+	var m5 := mode5_rect()
+	draw_rect(m5, GOLD if mode_5v5 else Color("4a5a50"))
+	_outline(m5, PANEL_DARK, 3.0)
 	var er := easy_rect()
 	draw_rect(er, GOLD if difficulty == 0 else Color("4a5a50"))
 	_outline(er, PANEL_DARK, 3.0)
@@ -486,7 +529,7 @@ func _tap(pos: Vector2) -> void:
 			return
 		if detail_start_rect().has_point(pos):
 			ui_click.emit()
-			start_requested.emit(str(heroes[sel_index].get("id", "tiger")), difficulty)
+			start_requested.emit(str(heroes[sel_index].get("id", "tiger")), difficulty, mode_5v5)
 			return
 		# 弹窗内的技能区不响应点击，避免误触关闭。
 		return
@@ -501,6 +544,22 @@ func _tap(pos: Vector2) -> void:
 			queue_redraw()
 			return
 
+	if mode3_rect().has_point(pos):
+		if mode_5v5:
+			mode_5v5 = false
+			_apply_mode()
+			ui_click.emit()
+			_refresh_labels()
+			queue_redraw()
+		return
+	if mode5_rect().has_point(pos):
+		if not mode_5v5:
+			mode_5v5 = true
+			_apply_mode()
+			ui_click.emit()
+			_refresh_labels()
+			queue_redraw()
+		return
 	if easy_rect().has_point(pos):
 		if difficulty != 0:
 			difficulty = 0
@@ -517,4 +576,4 @@ func _tap(pos: Vector2) -> void:
 		return
 	if start_rect().has_point(pos):
 		ui_click.emit()
-		start_requested.emit(str(heroes[sel_index].get("id", "tiger")), difficulty)
+		start_requested.emit(str(heroes[sel_index].get("id", "tiger")), difficulty, mode_5v5)

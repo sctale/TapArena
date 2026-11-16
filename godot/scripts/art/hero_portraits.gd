@@ -138,6 +138,39 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(7, 20, 2, 2), cream)
 			_add(ops, _rect(23, 20, 2, 2), cream)
 			_add(ops, _diamond(8, 26, 2), accent)
+		"turtle":
+			for sx in [-1, 1]:
+				_add(ops, _rect(4 if sx < 0 else 25, 10, 3, 9), _darker(fur, 0.8))
+				_add(ops, _rect(6 if sx < 0 else 23, 7, 3, 4), accent)
+			_add(ops, _rect(9, 5, 14, 4), _darker(fur, 0.86))
+			_add(ops, _rect(12, 17, 8, 4), cream)
+			_add(ops, _rect(15, 17, 2, 2), dark)
+		"hedgehog":
+			for sx in [-1, 1]:
+				for k in range(3):
+					_add(ops, _rect((2 if sx < 0 else 27) - k if sx < 0 else (27 + k), 7 + k * 4, 3, 4), dark)
+			_add(ops, _rect(12, 17, 8, 4), cream)
+			_add(ops, _rect(15, 17, 2, 2), dark)
+		"redpanda":
+			_add(ops, _disc(9, 5, 3), dark)
+			_add(ops, _disc(23, 5, 3), dark)
+			_add(ops, _disc(9, 5, 1.4), cream)
+			_add(ops, _disc(23, 5, 1.4), cream)
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(15, 16, 2, 2), dark)
+			_add(ops, _rect(12, 6, 8, 2), _lighter(fur, 0.12))
+		"wolf":
+			_add(ops, _poly([Vector2(10, 6), Vector2(10, 0), Vector2(15, 5)]), dark)
+			_add(ops, _poly([Vector2(22, 6), Vector2(22, 0), Vector2(17, 5)]), dark)
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(15, 16, 2, 2), dark)
+			_add(ops, _rect(11, 10, 3, 2), cream)
+		"crane":
+			_add(ops, _rect(14, 0, 4, 4), accent)
+			_add(ops, _poly([Vector2(14, 16), Vector2(18, 16), Vector2(16, 22)]), accent)
+			_add(ops, _rect(5, 16, 4, 3), dark)
+			_add(ops, _rect(23, 16, 4, 3), dark)
+			_add(ops, _rect(10, 24, 12, 3), cream)
 
 
 func _bg(ops: Array, dark: Color) -> void:

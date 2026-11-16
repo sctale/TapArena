@@ -72,8 +72,26 @@ func _process(_delta: float) -> bool:
 			failures.append("回首页失败")
 		if main.sim != null or main.hud != null:
 			failures.append("回首页后战斗对象没有释放")
+		if main.home != null:
+			main.home._tap(main.home.mode5_rect().get_center())
+	elif frame == 74:
+		if main.home == null:
+			failures.append("切换 5v5 后首页消失")
+		else:
+			if not main.home.mode_5v5:
+				failures.append("5v5 模式没有切换")
+			if main.home.heroes.size() != 15:
+				failures.append("5v5 首页英雄数量不是 15，实际 %d" % main.home.heroes.size())
+			main.home._tap(main.home.start_rect().get_center())
+	elif frame == 78:
+		if main.sim == null or not main.match_active:
+			failures.append("5v5 没有进入战斗")
+		elif not main.sim.five_v_five:
+			failures.append("5v5 标记没有传入战斗")
+		elif main.sim.heroes.size() != 10:
+			failures.append("5v5 战斗英雄数量不是 10")
 		if failures.is_empty():
-			print("FLOW_OK home->battle->home")
+			print("FLOW_OK home->battle->home->5v5")
 		else:
 			for f in failures:
 				print("FLOW_FAIL " + f)

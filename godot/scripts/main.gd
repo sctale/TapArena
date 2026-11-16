@@ -25,6 +25,7 @@ var hitstop_until_ms := 0
 var current_hero := "tiger"
 var current_difficulty := 0
 var current_seed := 20261107
+var current_mode_5v5 := false
 var fps_start_ms := 0
 var fps_frames := 0
 var last_back_ms := 0
@@ -59,7 +60,8 @@ func _ready() -> void:
 	for a in args:
 		if str(a).begins_with("--hero="):
 			current_hero = str(a).substr(7)
-			break
+		elif str(a) == "--mode=5v5":
+			current_mode_5v5 = true
 	if "--skip-home" in args or "--top" in args or "--no-hud" in args:
 		_start_match(current_hero, current_difficulty, current_seed)
 	else:
@@ -90,12 +92,15 @@ func _show_home() -> void:
 	sim_acc = 0.0
 	home = HomeScript.new()
 	add_child(home)
+	home.mode_5v5 = current_mode_5v5
+	home._apply_mode()
+	home._refresh_labels()
 	home.start_requested.connect(_on_home_start)
 	home.ui_click.connect(_on_ui_click)
 
 
-func _on_home_start(hero_id: String, difficulty: int) -> void:
-	_start_match(hero_id, difficulty, int(Time.get_ticks_msec() % 1000000))
+func _on_home_start(hero_id: String, difficulty: int, mode_5v5: bool) -> void:
+	_start_match(hero_id, difficulty, int(Time.get_ticks_msec() % 1000000), mode_5v5)
 
 
 func _on_ui_click() -> void:
@@ -103,10 +108,11 @@ func _on_ui_click() -> void:
 		sfx.play("click")
 
 
-func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
+func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 := false) -> void:
 	current_hero = hero_id
 	current_difficulty = difficulty
 	current_seed = seed_value
+	current_mode_5v5 = mode_5v5
 
 	_clear_scene()
 
@@ -118,7 +124,7 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	match_active = true
 
 	sim = BattleSimScript.new()
-	sim.setup(hero_id, difficulty, seed_value)
+	sim.setup(hero_id, difficulty, seed_value, mode_5v5)
 
 	view = BattleViewScript.new()
 	view.process_priority = 0
@@ -215,6 +221,14 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		sim.step(0.2)
 		for i in range(60):
 			sim.step(1.0 / 60.0)
+	# 调试：直接看巨兽第二形态（翅膀 + 陨石/旋风），不用等它先被打倒一次。
+	if "--boss-fly" in OS.get_cmdline_user_args():
+		sim.clock = 179.9
+		sim.step(0.2)
+		if sim.boss != null:
+			sim.boss.boss_phase = 2
+			sim.boss.boss_flying = true
+			sim.boss.cds = [0.5, 2.0, 6.0]
 		if sim.boss != null:
 			camera_follow = false
 			cam.set_target(Vector3(sim.boss.pos.x + 120.0, 0, sim.boss.pos.y))
@@ -228,8 +242,8 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 	# 开发用：直接摧毁红方水晶，检查结束动画与结算页。
 	var vargs := OS.get_cmdline_user_args()
 	if "--victory" in vargs or "--victory-minion" in vargs:
-		sim.towers_red[0].hp = 0.0
-		sim.towers_red[1].hp = 0.0
+		for t in sim.towers_red:
+			t.hp = 0.0
 		var killer = sim.player
 		if "--victory-minion" in vargs:
 			sim.spawn_wave(sim.BLUE)
@@ -239,7 +253,7 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int) -> void:
 		sim.step(0.016)
 		hud.queue_redraw()
 
-	print("[MATCH] hero=%s difficulty=%d seed=%d" % [hero_id, difficulty, seed_value])
+	print("[MATCH] hero=%s difficulty=%d seed=%d mode=%s" % [hero_id, difficulty, seed_value, "5v5" if mode_5v5 else "3v3"])
 
 
 func _process(delta: float) -> void:
@@ -311,7 +325,7 @@ func _toggle_pause() -> void:
 
 
 func _restart() -> void:
-	_start_match(current_hero, current_difficulty, current_seed + 1)
+	_start_match(current_hero, current_difficulty, current_seed + 1, current_mode_5v5)
 
 
 func _on_match_ended(winner: int) -> void:

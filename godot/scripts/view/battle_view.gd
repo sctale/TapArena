@@ -7,6 +7,7 @@ extends Node3D
 const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
 	"panda": 88.0, "owl": 88.0, "axolotl": 88.0, "deer": 88.0,
+	"turtle": 88.0, "hedgehog": 88.0, "redpanda": 88.0, "wolf": 88.0, "crane": 88.0,
 }
 
 var sim = null
@@ -15,6 +16,7 @@ var icons = null
 
 var hero_nodes: Dictionary = {}
 var minion_nodes: Dictionary = {}
+var jungle_nodes: Dictionary = {}
 var boss_nodes: Dictionary = {}
 var structure_nodes: Dictionary = {}
 var shot_nodes: Dictionary = {}
@@ -47,6 +49,8 @@ func attach(s) -> void:
 	rng.seed = 7127
 	_build_world()
 	sim.fx.connect(_on_fx)
+	if sim.has_signal("beam_fx"):
+		sim.beam_fx.connect(_on_beam_fx)
 
 
 func _team_color(team: int) -> Color:
@@ -139,14 +143,23 @@ func _build_world() -> void:
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ground)
 
-	var lane := MeshInstance3D.new()
-	var lane_plane := PlaneMesh.new()
-	lane_plane.size = Vector2(sim.map_w, 190.0)
-	lane.mesh = lane_plane
-	lane.position = Vector3(sim.map_w * 0.5, 0.6, 800.0)
-	lane.material_override = _tiled_material("path", Vector2(sim.map_w / 48.0, 190.0 / 48.0))
-	lane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(lane)
+	var lane_paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
+	var lane_mat := _tiled_material("path", Vector2(sim.map_w / 48.0, 190.0 / 48.0))
+	for path in lane_paths:
+		if path.is_empty():
+			continue
+		var lane_y := 0.0
+		for pnt in path:
+			lane_y += pnt.y
+		lane_y /= float(path.size())
+		var lane := MeshInstance3D.new()
+		var lane_plane := PlaneMesh.new()
+		lane_plane.size = Vector2(sim.map_w, 190.0)
+		lane.mesh = lane_plane
+		lane.position = Vector3(sim.map_w * 0.5, 0.6, lane_y)
+		lane.material_override = lane_mat
+		lane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(lane)
 
 	_build_lane_curb()
 	_build_hills()
@@ -154,21 +167,43 @@ func _build_world() -> void:
 	_build_units()
 
 
+func _lane_ys() -> Array:
+	var out: Array = []
+	var paths: Array = sim.lane_paths if sim.five_v_five else [sim.lane]
+	for path in paths:
+		if path.is_empty():
+			continue
+		var y := 0.0
+		for p in path:
+			y += p.y
+		out.append(y / float(path.size()))
+	return out
+
+
+func _near_lane(z: float, margin := 145.0) -> bool:
+	for lane_y in _lane_ys():
+		if absf(z - lane_y) < margin:
+			return true
+	return false
+
+
 func _build_lane_curb() -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(46, 22, 46)
 	var mat := _tile_material("stone", Color(1, 1, 1))
+	var count := int(sim.map_w / 56.0) + 1
+	var lane_ys := _lane_ys()
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
-	var count := int(sim.map_w / 56.0) + 1
-	mm.instance_count = count * 2
+	mm.instance_count = count * 2 * lane_ys.size()
 	var i := 0
-	for k in range(count):
-		for side in [-1, 1]:
-			var pos := Vector3(28.0 + float(k) * 56.0, 0, 800.0 + float(side) * 118.0)
-			mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, pos))
-			i += 1
+	for lane_y in lane_ys:
+		for k in range(count):
+			for side in [-1, 1]:
+				var pos := Vector3(28.0 + float(k) * 56.0, 0, lane_y + float(side) * 118.0)
+				mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, pos))
+				i += 1
 	var node := MultiMeshInstance3D.new()
 	node.multimesh = mm
 	node.material_override = mat
@@ -209,9 +244,13 @@ func _build_scatter() -> void:
 		mm.mesh = mesh
 		var spots: Array = []
 		for k in range(6):
-			var x := rng.randf_range(140.0, sim.map_w - 140.0)
-			var z := rng.randf_range(120.0, 600.0) if (k % 2 == 0) else rng.randf_range(1000.0, 1480.0)
-			spots.append(Vector3(x, 0, z))
+			for tries in range(8):
+				var x := rng.randf_range(140.0, sim.map_w - 140.0)
+				var z := rng.randf_range(120.0, 600.0) if (k % 2 == 0) else rng.randf_range(1000.0, 1480.0)
+				if _near_lane(z, 170.0):
+					continue
+				spots.append(Vector3(x, 0, z))
+				break
 		mm.instance_count = spots.size()
 		for k in range(spots.size()):
 			var s := rng.randf_range(0.85, 1.35)
@@ -228,11 +267,18 @@ func _build_scatter() -> void:
 		var rmm := MultiMesh.new()
 		rmm.transform_format = MultiMesh.TRANSFORM_3D
 		rmm.mesh = rmesh
-		rmm.instance_count = 5
+		var rock_spots: Array = []
 		for k in range(5):
-			var x := rng.randf_range(180.0, sim.map_w - 180.0)
-			var z := rng.randf_range(200.0, 500.0) if (k % 2 == 0) else rng.randf_range(1100.0, 1420.0)
-			rmm.set_instance_transform(k, Transform3D(Basis.IDENTITY, Vector3(x, 0, z)))
+			for tries in range(8):
+				var x := rng.randf_range(180.0, sim.map_w - 180.0)
+				var z := rng.randf_range(200.0, 500.0) if (k % 2 == 0) else rng.randf_range(1100.0, 1420.0)
+				if _near_lane(z, 170.0):
+					continue
+				rock_spots.append(Vector3(x, 0, z))
+				break
+		rmm.instance_count = rock_spots.size()
+		for k in range(rock_spots.size()):
+			rmm.set_instance_transform(k, Transform3D(Basis.IDENTITY, rock_spots[k]))
 		var rnode := MultiMeshInstance3D.new()
 		rnode.multimesh = rmm
 		rnode.material_override = _mesh_material(rmesh)
@@ -264,6 +310,8 @@ func _build_units() -> void:
 			_add_minion(u)
 		elif u.kind == sim.BOSS:
 			_add_boss(u)
+		elif u.kind == sim.JUNGLE:
+			_add_jungle(u)
 		elif u.kind == sim.TOWER or u.kind == sim.BASE:
 			_add_structure(u)
 
@@ -311,19 +359,49 @@ func _add_minion(u) -> void:
 	minion_nodes[u.uid] = {"root": root, "body": body}
 
 
+func _add_jungle(u) -> void:
+	var root := Node3D.new()
+	root.name = "Jungle_%d" % u.uid
+	add_child(root)
+	var mesh = _model("jungle_" + u.jungle_kind, func(): return BlockModels.jungle_monster(
+		atlas, u.jungle_kind))
+	var body := _make_instance(mesh)
+	root.add_child(body)
+	jungle_nodes[u.uid] = {"root": root, "body": body}
+
+
+func _sync_jungle(u) -> void:
+	var item = jungle_nodes.get(u.uid)
+	if item == null:
+		_add_jungle(u)
+		item = jungle_nodes[u.uid]
+	var root: Node3D = item["root"]
+	root.visible = u.is_alive()
+	if not u.is_alive():
+		return
+	var rp: Vector2 = sim.render_pos(u)
+	root.position = Vector3(rp.x, 0, rp.y)
+	item["body"].rotation.y = sin(Time.get_ticks_msec() * 0.001 + float(u.uid)) * 0.08
+
+
 func _add_boss(u) -> void:
 	var root := Node3D.new()
 	root.name = "Boss_%d" % u.uid
 	add_child(root)
-	var mesh = _model("boss_%d" % u.team, func(): return BlockModels.boss(
-		atlas, _team_color(u.team), u.team))
+	var flight: bool = u.boss_flying
+	var mesh = _model("boss_%d_%s" % [u.team, str(flight)], func(): return BlockModels.boss(
+		atlas, _team_color(u.team), u.team, flight))
 	var body := _make_instance(mesh)
 	root.add_child(body)
-	boss_nodes[u.uid] = {"root": root, "body": body}
+	boss_nodes[u.uid] = {"root": root, "body": body, "flight": flight}
 
 
 func _sync_boss(u) -> void:
 	var item = boss_nodes.get(u.uid)
+	if item != null and bool(item.get("flight", false)) != bool(u.boss_flying):
+		(item["root"] as Node3D).queue_free()
+		boss_nodes.erase(u.uid)
+		item = null
 	if item == null:
 		_add_boss(u)
 		item = boss_nodes[u.uid]
@@ -335,9 +413,15 @@ func _sync_boss(u) -> void:
 	var wt: float = u.walk_t
 	if u.moving:
 		wt -= (1.0 - sim.interp_alpha) * (1.0 / 30.0)
-	root.position = Vector3(rp.x, absf(sin(wt * 6.0)) * (5.0 if u.moving else 0.0), rp.y)
+	var air := 58.0 if u.boss_flying else 0.0
+	var hover := 0.0
+	if u.boss_flying:
+		# 飞行形态一直悬停，翅膀微微上下起伏；地面形态只在走路时弹跳。
+		hover = sin(Time.get_ticks_msec() * 0.0024) * 4.0
+	root.position = Vector3(rp.x, air + hover + absf(sin(wt * 6.0)) * (5.0 if u.moving else 0.0), rp.y)
 	var yaw := PI * 0.5 - 0.34
 	root.rotation.y = yaw if u.facing >= 0.0 else -yaw
+	root.rotation.z = sin(Time.get_ticks_msec() * 0.0024 + 0.8) * 0.035 if u.boss_flying else 0.0
 	var s := 1.0
 	if u.atk_anim > 0.0:
 		var k: float = 1.0 - u.atk_anim / 0.32
@@ -416,6 +500,8 @@ func _sync_units(delta: float) -> void:
 			_sync_minion(u)
 		elif u.kind == sim.BOSS:
 			_sync_boss(u)
+		elif u.kind == sim.JUNGLE:
+			_sync_jungle(u)
 		elif u.kind == sim.TOWER or u.kind == sim.BASE:
 			var item = structure_nodes.get(u.uid)
 			if item != null:
@@ -844,6 +930,28 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 			_spawn_burst(pos, color, 0.30)
 
 
+func _on_beam_fx(from: Vector3, to: Vector3, color: Color, width: float) -> void:
+	# 光柱 / 月链 / 鹤羽：用一根细长盒子连接两点，短暂闪过后消失。
+	var delta := to - from
+	var length := delta.length()
+	if length < 1.0:
+		return
+	var mesh := _fx_mesh("fx_beam", func():
+		var bm := BoxMesh.new()
+		bm.size = Vector3(1.0, 1.0, 1.0)
+		return bm)
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.position = from + delta * 0.5
+	node.scale = Vector3(length, maxf(width, 8.0), maxf(width, 8.0))
+	node.rotation = Vector3(0.0, atan2(-delta.z, delta.x), 0.0)
+	node.material_override = _fx_mat(color, 0.85)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	fx_items.append({"node": node, "t": 0.0, "life": 0.24, "start": 0.35, "end": 2.2})
+	_spawn_burst(to, color, 0.28)
+
+
 func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void:
 	var node := MeshInstance3D.new()
 	var rkey := "fx_ring_%d" % int(round(radius))
@@ -978,10 +1086,39 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_feathers(pos, color, maxf(radius, 140.0))
 		"heart":
 			_spawn_heart(pos, color)
-		"roar":
+		"roar", "mark", "fear":
 			_spawn_roar(pos, color, maxf(radius, 160.0))
+		"taunt":
+			_spawn_heart(pos, color)
+			_spawn_ring(pos, color, maxf(radius, 140.0), 0.55)
+		"spin":
+			_spawn_spin(pos, color, maxf(radius, 140.0))
+		"trap":
+			_spawn_ground(pos, color, maxf(radius, 120.0), "spikes")
+		"heal_zone":
+			_spawn_bubbles(pos, color, maxf(radius, 130.0))
+			_spawn_leaves(pos, color, maxf(radius, 130.0))
+		"boomerang":
+			_spawn_stars(pos, color, 4, maxf(radius, 90.0))
+		"beam", "chain":
+			_spawn_burst(pos, color, 0.30)
 		_:
 			_spawn_burst(pos, color, 0.30)
+
+
+func _spawn_spin(pos: Vector3, color: Color, radius: float) -> void:
+	# 刺球旋身：一圈贴身圆环 + 四面飞出的短刺。
+	_spawn_ring(pos, color, radius * 0.82, 0.48)
+	var mat := _fx_mat(color, 0.95)
+	var mesh := _fx_mesh("fx_spin_spike", func():
+		var bm := BoxMesh.new()
+		bm.size = Vector3(10, 10, 34)
+		return bm)
+	for i in range(8):
+		var ang := TAU * float(i) / 8.0
+		_add_fx_mesh(mesh, mat, pos + Vector3(cos(ang), 0.0, sin(ang)) * radius * 0.58
+			+ Vector3(0.0, 24.0, 0.0), 0.42, 0.35, 1.5,
+			Vector3.ZERO, Vector3(0.0, 6.0, 0.0), Vector3(0.0, ang, 0.0))
 
 
 func _spawn_slashes(pos: Vector3, color: Color, count: int, radius: float) -> void:

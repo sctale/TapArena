@@ -7,6 +7,7 @@ extends RefCounted
 signal banner(text: String, duration: float)
 signal float_text(pos: Vector3, text: String, color: Color)
 signal fx(kind: String, pos: Vector3, color: Color, radius: float)
+signal beam_fx(from: Vector3, to: Vector3, color: Color, width: float)
 signal sfx(key: String)
 signal hitstop(seconds: float)
 signal level_up(unit)
@@ -19,6 +20,9 @@ const MINION := 1
 const TOWER := 2
 const BASE := 3
 const BOSS := 4
+const JUNGLE := 5
+const NEUTRAL := 2
+const BASE_HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl", "deer"]
 
 class Unit:
 	var uid: int = 0
@@ -64,6 +68,17 @@ class Unit:
 	var shield_t: float = 0.0
 	var thorn_t: float = 0.0
 	var calm_t: float = 0.0
+	# 差异化状态：猎杀标记 / 恐惧 / 嘲讽 / 旋身刺球。
+	var mark_t: float = 0.0
+	var fear_t: float = 0.0
+	var fear_src = null
+	var taunt_t: float = 0.0
+	var taunt_src = null
+	var spin_t: float = 0.0
+	var spin_tick: float = 0.0
+	var spin_radius: float = 130.0
+	var spin_dmg: float = 0.0
+	var spin_color := Color.WHITE
 
 	var atk_anim: float = 0.0
 	var cast_anim: float = 0.0
@@ -78,9 +93,14 @@ class Unit:
 	var ai_think: float = 0.0
 	var ai_target = null
 	var lane_index: int = 0
+	var lane_id: int = 1
+	var jungle_kind: String = ""
+	var respawn_home := Vector2.ZERO
 
 	# BOSS 技能状态：前摇、冲撞、施法目标。普通英雄不用这些字段。
 	var boss_skill: String = ""
+	var boss_phase: int = 1
+	var boss_flying: bool = false
 	var boss_cast_t: float = 0.0
 	var boss_charge_t: float = 0.0
 	var boss_charge_dir := Vector2.ZERO
@@ -118,6 +138,11 @@ class Projectile:
 	var target = null
 	var hit: Dictionary = {}
 	var style: String = "cube"
+	# 回旋镖：飞出一段距离后折返，折返时清空命中表，可以再打一次。
+	var boom: bool = false
+	var origin := Vector2.ZERO
+	var boom_range: float = 420.0
+	var boomed: bool = false
 
 class Zone:
 	var pos := Vector2.ZERO
@@ -127,6 +152,8 @@ class Zone:
 	var slow: float = 0.9
 	var team: int = 0
 	var color := Color.WHITE
+	# 治疗区域：每秒给区域内友军回复最大生命的比例。
+	var heal_pct: float = 0.0
 
 class Potion:
 	var team: int = 0
@@ -175,6 +202,9 @@ var skill_pressed: Array = [false, false, false]
 var interp_alpha: float = 1.0
 
 var lane: Array = []
+var lane_paths: Array = []
+var five_v_five := false
+var team_size := 3
 var rng := RandomNumberGenerator.new()
 
 var map_w: float = 3000.0
@@ -198,6 +228,7 @@ var minion_cfg: Dictionary = {}
 var comeback_cfg: Dictionary = {}
 var potion_cfg: Dictionary = {}
 var boss_cfg: Dictionary = {}
+var jungle_cfg: Dictionary = {}
 var ai_cfg: Dictionary = {}
 
 var ai_think_base: float = 0.22
@@ -216,9 +247,11 @@ static func color_of(hex: String, fallback := Color.WHITE) -> Color:
 	return Color.from_string(hex.trim_prefix("#"), fallback)
 
 
-func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
+func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := false) -> void:
 	load_data()
 	rng.seed = seed_value
+	five_v_five = mode_5v5
+	team_size = 3
 
 	units.clear()
 	heroes.clear()
@@ -274,6 +307,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	comeback_cfg = rules.get("comeback", {})
 	potion_cfg = rules.get("potion", {})
 	boss_cfg = rules.get("boss", {})
+	jungle_cfg = rules.get("jungle_stats", {})
 	ai_cfg = rules.get("ai", {})
 	boss_respawn = float(boss_cfg.get("respawn", 25.0))
 	var hs: Dictionary = rules.get("hitstop", {})
@@ -286,14 +320,33 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 	ai_skill_mul = float(dcfg.get("ai_skill_mul", 1.0))
 	enemy_dmg_mul = float(dcfg.get("enemy_dmg_mul", 1.0))
 
+	lane_paths.clear()
+	if five_v_five:
+		var mode_cfg: Dictionary = rules.get("mode_5v5", {})
+		team_size = int(mode_cfg.get("team_size", 5))
+		match_cap = float(mode_cfg.get("match_cap", match_cap))
+		sudden_death_time = float(mode_cfg.get("sudden_death_time", sudden_death_time))
+		for raw_lane in rules.get("lanes_5v5", []):
+			var path: Array = []
+			for p in raw_lane:
+				path.append(Vector2(float(p[0]), float(p[1])))
+			lane_paths.append(path)
+		if lane_paths.is_empty():
+			lane_paths.append([])
+	else:
+		team_size = 3
 	lane.clear()
-	for p in rules.get("lane", []):
+	var mid_raw: Array = lane_paths[1] if lane_paths.size() > 1 else rules.get("lane", [])
+	for p in mid_raw:
 		lane.append(Vector2(float(p[0]), float(p[1])))
 
 	var others: Array = []
 	for d in heroes_data:
-		if d["id"] != player_hero:
-			others.append(d["id"])
+		var hid := str(d.get("id", ""))
+		if not five_v_five and not BASE_HERO_IDS.has(hid):
+			continue
+		if hid != player_hero:
+			others.append(hid)
 	for i in range(others.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
 		var tmp = others[i]
@@ -302,39 +355,68 @@ func setup(player_hero: String, difficulty: int, seed_value: int) -> void:
 
 	base_blue = make_base(BLUE, Vector2(230, 800))
 	base_red = make_base(RED, Vector2(2770, 800))
-	# 外塔 = 更靠近敌方的一侧，必须先拆；内塔在水晶旁，受外塔保护。
-	towers_blue.append(make_tower(BLUE, 0, Vector2(1180, 800)))
-	towers_blue.append(make_tower(BLUE, 1, Vector2(760, 800)))
-	towers_red.append(make_tower(RED, 0, Vector2(1900, 800)))
-	towers_red.append(make_tower(RED, 1, Vector2(2320, 800)))
-	# 双方一塔后方各放一瓶回血药剂，踩到即喝，30 秒后重新长出来。
-	make_potion(BLUE, Vector2(1050, 800))
-	make_potion(RED, Vector2(2030, 800))
+	if five_v_five:
+		# 三路各一座外塔；塔位取该路的中点，战斗推进仍按 lane 过滤。
+		for lane_id in range(lane_paths.size()):
+			var path: Array = lane_paths[lane_id]
+			if path.size() < 6:
+				continue
+			towers_blue.append(make_tower(BLUE, 0, path[2], lane_id))
+			towers_red.append(make_tower(RED, 0, path[4], lane_id))
+			make_potion(BLUE, path[1])
+			make_potion(RED, path[5])
+		for camp in rules.get("jungle", []):
+			var cp = camp.get("pos", [0, 0])
+			make_jungle(str(camp.get("kind", "boar")), Vector2(float(cp[0]), float(cp[1])))
+	else:
+		# 外塔 = 更靠近敌方的一侧，必须先拆；内塔在水晶旁，受外塔保护。
+		towers_blue.append(make_tower(BLUE, 0, Vector2(1180, 800)))
+		towers_blue.append(make_tower(BLUE, 1, Vector2(760, 800)))
+		towers_red.append(make_tower(RED, 0, Vector2(1900, 800)))
+		towers_red.append(make_tower(RED, 1, Vector2(2320, 800)))
+		# 双方一塔后方各放一瓶回血药剂，踩到即喝，30 秒后重新长出来。
+		make_potion(BLUE, Vector2(1050, 800))
+		make_potion(RED, Vector2(2030, 800))
 
 	var allies: Array = []
-	var player_front := player_hero == "tiger" or player_hero == "bear"
-	if not player_front:
-		allies.append(take_preferred(others, ["bear", "tiger", "panda"]))
-		allies.append(take_preferred(others, ["rabbit", "axolotl", "frog", "cat", "deer", "fox"]))
-	else:
-		allies.append(take_preferred(others, ["deer", "cat", "fox", "rabbit", "axolotl", "frog"]))
-		allies.append(take_preferred(others, ["axolotl", "rabbit", "frog", "deer", "fox", "cat"]))
+	var player_front := player_hero == "tiger" or player_hero == "bear" or player_hero == "turtle"
+	var ally_prefs := [
+		["turtle", "bear", "tiger", "panda"],
+		["rabbit", "axolotl", "frog", "cat", "deer", "fox"],
+		["hedgehog", "wolf", "cat", "fox", "redpanda", "owl"],
+		["deer", "crane", "owl", "frog", "rabbit"],
+	]
+	if player_front:
+		ally_prefs = [
+			["deer", "cat", "fox", "rabbit", "axolotl", "frog"],
+			["axolotl", "rabbit", "frog", "deer", "fox", "cat"],
+			["hedgehog", "wolf", "redpanda", "crane", "owl"],
+			["turtle", "panda", "bear", "owl", "crane"],
+		]
+	for i in range(team_size - 1):
+		var prefs: Array = ally_prefs[i % ally_prefs.size()]
+		allies.append(take_preferred(others, prefs))
 
-	var blue_ids: Array = [player_hero, allies[0], allies[1]]
+	var blue_ids: Array = [player_hero] + allies
 	var red_ids: Array = others
-
-	for i in range(3):
-		var h = make_hero(blue_ids[i], BLUE, i)
+	var lanes_5 := [1, 0, 2, 1, 0]
+	for i in range(team_size):
+		var lane_id: int = lanes_5[i] if five_v_five else 1
+		var h = make_hero(str(blue_ids[i]), BLUE, i, lane_id)
 		if i == 0:
 			h.is_player = true
 			player = h
-	for i in range(3):
-		make_hero(red_ids[i], RED, i)
+	for i in range(team_size):
+		var lane_id: int = lanes_5[i] if five_v_five else 1
+		make_hero(str(red_ids[i]), RED, i, lane_id)
 
 	started = true
 	wave_t = 3.0
-	banner.emit("往右走 → 先拆两座蘑菇塔，再点亮敌方水晶！", 3.6)
-	print("[SIM] seed=%d player=%s difficulty=%s" % [seed_value, player_hero, diff_name])
+	if five_v_five:
+		banner.emit("三路推进 → 拆掉两座塔，就能进攻敌方水晶！", 3.6)
+	else:
+		banner.emit("往右走 → 先拆两座蘑菇塔，再点亮敌方水晶！", 3.6)
+	print("[SIM] seed=%d player=%s difficulty=%s mode=%s" % [seed_value, player_hero, diff_name, "5v5" if five_v_five else "3v3"])
 
 
 func load_data() -> void:
@@ -387,7 +469,7 @@ func new_unit(kind: int, team: int, display_name: String, pos: Vector2):
 
 func make_base(team: int, pos: Vector2):
 	var u = new_unit(BASE, team, "清清水晶" if team == BLUE else "红红水晶", pos)
-	u.hp = float(base_cfg.get("hp", 3000))
+	u.hp = float(base_cfg.get("hp_5v5", 2600) if five_v_five else base_cfg.get("hp", 3000))
 	u.max_hp = u.hp
 	u.radius = float(base_cfg.get("radius", 90))
 	u.height = float(base_cfg.get("height", 150))
@@ -399,18 +481,59 @@ func make_base(team: int, pos: Vector2):
 	return u
 
 
-func make_tower(team: int, tier: int, pos: Vector2):
+func make_tower(team: int, tier: int, pos: Vector2, lane_id := 1):
 	var u = new_unit(TOWER, team, "外塔" if tier == 0 else "内塔", pos)
-	u.hp = float(tower_cfg.get("hp", 4200))
+	u.lane_id = lane_id
+	u.hp = float(tower_cfg.get("hp_5v5", 2600) if five_v_five else tower_cfg.get("hp", 4200))
 	u.max_hp = u.hp
 	u.radius = float(tower_cfg.get("radius", 58))
 	u.height = float(tower_cfg.get("height", 140))
 	u.attack_range = float(tower_cfg.get("range", 350))
-	u.dmg = float(tower_cfg.get("dmg", 100))
+	u.dmg = float(tower_cfg.get("dmg_5v5", 82) if five_v_five else tower_cfg.get("dmg", 100))
 	u.atk_interval = float(tower_cfg.get("atk_interval", 1.0))
 	u.atk_timer = rng.randf_range(0.0, 1.0)
 	u.level = tier
 	return u
+
+
+func make_jungle(kind: String, pos: Vector2):
+	var names := {"boar": "森林野猪", "wolf": "灰狼", "crab": "河蟹"}
+	var u = new_unit(JUNGLE, NEUTRAL, str(names.get(kind, "野怪")), pos)
+	u.jungle_kind = kind
+	u.lane_id = -1
+	u.respawn_home = pos
+	u.max_hp = float(jungle_cfg.get("hp", 650))
+	u.hp = u.max_hp
+	u.radius = 30.0
+	u.height = 48.0
+	u.attack_range = float(jungle_cfg.get("range", 110))
+	u.dmg = float(jungle_cfg.get("dmg", 36))
+	u.atk_interval = float(jungle_cfg.get("atk_interval", 1.1))
+	u.atk_timer = rng.randf_range(0.2, 0.8)
+	u.move_speed = 0.0
+	return u
+
+
+func respawn_jungle(u) -> void:
+	u.hp = u.max_hp
+	u.pos = u.respawn_home
+	u.prev_pos = u.pos
+	u.stun_t = 0.0
+	u.slow_t = 0.0
+	u.atk_timer = 0.6
+
+
+func step_jungle(u, dt: float) -> void:
+	var foe = nearest_enemy(u, u.attack_range + 30.0)
+	if foe == null:
+		u.moving = false
+		return
+	u.moving = false
+	u.facing = 1.0 if foe.pos.x >= u.pos.x else -1.0
+	if u.atk_timer <= 0.0:
+		u.atk_timer = u.atk_interval
+		u.atk_anim = 0.25
+		hit_with_fx(foe, u.dmg, u, 0.0)
 
 
 func make_potion(team: int, pos: Vector2):
@@ -492,6 +615,8 @@ func spawn_boss(team: int) -> void:
 	u.height = float(boss_cfg.get("height", 132))
 	u.atk_timer = 0.5
 	u.cds = [3.0, 6.0, 9.0]
+	u.boss_phase = 1
+	u.boss_flying = false
 	u.boss_skill = ""
 	u.boss_cast_t = 0.0
 	u.boss_charge_t = 0.0
@@ -518,12 +643,14 @@ func respawn_boss(u) -> void:
 	u.shield = 0.0
 	u.atk_timer = 0.4
 	u.cds = [3.0, 6.0, 9.0]
+	u.boss_phase = mini(2, u.boss_phase + 1)
+	u.boss_flying = u.boss_phase >= 2
 	u.boss_skill = ""
 	u.boss_cast_t = 0.0
 	u.boss_charge_t = 0.0
 	u.boss_charge_hit.clear()
 	u.boss_target = null
-	banner.emit("峡谷巨兽再次出发！", 2.6)
+	banner.emit("峡谷巨兽展开翅膀，飞回战场！" if u.boss_flying else "峡谷巨兽再次出发！", 2.8)
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(u.team), 180.0)
 
 
@@ -544,26 +671,42 @@ func step_boss(u, dt: float) -> void:
 		_step_boss_charge(u, dt)
 		return
 
-	var skills: Dictionary = boss_cfg.get("skills", {})
-	var slam: Dictionary = skills.get("slam", {})
-	var roar: Dictionary = skills.get("roar", {})
+	var skills: Dictionary = boss_cfg.get("skills_flying" if u.boss_flying else "skills", {})
+	var first: Dictionary = skills.get("meteor" if u.boss_flying else "slam", {})
+	var second: Dictionary = skills.get("cyclone" if u.boss_flying else "roar", {})
 	var charge: Dictionary = skills.get("charge", {})
 
-	# 裂地重击：身边有英雄/小兵才用，避免对空塔浪费。
-	if u.cds[0] <= 0.0 and count_enemy_units_near(u, float(slam.get("radius", 250.0))) > 0:
-		_begin_boss_cast(u, "slam", slam, 0)
-		return
-	# 巨兽咆哮：范围更大，先减速再追。
-	if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(roar.get("radius", 330.0))) > 0:
-		_begin_boss_cast(u, "roar", roar, 1)
-		return
-	# 野蛮冲撞：离前塔还远时直接撞过去。
-	var front = front_structure(u.team)
-	if u.cds[2] <= 0.0 and front != null and front.is_alive():
-		var fd: float = u.pos.distance_to(front.pos)
-		if fd >= float(charge.get("min_range", 260.0)) and fd <= float(charge.get("range", 620.0)):
-			_begin_boss_cast(u, "charge", charge, 2, front)
+	if u.boss_flying:
+		# 飞行形态：陨石砸向最近的英雄/前塔，旋风清空身边。
+		if u.cds[0] <= 0.0:
+			var meteor_target = nearest_enemy_unit(u, float(first.get("range", 650.0)))
+			if meteor_target != null:
+				_begin_boss_cast(u, "meteor", first, 0, meteor_target)
+				return
+		if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(second.get("radius", 300.0))) > 0:
+			_begin_boss_cast(u, "cyclone", second, 1)
 			return
+		var front_fly = front_structure(u.team)
+		if front_fly != null and front_fly.is_alive():
+			var fd2: float = u.pos.distance_to(front_fly.pos)
+			if fd2 > u.attack_range * 0.8:
+				move_ai(u, front_fly.pos - u.pos, dt, 0.92)
+				return
+	else:
+		# 地面形态：裂地重击 / 咆哮 / 冲撞。
+		if u.cds[0] <= 0.0 and count_enemy_units_near(u, float(first.get("radius", 250.0))) > 0:
+			_begin_boss_cast(u, "slam", first, 0)
+			return
+		if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(second.get("radius", 330.0))) > 0:
+			_begin_boss_cast(u, "roar", second, 1)
+			return
+		var front = front_structure(u.team)
+		if u.cds[2] <= 0.0 and front != null and front.is_alive():
+			var fd: float = u.pos.distance_to(front.pos)
+			if fd >= float(charge.get("min_range", 260.0)) and fd <= float(charge.get("range", 620.0)):
+				_begin_boss_cast(u, "charge", charge, 2, front)
+				return
+	var front = front_structure(u.team)
 
 	# 其余时间保持原来的普攻推进。
 	var target = nearest_enemy(u, u.attack_range + 90.0)
@@ -638,6 +781,14 @@ func _begin_boss_cast(u, kind: String, cfg: Dictionary, index: int, target = nul
 		label = "巨兽咆哮！"
 		style = "roar"
 		telegraph = float(cfg.get("radius", 330.0)) * 0.75
+	elif kind == "meteor":
+		label = "陨石坠落！"
+		style = "starfall_ult"
+		telegraph = float(cfg.get("radius", 260.0)) * 0.9
+	elif kind == "cyclone":
+		label = "旋风横扫！"
+		style = "clawstorm"
+		telegraph = float(cfg.get("radius", 300.0)) * 0.8
 	elif kind == "charge":
 		label = "野蛮冲撞！"
 		telegraph = 90.0
@@ -655,7 +806,7 @@ func _begin_boss_cast(u, kind: String, cfg: Dictionary, index: int, target = nul
 
 func _resolve_boss_cast(u) -> void:
 	var kind: String = str(u.boss_skill)
-	var skills: Dictionary = boss_cfg.get("skills", {})
+	var skills: Dictionary = boss_cfg.get("skills_flying" if u.boss_flying else "skills", {})
 	var cfg: Dictionary = skills.get(kind, {})
 	var col := _team_color(u.team)
 	u.cast_anim = 0.0
@@ -688,6 +839,24 @@ func _resolve_boss_cast(u) -> void:
 						and u.pos.distance_to(a.pos) <= radius + a.radius:
 					a.hp = minf(a.max_hp, a.hp + a.max_hp * 0.10)
 			fx.emit("cast_roar", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
+			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
+			sfx.emit("ult")
+		"meteor":
+			var radius := float(cfg.get("radius", 260.0))
+			var center: Vector2 = u.pos + Vector2(u.facing, 0.0) * 220.0
+			if u.boss_target != null and u.boss_target.is_alive():
+				center = u.boss_target.pos
+			area_damage(center, radius, float(cfg.get("dmg", 220.0)), u, u.team,
+				float(cfg.get("slow", 1.2)), 0.0, 30.0)
+			fx.emit("cast_starfall_ult", Vector3(center.x, 20.0, center.y), col, radius)
+			fx.emit("ring", Vector3(center.x, 6.0, center.y), col, radius)
+			fx.emit("debris", Vector3(center.x, 30.0, center.y), col, radius)
+			sfx.emit("boom")
+		"cyclone":
+			var radius := float(cfg.get("radius", 300.0))
+			area_damage(u.pos, radius, float(cfg.get("dmg", 130.0)), u, u.team,
+				float(cfg.get("slow", 1.5)), 0.0, float(cfg.get("knock", 60.0)))
+			fx.emit("cast_clawstorm", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
 			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
 			sfx.emit("ult")
 		"charge":
@@ -744,10 +913,16 @@ func _step_boss_charge(u, dt: float) -> void:
 		fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), _team_color(u.team), 90.0)
 
 
-func make_hero(id: String, team: int, slot: int):
+func make_hero(id: String, team: int, slot: int, lane_id := 1):
 	var d: Dictionary = defs_by_id.get(id, heroes_data[0])
-	var offset := Vector2(150.0 if team == BLUE else -150.0, float(slot - 1) * 70.0)
-	var u = new_unit(HERO, team, str(d.get("name", id)), base_pos(team) + offset)
+	var spawn := base_pos(team) + Vector2(150.0 if team == BLUE else -150.0, float(slot - 1) * 70.0)
+	if five_v_five and lane_paths.size() > lane_id:
+		var path: Array = lane_paths[lane_id]
+		if path.size() > 0:
+			spawn = path[0] if team == BLUE else path[path.size() - 1]
+			spawn += Vector2(0.0, float(slot % 2) * 32.0 - 16.0)
+	var u = new_unit(HERO, team, str(d.get("name", id)), spawn)
+	u.lane_id = lane_id
 	u.def = d
 	u.hero_id = id
 	u.skills = d.get("skills", [])
@@ -794,11 +969,11 @@ func step(dt: float) -> void:
 	if not boss_spawned and clock >= sudden_death_time:
 		boss_spawned = true
 		spawn_boss(leading_team())
-	if not warned_45 and clock >= 240.0:
+	if not warned_45 and clock >= match_cap - 45.0:
 		warned_45 = true
 		final_push = true
 		banner.emit("最后 45 秒！防御塔停火，兵线加速", 3.2)
-	if not warned_15 and clock >= 270.0:
+	if not warned_15 and clock >= match_cap - 15.0:
 		warned_15 = true
 		banner.emit("最后 15 秒！", 2.4)
 
@@ -843,10 +1018,22 @@ func step(dt: float) -> void:
 
 
 func spawn_wave(team: int) -> void:
-	var origin := base_pos(team)
+	if five_v_five:
+		for lane_id in range(lane_paths.size()):
+			spawn_wave_lane(team, lane_id)
+	else:
+		spawn_wave_lane(team, 1)
+
+
+func spawn_wave_lane(team: int, lane_id: int) -> void:
+	var path: Array = lane_paths[lane_id] if five_v_five and lane_id < lane_paths.size() else lane
+	if path.is_empty():
+		return
+	var origin: Vector2 = path[0] if team == BLUE else path[path.size() - 1]
 	var count := int(minion_cfg.get("count", 3))
 	for k in range(count):
-		var m = new_unit(MINION, team, "小果冻", origin + Vector2(0.0, float(k - 1) * 46.0))
+		var m = new_unit(MINION, team, "小果冻", origin + Vector2(0.0, float(k - (count - 1) * 0.5) * 38.0))
+		m.lane_id = lane_id
 		m.hp = float(minion_cfg.get("hp", 280))
 		m.max_hp = m.hp
 		m.radius = float(minion_cfg.get("radius", 20))
@@ -856,7 +1043,7 @@ func spawn_wave(team: int) -> void:
 		m.atk_interval = float(minion_cfg.get("atk_interval", 0.9))
 		m.atk_timer = rng.randf_range(0.0, 0.6)
 		m.move_speed = float(minion_cfg.get("move_speed", 176))
-		m.lane_index = 1 if team == BLUE else lane.size() - 2
+		m.lane_index = 1 if team == BLUE else path.size() - 2
 		minions.append(m)
 
 
@@ -871,6 +1058,9 @@ func step_unit(u, dt: float) -> void:
 	u.dash_t = maxf(0.0, u.dash_t - dt)
 	u.shield_t = maxf(0.0, u.shield_t - dt)
 	u.thorn_t = maxf(0.0, u.thorn_t - dt)
+	u.mark_t = maxf(0.0, u.mark_t - dt)
+	u.fear_t = maxf(0.0, u.fear_t - dt)
+	u.taunt_t = maxf(0.0, u.taunt_t - dt)
 	if u.shield_t <= 0.0:
 		u.shield = 0.0
 
@@ -889,6 +1079,11 @@ func step_unit(u, dt: float) -> void:
 			u.respawn_t -= dt
 			if u.respawn_t <= 0.0:
 				respawn_boss(u)
+		elif u.kind == JUNGLE:
+			u.die_t += dt
+			u.respawn_t -= dt
+			if u.respawn_t <= 0.0:
+				respawn_jungle(u)
 		return
 
 	u.atk_timer -= dt
@@ -909,11 +1104,14 @@ func step_unit(u, dt: float) -> void:
 		step_minion(u, dt)
 	elif u.kind == BOSS:
 		step_boss(u, dt)
+	elif u.kind == JUNGLE:
+		step_jungle(u, dt)
 	else:
 		step_structure(u)
 
 
 func step_hero(h, dt: float) -> void:
+	_step_spin(h, dt)
 	if h.move_skill_t > 0.0:
 		_step_move_skill(h, dt)
 		return
@@ -1033,11 +1231,46 @@ func hero_shot_style(id: String) -> String:
 			return "bubble"
 		"deer":
 			return "arrow"
+		"hedgehog":
+			return "arrow"
+		"crane":
+			return "feather"
 	return "cube"
+
+
+func _step_spin(h, dt: float) -> void:
+	# 刺猬滚成刺球：持续 2.4 秒，每隔一小段时间对周围敌人造成一次伤害。
+	if h.spin_t <= 0.0:
+		return
+	h.spin_t = maxf(0.0, h.spin_t - dt)
+	h.spin_tick -= dt
+	if h.spin_tick > 0.0:
+		return
+	h.spin_tick = 0.30
+	area_damage(h.pos, h.spin_radius, h.spin_dmg, h, h.team, 0.35, 0.0, 14.0, true)
+	fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), h.spin_color, h.spin_radius)
+	fx.emit("burst", Vector3(h.pos.x, 26.0, h.pos.y), h.spin_color, 0.0)
 
 
 func step_hero_ai(h, dt: float) -> void:
 	var hp_p: float = h.hp / h.max_hp
+	# 恐惧：被猛狮吼到后短暂往远离施法者的方向跑。
+	if h.fear_t > 0.0 and h.fear_src != null and h.fear_src.is_alive():
+		var away_f: Vector2 = h.pos - h.fear_src.pos
+		if away_f.length_squared() > 0.01:
+			move_ai(h, away_f, dt, 1.15)
+			h.facing = 1.0 if away_f.x >= 0.0 else -1.0
+			return
+	if five_v_five:
+		# 本路塔拆完后，AI 自动换到还有塔的路，避免围着已保护的水晶空站。
+		var lane_front = front_structure(h.team, h.lane_id)
+		if lane_front != null and lane_front.kind == BASE and is_base_protected(lane_front):
+			for l in range(mini(3, lane_paths.size())):
+				var cand = front_structure(h.team, l)
+				if cand != null and cand.kind == TOWER and cand.is_alive():
+					h.lane_id = l
+					h.ai_target = null
+					break
 	var foe_heroes := count_team_heroes(1 - h.team, h.pos, 460.0)
 	var ally_heroes := count_team_heroes(h.team, h.pos, 460.0)
 	var enemy_near := enemy_hero_near(h, 430.0)
@@ -1055,8 +1288,12 @@ func step_hero_ai(h, dt: float) -> void:
 	# 每次决策都重新打分，避免锁定一座塔后一路无视路上的兵和英雄。
 	if think or h.ai_target == null or not h.ai_target.is_alive():
 		h.ai_target = ai_target(h)
+	# 嘲讽：潮汐守卫举盾时，附近敌人暂时只能打它。
+	if h.taunt_t > 0.0 and h.taunt_src != null and h.taunt_src.is_alive():
+		h.ai_target = h.taunt_src
+		retreat = false
 	var t = h.ai_target
-	var front = front_structure(h.team)
+	var front = front_structure(h.team, h.lane_id if five_v_five else -1)
 	# 锁定目标后仍可能一路追到塔后；追击途中也要受前塔限制。
 	if t != null and t != front and front != null and front.kind == TOWER and front.is_alive():
 		if (h.team == BLUE and t.pos.x > front.pos.x + 20.0) or \
@@ -1147,7 +1384,7 @@ func step_hero_skills(h, hp_p: float, retreat: bool) -> void:
 		if h.cds[i] > 0.0:
 			continue
 		var kind := str(s.get("kind", ""))
-		var support := kind == "heal" or kind == "shield"
+		var support := kind == "heal" or kind == "shield" or kind == "taunt" or kind == "heal_zone"
 		if retreat and not support:
 			continue
 
@@ -1218,12 +1455,14 @@ func count_enemies_around(h, radius: float, dot_min: float) -> int:
 	return n
 
 
-func front_structure(team: int):
-	# 敌方最靠前（离我方最近）的存活塔；两座塔都拆掉后才轮到水晶。
+func front_structure(team: int, lane_id := -1):
+	# 敌方最靠前（离我方最近）的存活塔；指定 lane_id 时只看该路。
 	var list: Array = towers_red if team == BLUE else towers_blue
 	var best = null
 	for t in list:
 		if not t.is_alive():
+			continue
+		if five_v_five and lane_id >= 0 and t.lane_id != lane_id:
 			continue
 		if best == null:
 			best = t
@@ -1237,7 +1476,7 @@ func front_structure(team: int):
 
 
 func ai_target(h):
-	var front = front_structure(h.team)
+	var front = front_structure(h.team, h.lane_id if five_v_five else -1)
 	var tower_alive: bool = front != null and front.kind == TOWER and front.is_alive()
 	var best = null
 	var best_score := -1.0e20
@@ -1251,6 +1490,13 @@ func ai_target(h):
 	for o in units:
 		if not o.is_alive() or o.team == h.team:
 			continue
+		if o.kind == JUNGLE:
+			continue
+		if five_v_five and o.kind == TOWER and o.lane_id != h.lane_id:
+			continue
+		if five_v_five and o.kind != TOWER and o.kind != BASE:
+			if o.lane_id != h.lane_id and h.pos.distance_to(o.pos) > 320.0:
+				continue
 		if o.kind == TOWER and is_tower_protected(o):
 			continue
 		if o.kind == BASE and is_base_protected(o):
@@ -1383,16 +1629,19 @@ func step_minion(m, dt: float) -> void:
 		return
 
 	var step_dir := 1 if m.team == BLUE else -1
-	var idx := clampi(m.lane_index, 0, lane.size() - 1)
-	var goal: Vector2 = lane[idx]
-	for guard in range(lane.size()):
+	var path: Array = lane_paths[m.lane_id] if five_v_five and m.lane_id < lane_paths.size() else lane
+	if path.is_empty():
+		return
+	var idx := clampi(m.lane_index, 0, path.size() - 1)
+	var goal: Vector2 = path[idx]
+	for guard in range(path.size()):
 		if (goal - m.pos).length() > 70.0:
 			break
 		var next_idx := idx + step_dir
-		if next_idx < 0 or next_idx >= lane.size():
+		if next_idx < 0 or next_idx >= path.size():
 			break
 		idx = next_idx
-		goal = lane[idx]
+		goal = path[idx]
 	m.lane_index = idx
 
 	var to: Vector2 = goal - m.pos
@@ -1467,6 +1716,42 @@ func step_projectiles(dt: float) -> void:
 		if not p.alive:
 			continue
 		p.prev_pos = p.pos
+		if p.boom:
+			if not p.boomed:
+				p.pos += p.dir * (p.speed * dt)
+				if p.origin.distance_to(p.pos) >= p.boom_range:
+					p.boomed = true
+					p.hit.clear()
+					p.pierce = maxi(p.pierce, 1)
+			elif p.src != null and p.src.is_alive():
+				var back: Vector2 = p.src.pos - p.pos
+				if back.length() <= 26.0:
+					p.alive = false
+					continue
+				p.dir = back.normalized()
+				p.pos += p.dir * (p.speed * dt)
+			else:
+				p.alive = false
+				continue
+			p.life -= dt
+			if p.life <= 0.0:
+				p.alive = false
+				continue
+			for u in units:
+				if not u.is_alive() or u.team == p.team:
+					continue
+				var hit_r: float = u.radius * 0.7 if (u.kind == TOWER or u.kind == BASE) else u.radius + 10.0
+				if (p.pos - u.pos).length_squared() > hit_r * hit_r:
+					continue
+				if p.hit.has(u.uid):
+					continue
+				hit_with_fx(u, p.dmg, p.src, 0.0, p.color)
+				if p.slow > 0.0:
+					u.slow_t = maxf(u.slow_t, p.slow)
+				p.hit[u.uid] = true
+				fx.emit("burst", Vector3(p.pos.x, 20.0, p.pos.y), p.color, 0.0)
+				break
+			continue
 		if p.homing and p.target != null and p.target.is_alive():
 			var to: Vector2 = p.target.pos - p.pos
 			if to.length_squared() > 0.01:
@@ -1545,6 +1830,9 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 
 	if src != null and src.team == RED and target.team == BLUE:
 		amount *= enemy_dmg_mul
+	# 猎杀标记：被狼盯上的目标承受更多伤害。
+	if target.mark_t > 0.0:
+		amount *= 1.22
 
 	# 终极对决：建筑变脆，保证 3 分钟内能打出结果。
 	if sudden_death and (target.kind == TOWER or target.kind == BASE):
@@ -1604,6 +1892,15 @@ func kill(target, killer) -> void:
 		banner.emit("%s 击败了 %s" % [killer_name, target.display_name], 1.8)
 		sfx.emit("ult")
 
+	elif target.kind == JUNGLE:
+		target.respawn_t = float(jungle_cfg.get("respawn", 45.0))
+		if killer != null and killer.kind == HERO:
+			add_xp(killer, float(jungle_cfg.get("xp", 90.0)))
+			var heal: float = killer.max_hp * float(jungle_cfg.get("heal_pct", 0.08))
+			killer.hp = minf(killer.max_hp, killer.hp + heal)
+			float_text.emit(Vector3(killer.pos.x, killer.height + 24.0, killer.pos.y),
+				"+%d 野怪经验" % int(jungle_cfg.get("xp", 90.0)), Color(0.85, 1.0, 0.7))
+		sfx.emit("pickup")
 	elif target.kind == BOSS:
 		target.respawn_t = boss_respawn
 		banner.emit("峡谷巨兽被击退了！", 2.4)
@@ -1706,6 +2003,50 @@ func nearest_enemy(from, radius: float):
 	return best
 
 
+func nearest_enemy_excluding(from, origin: Vector2, radius: float, excluded: Array):
+	var best = null
+	var bd := radius
+	for u in units:
+		if not u.is_alive() or u.team == from.team:
+			continue
+		if excluded.has(u):
+			continue
+		if u.kind == TOWER and is_tower_protected(u):
+			continue
+		if u.kind == BASE and is_base_protected(u):
+			continue
+		var d: float = origin.distance_to(u.pos)
+		if d <= bd:
+			bd = d
+			best = u
+	return best
+
+
+func _throw_boomerang(h, dir: Vector2, dmg: float, color: Color, s: Dictionary) -> void:
+	var p = Projectile.new()
+	p.pos = h.pos
+	p.prev_pos = p.pos
+	p.dir = dir.normalized() if dir.length_squared() > 0.001 else Vector2.RIGHT
+	p.team = h.team
+	p.src = h
+	p.speed = float(s.get("speed", 620.0))
+	p.dmg = dmg
+	p.life = 3.0
+	p.size = 10.0
+	p.color = color
+	p.slow = float(s.get("slow", 0.0))
+	p.pierce = int(s.get("pierce", 2))
+	p.style = str(s.get("shot_style", "arrow"))
+	p.boom = true
+	p.origin = h.pos
+	p.boom_range = float(s.get("range", 420.0))
+	p.view_id = _shot_view
+	_shot_view += 1
+	shots.append(p)
+	fx.emit("muzzle", Vector3(p.pos.x, h.height * 0.45, p.pos.y), color, 0.0)
+	sfx.emit("shoot_" + h.hero_id)
+
+
 func nearest_hero(from, radius: float):
 	var best = null
 	var bd := radius
@@ -1752,10 +2093,14 @@ func is_base_protected(b) -> bool:
 	if b.kind != BASE:
 		return false
 	var list: Array = towers_blue if b.team == BLUE else towers_red
+	var alive := 0
 	for o in list:
 		if o.is_alive():
-			return true
-	return false
+			alive += 1
+	if five_v_five:
+		var open_at := int(rules.get("mode_5v5", {}).get("base_open_towers", 1))
+		return alive > open_at
+	return alive > 0
 
 
 func step_zones(dt: float) -> void:
@@ -1766,9 +2111,14 @@ func step_zones(dt: float) -> void:
 			zones.remove_at(i)
 			continue
 		for u in units:
-			if not u.is_alive() or u.team == z.team:
+			if not u.is_alive():
 				continue
 			if z.pos.distance_to(u.pos) > z.radius + u.radius:
+				continue
+			if u.team == z.team:
+				# 治疗区域：对自己人每秒回复，不减速。
+				if z.heal_pct > 0.0 and u.kind == HERO:
+					u.hp = minf(u.max_hp, u.hp + u.max_hp * z.heal_pct * dt)
 				continue
 			u.slow_t = maxf(u.slow_t, z.slow)
 
@@ -1779,7 +2129,7 @@ func cleanup_dead() -> void:
 		if u.is_alive():
 			continue
 		# 塔、水晶与峡谷巨兽留在 units 里，表现层才能换废墟或显示复活。
-		if u.kind == HERO or u.kind == BOSS or u.kind == TOWER or u.kind == BASE:
+		if u.kind == HERO or u.kind == BOSS or u.kind == TOWER or u.kind == BASE or u.kind == JUNGLE:
 			continue
 		units.remove_at(i)
 	minions = minions.filter(func(m): return m.is_alive())
@@ -1852,7 +2202,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 	if aim != null:
 		aim_dir = (aim.pos - h.pos).normalized()
 		h.facing = 1.0 if aim.pos.x >= h.pos.x else -1.0
-	if kind == "dash":
+	if kind == "dash" or kind == "blink":
 		# 位移技能只认玩家/英雄当前的移动方向，不自动扭头追最近敌人。
 		# 否则逃跑时按瞬移会被拽回敌人身边。
 		if h.is_player:
@@ -1875,7 +2225,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 	var radius := float(s.get("radius", 120.0))
 	var style := str(s.get("fx", "burst"))
 	var shot_style := str(s.get("shot_style", style))
-	if kind != "leap" and kind != "pull" and kind != "multi":
+	if kind != "leap" and kind != "pull" and kind != "multi" and kind != "beam" and kind != "chain":
 		# 每个英雄的施法都有专属形状：爪痕、星星、叶子、水泡、箭雨、竹子、月光…
 		fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
 
@@ -1995,6 +2345,164 @@ func cast(h, s: Dictionary, index: int) -> void:
 				dest = clamp_to_front(h, dest)
 			# 跳跃用 0.32 秒弧线走完，落地再结算范围伤害。
 			_start_move_skill(h, dest, 0.32, "leap", {"skill": s, "color": color})
+		"blink":
+			# 幻影闪：瞬间出现在目标方向，落地炸出一圈星屑，和连续位移的冲刺手感不同。
+			var blink_from: Vector2 = h.pos
+			var blink_to: Vector2 = h.pos + aim_dir * float(s.get("range", 260.0))
+			if not h.is_player:
+				blink_to = clamp_to_front(h, blink_to)
+			move_to(h, blink_to)
+			h.prev_pos = blink_to
+			h.invuln_t = maxf(h.invuln_t, 0.18)
+			area_damage(blink_to, float(s.get("radius", 120.0)), dmg, h, h.team,
+				float(s.get("slow", 0.0)), 0.0, 0.0)
+			fx.emit("cast_star", Vector3(blink_from.x, 22.0, blink_from.y), color, radius)
+			fx.emit("cast_star", Vector3(blink_to.x, 22.0, blink_to.y), color, radius)
+			fx.emit("ring", Vector3(blink_to.x, 6.0, blink_to.y), color, radius)
+		"beam":
+			# 鹤羽贯日：一条直线的贯穿攻击，穿过的小兵和英雄都会被打到。
+			var beam_end: Vector2 = h.pos + aim_dir * float(s.get("range", 620.0))
+			var width := float(s.get("width", 40.0))
+			var hit_any := false
+			for u in units:
+				if not u.is_alive() or u.team == h.team:
+					continue
+				var to_u: Vector2 = u.pos - h.pos
+				var along: float = to_u.dot(aim_dir)
+				if along < 0.0 or along > float(s.get("range", 620.0)) + u.radius:
+					continue
+				var perp: float = absf(to_u.cross(aim_dir))
+				if perp > width * 0.5 + u.radius:
+					continue
+				deal_damage(u, dmg, h)
+				u.slow_t = maxf(u.slow_t, float(s.get("slow", 0.0)))
+				fx.emit("hit", Vector3(u.pos.x, 34.0, u.pos.y), color, 0.0)
+				hit_any = true
+			# 光柱同时治疗路径上的友军，体现「鹤」的守护感。
+			var heal_pct := float(s.get("heal_pct", 0.0))
+			if heal_pct > 0.0:
+				for a in heroes:
+					if a == h or not a.is_alive() or a.team != h.team:
+						continue
+					var to_a: Vector2 = a.pos - h.pos
+					var along_a: float = to_a.dot(aim_dir)
+					if along_a < 0.0 or along_a > float(s.get("range", 620.0)):
+						continue
+					if absf(to_a.cross(aim_dir)) > width * 0.5 + a.radius:
+						continue
+					a.hp = minf(a.max_hp, a.hp + a.max_hp * heal_pct)
+					float_text.emit(Vector3(a.pos.x, a.height + 24.0, a.pos.y), "+" + str(roundi(a.max_hp * heal_pct)), color)
+			beam_fx.emit(Vector3(h.pos.x, 34.0, h.pos.y), Vector3(beam_end.x, 34.0, beam_end.y), color, width)
+			fx.emit("ring", Vector3(beam_end.x, 6.0, beam_end.y), color, 70.0)
+			if hit_any:
+				sfx.emit("hit")
+		"chain":
+			# 月链：在敌人之间弹跳，每跳一次伤害衰减，最多 count 次。
+			var chain_hit: Array = []
+			var cur = nearest_enemy(h, float(s.get("range", 420.0)))
+			var from_pos: Vector2 = h.pos
+			for k in range(int(s.get("count", 4))):
+				if cur == null or not cur.is_alive() or chain_hit.has(cur):
+					break
+				var falloff: float = pow(0.82, float(k))
+				deal_damage(cur, dmg * falloff, h)
+				cur.slow_t = maxf(cur.slow_t, float(s.get("slow", 0.5)))
+				fx.emit("hit", Vector3(cur.pos.x, 32.0, cur.pos.y), color, 0.0)
+				beam_fx.emit(Vector3(from_pos.x, 34.0, from_pos.y),
+					Vector3(cur.pos.x, 34.0, cur.pos.y), color, 20.0)
+				chain_hit.append(cur)
+				from_pos = cur.pos
+				cur = nearest_enemy_excluding(h, from_pos, float(s.get("jump_range", 260.0)), chain_hit)
+			fx.emit("ring", Vector3(from_pos.x, 6.0, from_pos.y), color, 110.0)
+		"mark":
+			# 猎杀标记：狼嚎范围内所有敌人被标记，短时间承受额外伤害。
+			var marked := 0
+			for u in units:
+				if not u.is_alive() or u.team == h.team:
+					continue
+				if h.pos.distance_to(u.pos) > radius + u.radius:
+					continue
+				deal_damage(u, dmg, h)
+				u.mark_t = maxf(u.mark_t, float(s.get("mark_time", 4.5)))
+				u.slow_t = maxf(u.slow_t, float(s.get("slow", 0.9)))
+				fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), color, 52.0)
+				marked += 1
+			fx.emit("cast_roar", Vector3(h.pos.x, 20.0, h.pos.y), color, radius)
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y),
+				"标记 %d 个猎物" % marked if marked > 0 else "没有猎物", color)
+		"taunt":
+			# 潮汐嘲讽：举盾吸引附近敌人，自己获得护盾；敌人被迫先打乌龟。
+			h.shield = maxf(h.shield, h.max_hp * float(s.get("shield_pct", 0.22)))
+			h.shield_t = maxf(h.shield_t, float(s.get("buff_t", 4.0)))
+			var taunted := 0
+			for u in units:
+				if not u.is_alive() or u.team == h.team or u.kind != HERO:
+					continue
+				if h.pos.distance_to(u.pos) > radius + u.radius:
+					continue
+				u.taunt_t = maxf(u.taunt_t, float(s.get("taunt_time", 1.6)))
+				u.taunt_src = h
+				taunted += 1
+			fx.emit("cast_heart", Vector3(h.pos.x, 22.0, h.pos.y), color, radius)
+			fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y),
+				"来打我呀！" if taunted > 0 else "护盾展开", color)
+		"fear":
+			# 震慑咆哮：把周围敌人吓得往后退，短时间无法正常追击。
+			for u in units:
+				if not u.is_alive() or u.team == h.team:
+					continue
+				if h.pos.distance_to(u.pos) > radius + u.radius:
+					continue
+				deal_damage(u, dmg, h)
+				u.slow_t = maxf(u.slow_t, float(s.get("slow", 0.6)))
+				if u.kind == HERO:
+					u.fear_t = maxf(u.fear_t, float(s.get("fear_time", 1.2)))
+					u.fear_src = h
+			fx.emit("cast_roar", Vector3(h.pos.x, 20.0, h.pos.y), color, radius)
+			fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
+			sfx.emit("ult")
+		"spin":
+			# 滚动刺球：进入一段时间的高速旋身，持续伤害周围敌人。
+			h.spin_t = float(s.get("duration", 2.4))
+			h.spin_tick = 0.02
+			h.spin_radius = float(s.get("radius", 150.0))
+			h.spin_dmg = dmg
+			h.spin_color = color
+			fx.emit("cast_spin", Vector3(h.pos.x, 22.0, h.pos.y), color, h.spin_radius)
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "滚成刺球！", color)
+		"trap":
+			# 竹叶陷阱：在目标脚下布一个延时陷阱，触发后定身并伤害。
+			var trap_target = nearest_enemy(h, float(s.get("range", 460.0)))
+			var trap_pos: Vector2 = trap_target.pos if trap_target != null else h.pos + aim_dir * float(s.get("range", 460.0)) * 0.72
+			fx.emit("cast_trap", Vector3(trap_pos.x, 12.0, trap_pos.y), color, radius)
+			fx.emit("ring", Vector3(trap_pos.x, 6.0, trap_pos.y), color, radius)
+			pending.append({
+				"t": float(s.get("delay", 0.7)),
+				"center": trap_pos,
+				"skill": s,
+				"src": h,
+				"dmg": dmg,
+				"radius": radius,
+				"slow": float(s.get("slow", 0.0)),
+				"stun": float(s.get("stun", 1.0)),
+				"heal_pct": 0.0,
+				"color": color,
+				"style": "spikes",
+			})
+		"boomerang":
+			_throw_boomerang(h, aim_dir, dmg, color, s)
+		"heal_zone":
+			# 再生水域：在地面留下持续回血的区域，和一次性的治疗技能区分开。
+			var hz_target = nearest_enemy(h, float(s.get("range", 460.0)))
+			var hz_pos: Vector2 = hz_target.pos if hz_target != null else h.pos + aim_dir * float(s.get("range", 460.0)) * 0.6
+			var z = make_zone(hz_pos, radius, float(s.get("duration", 4.0)),
+				float(s.get("slow", 0.0)), h.team, color)
+			z.heal_pct = float(s.get("heal_pct", 0.05))
+			zones.append(z)
+			fx.emit("cast_waterfall", Vector3(hz_pos.x, 18.0, hz_pos.y), color, radius)
+			fx.emit("ring", Vector3(hz_pos.x, 6.0, hz_pos.y), color, radius)
+			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "再生水域！", color)
 		"multi":
 			var multi_target = nearest_enemy(h, float(s.get("range", 600.0)))
 			var center: Vector2 = multi_target.pos if multi_target != null else h.pos + aim_dir * 200.0
@@ -2019,7 +2527,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 
 func clamp_to_front(h, dest: Vector2) -> Vector2:
 	# AI 的位移技能不能把它送过敌方前塔，否则会绕过塔直扑水晶。
-	var front = front_structure(h.team)
+	var front = front_structure(h.team, h.lane_id if five_v_five else -1)
 	if front == null or front.kind != TOWER or not front.is_alive():
 		return dest
 	var keep: float = float(h.radius) + 18.0
@@ -2066,7 +2574,8 @@ func step_pending(dt: float) -> void:
 		var center: Vector2 = item["center"]
 		var radius := float(item["radius"])
 		var color: Color = item["color"]
-		area_damage(center, radius, float(item["dmg"]), src, src.team, float(item.get("slow", 0.0)), 0.0, 0.0)
+		area_damage(center, radius, float(item["dmg"]), src, src.team,
+			float(item.get("slow", 0.0)), float(item.get("stun", 0.0)), 0.0)
 		fx.emit("cast_" + str(item.get("style", "burst")), Vector3(center.x, 20.0, center.y), color, radius)
 		fx.emit("ring", Vector3(center.x, 6.0, center.y), color, radius)
 		fx.emit("burst", Vector3(center.x, 20.0, center.y), color, 0.0)

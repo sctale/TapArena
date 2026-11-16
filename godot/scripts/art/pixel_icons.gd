@@ -35,8 +35,21 @@ func tex(name: String) -> ImageTexture:
 		return _cache[name]
 	if name.begins_with("hero_"):
 		push_warning("缺少英雄头像：" + name)
-	if name == "skill_backstep":
-		return tex("skill_dash")
+	var alias := {
+		"skill_backstep": "skill_dash",
+		"skill_blink": "skill_dash",
+		"skill_beam": "skill_projectile",
+		"skill_boomerang": "skill_projectile",
+		"skill_chain": "skill_multi",
+		"skill_mark": "skill_pull",
+		"skill_taunt": "skill_shield",
+		"skill_fear": "skill_cone",
+		"skill_spin": "skill_radial",
+		"skill_trap": "skill_aoe",
+		"skill_heal_zone": "skill_heal",
+	}
+	if alias.has(name):
+		return tex(str(alias[name]))
 	if name.begins_with("skill_"):
 		return tex("skill_aoe")
 	return tex("ui_star")
@@ -154,6 +167,45 @@ func hero_portrait(hero_id: String, fur: Color, cream: Color, dark: Color, accen
 			_add(ops, _rect_mask(6, 9, 4, 3), cream)
 			_add(ops, _rect_mask(7, 9, 2, 2), dark)
 			_add(ops, _rect_mask(2, 12, 12, 4), accent)
+		"turtle":
+			_add(ops, _rect_mask(2, 5, 2, 4), dark)
+			_add(ops, _rect_mask(12, 5, 2, 4), dark)
+			_add(ops, _rect_mask(3, 6, 10, 3), accent)
+			_add(ops, _rect_mask(5, 6, 2, 2), dark)
+			_add(ops, _rect_mask(9, 6, 2, 2), dark)
+			_add(ops, _rect_mask(6, 9, 4, 2), cream)
+			_add(ops, _rect_mask(2, 12, 12, 4), accent)
+		"hedgehog":
+			for sx in [-1, 1]:
+				for k in range(3):
+					_add(ops, _rect_mask(1 - k if sx < 0 else 14 + k, 2 + k * 2, 2, 2), dark)
+			_add(ops, _rect_mask(5, 6, 2, 2), dark)
+			_add(ops, _rect_mask(9, 6, 2, 2), dark)
+			_add(ops, _rect_mask(5, 9, 6, 3), cream)
+			_add(ops, _rect_mask(7, 9, 2, 2), dark)
+		"redpanda":
+			_add(ops, _disc_mask(4.4, 3.4, 2.2), dark)
+			_add(ops, _disc_mask(11.6, 3.4, 2.2), dark)
+			_add(ops, _rect_mask(4, 5, 2, 2), dark)
+			_add(ops, _rect_mask(10, 5, 2, 2), dark)
+			_add(ops, _rect_mask(5, 9, 6, 3), cream)
+			_add(ops, _rect_mask(7, 9, 2, 2), dark)
+			_add(ops, _rect_mask(2, 12, 12, 4), accent)
+		"wolf":
+			_add(ops, _poly_mask([Vector2(4.4, 4), Vector2(4.8, 0), Vector2(7, 3)]), dark)
+			_add(ops, _poly_mask([Vector2(11.6, 4), Vector2(11.2, 0), Vector2(9, 3)]), dark)
+			_add(ops, _rect_mask(4, 6, 2, 2), dark)
+			_add(ops, _rect_mask(10, 6, 2, 2), dark)
+			_add(ops, _rect_mask(5, 9, 6, 3), cream)
+			_add(ops, _rect_mask(7, 9, 2, 2), dark)
+			_add(ops, _rect_mask(2, 12, 12, 4), accent)
+		"crane":
+			_add(ops, _rect_mask(7, 1, 2, 2), accent)
+			_add(ops, _poly_mask([Vector2(7, 8), Vector2(9, 8), Vector2(8, 12)]), accent)
+			_add(ops, _rect_mask(2, 8, 2, 2), dark)
+			_add(ops, _rect_mask(12, 8, 2, 2), dark)
+			_add(ops, _rect_mask(5, 9, 6, 3), cream)
+			_add(ops, _rect_mask(5, 12, 6, 3), cream)
 		_:
 			_add(ops, _rect_mask(5, 6, 2, 2), dark)
 			_add(ops, _rect_mask(9, 6, 2, 2), dark)

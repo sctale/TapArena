@@ -8,7 +8,7 @@
 - **唯一主线：Godot 4.7.2 版**，工程在 `godot/`，出 Android APK。
 - **Web 版 1.3 已冻结**：`www/`、`android/`、`build.ps1`、`开始游戏.cmd` 属于历史存档，不接收功能更新。
 - **Unity 3.2.0 存档已移除**（2026-11-15），不要再引入 Unity 相关文件、脚本或文档。
-- 玩法：3v3 森林推塔，8 位自制像素动物英雄，无联网、无内购、无广告。
+- 玩法：3v3 单路 / 5v5 三路森林推塔，15 位自制像素动物英雄（5v5 额外解锁 5 位），6 个野区营地；无联网、无内购、无广告。
 
 ## 2. 目录与职责
 
@@ -22,7 +22,7 @@ godot/                        唯一主线工程
   scripts/ui/home.gd          首页选人（版本号从 project.godot 读取）
   scripts/ui/input_hub.gd     触屏摇杆 + 技能 + 键盘
   scripts/art/                像素图集、图标、体素模型
-  data/heroes.json            8 位英雄与 18 个技能
+  data/heroes.json            15 位英雄与 45 个技能
   data/rules.json             数值、节奏、巨兽与结算规则
   tests/sim_headless.gd       10 局回归 + 规则单测（SIM_OK / RULE_OK）
   tests/flow_headless.gd      首页→战斗→首页状态机（FLOW_OK）
@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 46），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 47），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -89,7 +89,8 @@ godot --path godot -- --skip-home --auto-run
 
 - `battle_sim.gd` 保持纯逻辑：不引用 `Node`、`Camera3D`、UI、音频；表现层只通过信号订阅。
 - 建筑保护层级严格为 **外塔 → 内塔 → 水晶**：前序建筑未毁时后续建筑完全免疫伤害，AI 不得绕过前塔。
-- 节奏固定：3:00 终极对决 + 峡谷巨兽；4:00 起 45 秒结算倒计时（防御塔停火、兵线加速）；4:45 兜底结算。
+- 节奏固定：3v3 为 3:00 终极对决 + 峡谷巨兽，4:00 起 45 秒结算倒计时，4:45 兜底结算；5v5 为 3:00 终极对决，5:00 上限，最后 45 秒防御塔停火。
+- 5v5 每方 3 座路塔，拆掉 2 座后水晶失去保护；野区 6 个营地（野猪/灰狼/河蟹）。
 - 结算页必须展示双方 6 名玩家的完整战绩（击杀/死亡/输出），不能只显示玩家本人。
 - 相机：机位高度、俯角、朝向为常量；推镜/打击感只改 `fov`，震屏只平移机位、不重新对准。
 - 播报条固定位于 `h*0.245`，宽度 0.52w；3 分钟事件合并为一条播报，避免同帧多条互相覆盖。
@@ -100,8 +101,8 @@ godot --path godot -- --skip-home --auto-run
 
 ## 7. 调试参数（写在 `--` 之后）
 
-- `--skip-home` 跳过首页；`--hero=frog` 指定英雄；`--auto-run` 自动向右推进
-- `--dash` 移动中反复放 1 技能；`--boss` 直接触发 3 分钟巨兽（含播报/震屏）
+- `--skip-home` 跳过首页；`--hero=frog` 指定英雄；`--mode=5v5` 进入三路 5v5；`--auto-run` 自动向右推进
+- `--dash` 移动中反复放 1 技能；`--boss` 直接触发 3 分钟巨兽（含播报/震屏）；`--boss-fly` 直接看飞行第二形态
 - `--ult` 检查大招冷却；`--fx=waterfall_ult` 居中播放指定大招；`--no-hud` 隐藏 HUD
 - `--top` 全图俯瞰；`--look-base` / `--look-red` / `--look-lane` / `--look-tower` 定点镜头
 - `--behind` 检查建筑遮挡挖空；`--ruins` 检查废墟；`--pause` / `--result` / `--victory` 检查界面
