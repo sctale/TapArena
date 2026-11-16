@@ -3,7 +3,7 @@
 # 流程：生成导出预设 -> 导入资产 -> 无头规则回归 -> 导出 Android release -> aapt/apksigner 校验 -> 复制根目录 APK
 
 param(
-    [int]$VersionCode = 51,
+    [int]$VersionCode = 52,
     [switch]$SkipSim
 )
 
@@ -165,6 +165,7 @@ package/show_as_launcher_app=false
 launcher_icons/main_192x192="res://assets/icons/app_icon.png"
 launcher_icons/adaptive_foreground_432x432="res://assets/icons/app_icon_foreground.png"
 launcher_icons/adaptive_background_432x432="res://assets/icons/app_icon_background.png"
+launcher_icons/adaptive_monochrome_432x432="res://assets/icons/app_icon_monochrome.png"
 graphics/opengl_debug=false
 xr_features/xr_mode=0
 screen/immersive_mode=true

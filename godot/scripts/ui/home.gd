@@ -48,6 +48,7 @@ var lbl_detail_name: Label
 var lbl_detail_sub: Label
 var lbl_detail_blurb: Label
 var lbl_detail_tip: Label
+var lbl_detail_mode: Label
 var lbl_detail_close: Label
 var lbl_detail_start: Label
 var detail_skill_names: Array = []
@@ -244,20 +245,35 @@ func detail_skill_rect(i: int) -> Rect2:
 	var d := detail_rect()
 	var x := detail_text_x()
 	var w := d.end.x - x - d.size.x * 0.035
-	var rh := d.size.y * 0.125
-	return Rect2(x, d.position.y + d.size.y * (0.42 + float(i) * 0.145), w, rh)
+	var rh := d.size.y * 0.115
+	return Rect2(x, d.position.y + d.size.y * (0.40 + float(i) * 0.135), w, rh)
+
+
+func detail_tip_rect() -> Rect2:
+	var d := detail_rect()
+	return Rect2(detail_text_x(), d.end.y - d.size.y * 0.205,
+		d.end.x - detail_text_x() - d.size.x * 0.035, d.size.y * 0.045)
 
 
 func detail_close_rect() -> Rect2:
+	# 底部左侧次级按钮「返回列表」。
 	var d := detail_rect()
-	return Rect2(d.end.x - d.size.x * 0.105, d.position.y + d.size.y * 0.035,
-		d.size.x * 0.075, d.size.y * 0.060)
+	return Rect2(d.position.x + d.size.x * 0.035, d.end.y - d.size.y * 0.135,
+		d.size.x * 0.26, d.size.y * 0.115)
 
 
 func detail_start_rect() -> Rect2:
+	# 底部右侧主按钮「带它出发」。
 	var d := detail_rect()
-	return Rect2(d.end.x - d.size.x * 0.235, d.end.y - d.size.y * 0.135,
-		d.size.x * 0.195, d.size.y * 0.090)
+	return Rect2(d.end.x - d.size.x * 0.035 - d.size.x * 0.36, d.end.y - d.size.y * 0.135,
+		d.size.x * 0.36, d.size.y * 0.115)
+
+
+func detail_mode_rect() -> Rect2:
+	var d := detail_rect()
+	var x0 := detail_close_rect().end.x + d.size.x * 0.012
+	var x1 := detail_start_rect().position.x - d.size.x * 0.012
+	return Rect2(x0, d.end.y - d.size.y * 0.128, maxf(20.0, x1 - x0), d.size.y * 0.10)
 
 
 # ---- 文本 ----
@@ -302,8 +318,9 @@ func _make_labels() -> void:
 	lbl_detail_blurb = _mk_label(int(h * 0.022), Color(0.95, 0.98, 0.92, 0.88), HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_detail_blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl_detail_tip = _mk_label(int(h * 0.019), Color(1, 0.94, 0.78, 0.62), HORIZONTAL_ALIGNMENT_LEFT)
-	lbl_detail_close = _mk_label(int(h * 0.024), CREAM, HORIZONTAL_ALIGNMENT_CENTER)
-	lbl_detail_start = _mk_label(int(h * 0.035), INK, HORIZONTAL_ALIGNMENT_CENTER)
+	lbl_detail_mode = _mk_label(int(h * 0.021), Color(0.88, 0.95, 0.88, 0.80))
+	lbl_detail_close = _mk_label(int(h * 0.026), CREAM, HORIZONTAL_ALIGNMENT_CENTER)
+	lbl_detail_start = _mk_label(int(h * 0.036), INK, HORIZONTAL_ALIGNMENT_CENTER)
 	for i in range(3):
 		detail_skill_names.append(_mk_label(int(h * 0.028), GOLD, HORIZONTAL_ALIGNMENT_LEFT))
 		var hint := _mk_label(int(h * 0.020), Color(0.93, 0.97, 0.91, 0.84), HORIZONTAL_ALIGNMENT_LEFT)
@@ -377,8 +394,8 @@ func _refresh_labels() -> void:
 		int(dsel.get("range", 0))]
 	_place(lbl_detail_blurb, Rect2(tx, dr.position.y + dr.size.y * 0.165, right_w, h * 0.052))
 	lbl_detail_blurb.text = str(dsel.get("blurb", ""))
-	_place(lbl_detail_tip, Rect2(tx, dr.end.y - h * 0.045, right_w * 0.55, h * 0.030))
-	lbl_detail_tip.text = "关闭后可点其他卡片 · 开始后进入 %s" % ("5v5 对角三路" if mode_5v5 else "3v3 单路")
+	_place(lbl_detail_tip, detail_tip_rect())
+	lbl_detail_tip.text = "点其他卡片换英雄 · 看完技能再出发"
 
 	var skills: Array = dsel.get("skills", [])
 	for i in range(3):
@@ -402,7 +419,9 @@ func _refresh_labels() -> void:
 				l.visible = false
 
 	_place(lbl_detail_close, detail_close_rect())
-	lbl_detail_close.text = "返回"
+	lbl_detail_close.text = "返回列表"
+	_place(lbl_detail_mode, detail_mode_rect())
+	lbl_detail_mode.text = ("轻松" if difficulty == 0 else "挑战") + " · " + ("5v5" if mode_5v5 else "3v3")
 	_place(lbl_detail_start, detail_start_rect())
 	lbl_detail_start.text = "带它出发"
 
@@ -413,7 +432,7 @@ func _refresh_labels() -> void:
 	for l in hero_name_labels:
 		l.visible = main_visible
 	for l in [lbl_detail_name, lbl_detail_sub, lbl_detail_blurb, lbl_detail_tip,
-			lbl_detail_close, lbl_detail_start]:
+			lbl_detail_mode, lbl_detail_close, lbl_detail_start]:
 		l.visible = detail_open
 
 
@@ -533,13 +552,23 @@ func _draw_detail() -> void:
 			draw_texture_rect(icons.tex("skill_" + str(s.get("kind", "aoe"))), ir, false)
 
 	var close := detail_close_rect()
+	draw_rect(Rect2(d.position.x + d.size.x * 0.035, close.position.y - d.size.y * 0.028,
+		d.size.x * 0.93, 2.0), Color(1, 1, 1, 0.12))
 	draw_rect(close, PANEL_DEEP)
 	_outline(close, Color(0.80, 0.86, 0.76, 0.42), 2.0)
+	draw_rect(Rect2(close.position.x + 3, close.position.y + 3, close.size.x - 6, 2),
+		Color(1, 1, 1, 0.12))
 	var go := detail_start_rect()
 	draw_rect(go, GOLD)
 	_outline(go, PANEL_DARK, 3.0)
 	draw_rect(Rect2(go.position + Vector2(5, 4), Vector2(go.size.x - 10, 3)),
 		Color(1, 1, 1, 0.45))
+	var ts := d.size.y * 0.018
+	var play_c := Vector2(go.position.x + go.size.x * 0.10, go.get_center().y)
+	draw_colored_polygon(PackedVector2Array([
+		play_c + Vector2(-ts, -ts * 1.2), play_c + Vector2(-ts, ts * 1.2),
+		play_c + Vector2(ts * 1.4, 0),
+	]), PANEL_DARK)
 
 
 func _panel(r: Rect2, fill: Color) -> void:

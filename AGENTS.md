@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 51），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 52），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -89,6 +89,8 @@ godot --path godot -- --skip-home --auto-run
 ## 6. 代码与设计约束（必须遵守）
 
 - `battle_sim.gd` 保持纯逻辑：不引用 `Node`、`Camera3D`、UI、音频；表现层只通过信号订阅。
+- 攻击选取（4.13 起）：普攻/技能统一走 `pick_attack_target` / `pick_skill_target`——敌方英雄优先、残血单位优先、建筑最后，`atk_target` 带粘性；远程普攻是 homing 弹道，技能对移动目标做提前量。不要再退回 `nearest_enemy` 一把抓。
+- 启动图标：自适应前景有效像素必须落在 432 画布中央 264 安全区内并居中；`launcher_icons/adaptive_monochrome_432x432` 必须指向 `app_icon_monochrome.png`，否则 Android 13 主题图标缺 monochrome 节点。
 - 建筑保护层级严格为 **外塔 → 内塔 → 水晶**：前序建筑未毁时后续建筑完全免疫伤害，AI 不得绕过前塔。
 - 节奏固定：3v3 为 3:00 终极对决 + 峡谷巨兽，4:00 起 45 秒结算倒计时，4:45 兜底结算；5v5 为 4:00 峡谷巨兽、5:00 终极对决，8:00 上限，最后 45 秒防御塔停火。巨兽与终极对决由 `boss_time` / `sudden_death_time` 两个字段控制，3v3 默认同帧。
 - 5v5 为 2400×2400 对角三路：上路沿左/上边、中路对角、下路沿下/右边，河道斜穿野区；每方 3 座路塔，拆掉 2 座后水晶失去保护；野区 6 个营地（野猪/灰狼/河蟹，狼营给增伤、蟹营给加速），双方各一名打野只刷本方野区；终极对决只放大建筑伤害，塔/水晶保护层级全程有效。

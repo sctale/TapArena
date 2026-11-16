@@ -23,6 +23,11 @@ const BOSS := 4
 const JUNGLE := 5
 const NEUTRAL := 2
 const BASE_HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl", "deer"]
+# 不需要敌方目标的自身/区域技能；其余方向型技能走智能瞄准。
+const SELF_SKILL_KINDS := ["aoe", "radial", "heal", "heal_zone", "shield", "vanish",
+	"spin", "taunt", "fear", "mark"]
+# 需要按弹速做提前量预判的技能。
+const LEAD_SKILL_KINDS := ["projectile", "splash", "boomerang", "beam", "cone", "multi"]
 
 class Unit:
 	var uid: int = 0
@@ -103,6 +108,8 @@ class Unit:
 
 	var ai_think: float = 0.0
 	var ai_target = null
+	# 普攻锁定目标：王者式优先级（英雄 > 残血单位 > 建筑），粘性避免来回切换。
+	var atk_target = null
 	var lane_index: int = 0
 	var lane_id: int = 1
 	var jungle_kind: String = ""
@@ -225,7 +232,6 @@ var five_v_five := false
 var team_size := 3
 var keep_protection := false
 var rng := RandomNumberGenerator.new()
-
 var map_w: float = 3000.0
 var map_h: float = 1600.0
 var sudden_death_time: float = 180.0
@@ -257,6 +263,7 @@ var potion_cfg: Dictionary = {}
 var boss_cfg: Dictionary = {}
 var jungle_cfg: Dictionary = {}
 var ai_cfg: Dictionary = {}
+var targeting_cfg: Dictionary = {}
 var combat_cfg: Dictionary = {}
 
 var ai_think_base: float = 0.22
@@ -339,6 +346,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	boss_cfg = rules.get("boss", {})
 	jungle_cfg = rules.get("jungle_stats", {})
 	ai_cfg = rules.get("ai", {})
+	targeting_cfg = rules.get("targeting", {})
 	combat_cfg = rules.get("combat", {})
 	boss_respawn = float(boss_cfg.get("respawn", 25.0))
 	var hs: Dictionary = rules.get("hitstop", {})
@@ -1478,18 +1486,8 @@ func step_hero(h, dt: float) -> void:
 	# 恐惧期间不能普攻：被吓到只会抱头跑，先拉开距离。
 	if h.fear_t > 0.0:
 		return
-	# 普攻优先打被嘲讽目标 / AI 锁定的目标，而不是永远打最近的那个。
-	var target = null
-	if h.taunt_t > 0.0 and h.taunt_src != null and h.taunt_src.is_alive() \
-			and h.pos.distance_to(h.taunt_src.pos) <= h.attack_range + h.taunt_src.radius:
-		target = h.taunt_src
-	elif h.ai_target != null and h.ai_target.is_alive() \
-			and h.pos.distance_to(h.ai_target.pos) <= h.attack_range + h.ai_target.radius \
-			and not (h.ai_target.kind == TOWER and is_tower_protected(h.ai_target)) \
-			and not (h.ai_target.kind == BASE and is_base_protected(h.ai_target)):
-		target = h.ai_target
-	else:
-		target = nearest_enemy(h, h.attack_range + h.radius)
+	# 普攻按王者式优先级选目标：英雄 > 残血单位 > 建筑；远程弹道追踪目标。
+	var target = pick_attack_target(h)
 	if target != null and h.atk_timer <= 0.0:
 		h.atk_timer = h.atk_interval
 		h.atk_anim = 0.34
@@ -1497,7 +1495,7 @@ func step_hero(h, dt: float) -> void:
 		h.face_dir = (target.pos - h.pos).normalized()
 		if h.attack_range > 250.0:
 			shoot(h, target.pos - h.pos, h.dmg, h.accent, 700.0, 0.0, 0.0, 0.0, 0,
-				false, null, hero_shot_style(h.hero_id))
+				true, target, hero_shot_style(h.hero_id))
 		else:
 			hit_with_fx(target, h.dmg, h, 0.0)
 
@@ -2349,6 +2347,7 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 func kill(target, killer) -> void:
 	target.hp = 0.0
 	target.die_t = 0.0
+	target.atk_target = null
 	target.move_skill_t = 0.0
 	target.move_skill_total = 0.0
 	target.move_skill_kind = ""
@@ -2504,6 +2503,7 @@ func respawn(h) -> void:
 	h.jungle_gank_t = 0.0
 	h.move_dir = Vector2.ZERO
 	h.atk_timer = 0.3
+	h.atk_target = null
 	fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), Color(0.6, 0.95, 1.0) if h.team == BLUE else Color(1, 0.7, 0.6), 90.0)
 
 
@@ -2526,6 +2526,192 @@ func area_damage(center: Vector2, radius: float, dmg: float, src, team: int,
 			if n.length_squared() < 0.0001:
 				n = Vector2.RIGHT
 			move_to(u, u.pos + n.normalized() * knock)
+
+
+func _tcfg(key: String, def: float) -> float:
+	return float(targeting_cfg.get(key, def))
+
+
+func _target_in_reach(h, u, reach: float) -> bool:
+	if u == null or not u.is_alive() or u.team == h.team:
+		return false
+	if u.kind == TOWER and is_tower_protected(u):
+		return false
+	if u.kind == BASE and is_base_protected(u):
+		return false
+	return h.pos.distance_to(u.pos) <= reach + u.radius
+
+
+func pick_attack_target(h):
+	# 王者式普攻选目标：敌方英雄 > 残血小兵/野怪 > 防御塔 > 水晶。
+	# 当前目标仍有粘性分，避免两个同分单位之间来回抖动。
+	if h.taunt_t > 0.0 and h.taunt_src != null \
+			and _target_in_reach(h, h.taunt_src, h.attack_range):
+		h.atk_target = h.taunt_src
+		return h.atk_target
+	var best = null
+	var best_score := -1.0e20
+	for u in units:
+		if not _target_in_reach(h, u, h.attack_range):
+			continue
+		var d: float = h.pos.distance_to(u.pos)
+		var missing: float = 1.0 - clampf(u.hp / maxf(u.max_hp, 1.0), 0.0, 1.0)
+		var score := -1.0e20
+		match u.kind:
+			HERO:
+				score = _tcfg("hero_weight", 3000.0) - d * _tcfg("hero_dist", 0.5) \
+					+ missing * _tcfg("focus_hp", 600.0)
+			MINION, JUNGLE:
+				score = _tcfg("unit_weight", 1200.0) - d * _tcfg("unit_dist", 0.8) \
+					+ missing * _tcfg("unit_focus_hp", 500.0)
+			TOWER:
+				score = _tcfg("tower_weight", 400.0) - d * _tcfg("tower_dist", 0.2)
+			BASE:
+				score = _tcfg("base_weight", 200.0) - d * _tcfg("base_dist", 0.1)
+		if u == h.atk_target:
+			score += _tcfg("sticky", 280.0)
+		if u == h.ai_target:
+			score += _tcfg("ai_sticky", 200.0)
+		if score > best_score:
+			best_score = score
+			best = u
+	h.atk_target = best
+	return best
+
+
+func _best_skill_hero(h, radius: float):
+	# 技能优先打血量比例最低的敌方英雄（收割优先），同分看距离。
+	var best = null
+	var best_score := -1.0e20
+	for u in heroes:
+		if not _target_in_reach(h, u, radius):
+			continue
+		var d: float = h.pos.distance_to(u.pos)
+		var missing: float = 1.0 - clampf(u.hp / maxf(u.max_hp, 1.0), 0.0, 1.0)
+		var score: float = missing * _tcfg("skill_focus_hp", 500.0) \
+			- d * _tcfg("skill_dist", 0.4)
+		if u == h.atk_target:
+			score += _tcfg("skill_sticky", 300.0)
+		if score > best_score:
+			best_score = score
+			best = u
+	return best
+
+
+func pick_skill_target(h, s: Dictionary, kind: String):
+	if SELF_SKILL_KINDS.has(kind):
+		return null
+	var reach: float = maxf(float(s.get("range", 260.0)), 260.0) + 40.0
+	var hero = _best_skill_hero(h, reach)
+	if hero != null:
+		return hero
+	var best = null
+	var best_score := -1.0e20
+	for u in units:
+		if not _target_in_reach(h, u, reach):
+			continue
+		if u.kind == TOWER or u.kind == BASE:
+			continue
+		var d: float = h.pos.distance_to(u.pos)
+		var missing: float = 1.0 - clampf(u.hp / maxf(u.max_hp, 1.0), 0.0, 1.0)
+		var score: float = _tcfg("skill_unit_weight", 400.0) \
+			- d * _tcfg("skill_unit_dist", 0.6) \
+			+ missing * _tcfg("skill_unit_focus", 300.0)
+		if score > best_score:
+			best_score = score
+			best = u
+	if best != null:
+		return best
+	for u in units:
+		if not _target_in_reach(h, u, reach):
+			continue
+		if u.kind == TOWER or u.kind == BASE:
+			return u
+	return null
+
+
+func _lead_point(h, target, proj_speed: float) -> Vector2:
+	# 预判目标走位：按弹速估算飞行时间，朝移动方向提前量瞄准。
+	if target == null:
+		return h.pos
+	var t: float = clampf(h.pos.distance_to(target.pos) / maxf(240.0, proj_speed),
+		_tcfg("lead_min", 0.12), _tcfg("lead_max", 0.45))
+	var v := Vector2.ZERO
+	if target.move_dir.length_squared() > 0.01 and target.kind == HERO:
+		v = target.move_dir.normalized() * speed_of(target)
+	return target.pos + v * t * _tcfg("lead_scale", 0.85)
+
+
+func _area_aim_dir(h, s: Dictionary, kind: String, forward: Vector2) -> Vector2:
+	# 锥形/光束没有英雄时，按命中数量最多的方向施放（小兵聚团也能吃到）。
+	var reach: float = maxf(float(s.get("range", 260.0)), 200.0)
+	var radius: float = float(s.get("radius", 132.0))
+	var centers: Array = []
+	for u in units:
+		if not u.is_alive() or u.team == h.team:
+			continue
+		if u.kind == TOWER or u.kind == BASE:
+			continue
+		if h.pos.distance_to(u.pos) > reach + u.radius:
+			continue
+		centers.append(u.pos)
+	var seed_count := centers.size()
+	for i in range(seed_count):
+		for j in range(i + 1, seed_count):
+			centers.append((centers[i] + centers[j]) * 0.5)
+	var best_dir := forward
+	var best_score := -1.0
+	for cpos in centers:
+		var dir: Vector2 = cpos - h.pos
+		if dir.length_squared() < 0.01:
+			continue
+		dir = dir.normalized()
+		var score := 0.0
+		for u in units:
+			if not u.is_alive() or u.team == h.team:
+				continue
+			if u.kind == TOWER or u.kind == BASE:
+				continue
+			var to_u: Vector2 = u.pos - h.pos
+			var weight := 3.0 if u.kind == HERO else 1.0
+			if kind == "beam":
+				var width := float(s.get("width", 40.0))
+				var along: float = to_u.dot(dir)
+				if along < 0.0 or along > reach + u.radius:
+					continue
+				if absf(to_u.cross(dir)) > width * 0.5 + u.radius:
+					continue
+				score += weight
+			else:
+				if to_u.length() > radius + u.radius:
+					continue
+				if to_u.normalized().dot(dir) < 0.35:
+					continue
+				score += weight
+		if score > best_score:
+			best_score = score
+			best_dir = dir
+	return best_dir
+
+
+func _chain_target(h, from_pos: Vector2, radius: float, hit_list: Array):
+	# 月链后续弹跳：优先未命中的英雄，其次最近单位。
+	var best_hero = null
+	var best_score := -1.0e20
+	for u in heroes:
+		if not u.is_alive() or u.team == h.team or hit_list.has(u):
+			continue
+		var d: float = from_pos.distance_to(u.pos)
+		if d > radius:
+			continue
+		var missing: float = 1.0 - clampf(u.hp / maxf(u.max_hp, 1.0), 0.0, 1.0)
+		var score: float = missing * 500.0 - d * 0.3
+		if score > best_score:
+			best_score = score
+			best_hero = u
+	if best_hero != null:
+		return best_hero
+	return nearest_enemy_excluding(h, from_pos, radius, hit_list)
 
 
 func nearest_enemy(from, radius: float):
@@ -2746,13 +2932,24 @@ func try_cast(h, index: int) -> void:
 func cast(h, s: Dictionary, index: int) -> void:
 	var kind := str(s.get("kind", "projectile"))
 	var forward: Vector2 = h.move_dir.normalized() if h.move_dir.length_squared() > 0.01 else Vector2(h.facing, 0.0)
+	# 王者式智能施法：英雄优先、残血优先；方向型技能对移动目标做提前量。
 	var aim = null
-	if kind != "dash" or not h.is_player:
-		aim = nearest_enemy(h, maxf(float(s.get("range", 260.0)), 260.0))
+	var auto_aim: bool = not SELF_SKILL_KINDS.has(kind)
+	if h.is_player and (kind == "dash" or kind == "blink"):
+		# 玩家位移只认摇杆/朝向，不因为附近有敌人就自动扭头。
+		auto_aim = false
+	if auto_aim:
+		aim = pick_skill_target(h, s, kind)
 	var aim_dir := forward
 	if aim != null:
-		aim_dir = (aim.pos - h.pos).normalized()
-		h.facing = 1.0 if aim.pos.x >= h.pos.x else -1.0
+		var aim_point: Vector2 = aim.pos
+		if LEAD_SKILL_KINDS.has(kind):
+			var proj_speed := float(s.get("speed", 620.0))
+			if kind == "beam" or kind == "cone":
+				proj_speed = 1600.0
+			aim_point = _lead_point(h, aim, proj_speed)
+		aim_dir = (aim_point - h.pos).normalized()
+		h.facing = 1.0 if aim_point.x >= h.pos.x else -1.0
 	if kind == "dash" or kind == "blink":
 		# 位移技能只认玩家/英雄当前的移动方向，不自动扭头追最近敌人。
 		# 否则逃跑时按瞬移会被拽回敌人身边。
@@ -2768,6 +2965,8 @@ func cast(h, s: Dictionary, index: int) -> void:
 		else:
 			aim_dir = Vector2(h.facing, 0.0)
 		h.facing = 1.0 if aim_dir.x >= 0.0 else -1.0
+	if aim == null and (kind == "cone" or kind == "beam"):
+		aim_dir = _area_aim_dir(h, s, kind, forward)
 	if aim_dir.length_squared() < 0.001:
 		aim_dir = Vector2.RIGHT
 	h.face_dir = aim_dir
@@ -2826,7 +3025,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 				{"skill": s, "color": color, "from": dash_from})
 			fx.emit("burst", Vector3(dash_from.x, 24.0, dash_from.y), color, 0.0)
 		"backstep":
-			var foe = nearest_hero(h, float(s.get("range", 220.0)) + 220.0)
+			var foe = _best_skill_hero(h, float(s.get("range", 220.0)) + 220.0)
 			var back := Vector2(-h.facing, 0.0)
 			if foe != null and foe.is_alive():
 				back = (h.pos - foe.pos).normalized()
@@ -2889,7 +3088,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, 90.0)
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "扎手！", color)
 		"pull":
-			var pull_target = nearest_hero(h, float(s.get("range", 300.0)))
+			var pull_target = _best_skill_hero(h, float(s.get("range", 300.0)))
 			if pull_target == null:
 				float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "抱不到人…", color)
 				h.cds[index] = 0.8
@@ -2903,7 +3102,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			fx.emit("cast_" + style, Vector3(pull_target.pos.x, 22.0, pull_target.pos.y), color, 80.0)
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "抱住了！", color)
 		"leap":
-			var leap_target = nearest_hero(h, float(s.get("range", 360.0)))
+			var leap_target = _best_skill_hero(h, float(s.get("range", 360.0)))
 			var dest: Vector2 = leap_target.pos if leap_target != null else h.pos + aim_dir * 220.0
 			if leap_target != null and float(s.get("behind", 0.0)) > 0.0:
 				# 猎影突袭：穿过目标落到他身后，形成绕后切入。
@@ -2966,9 +3165,12 @@ func cast(h, s: Dictionary, index: int) -> void:
 			if hit_any:
 				sfx.emit("hit")
 		"chain":
-			# 月链：在敌人之间弹跳，每跳一次伤害衰减，最多 count 次。
+			# 月链：在敌人之间弹跳，每跳一次伤害衰减，最多 count 次；优先英雄。
 			var chain_hit: Array = []
-			var cur = nearest_enemy(h, float(s.get("range", 420.0)))
+			var chain_range := float(s.get("range", 420.0))
+			var cur = aim
+			if cur == null or h.pos.distance_to(cur.pos) > chain_range:
+				cur = nearest_enemy(h, chain_range)
 			var from_pos: Vector2 = h.pos
 			for k in range(int(s.get("count", 4))):
 				if cur == null or not cur.is_alive() or chain_hit.has(cur):
@@ -2981,7 +3183,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 					Vector3(cur.pos.x, 34.0, cur.pos.y), color, 20.0)
 				chain_hit.append(cur)
 				from_pos = cur.pos
-				cur = nearest_enemy_excluding(h, from_pos, float(s.get("jump_range", 260.0)), chain_hit)
+				cur = _chain_target(h, from_pos, float(s.get("jump_range", 260.0)), chain_hit)
 			fx.emit("ring", Vector3(from_pos.x, 6.0, from_pos.y), color, 110.0)
 		"mark":
 			# 猎杀标记：狼嚎范围内所有敌人被标记，短时间承受额外伤害。
@@ -3046,7 +3248,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "滚成刺球！", color)
 		"trap":
 			# 竹叶陷阱：布在目标脚下并按移动方向预判，延时后定身并伤害。
-			var trap_target = nearest_enemy(h, float(s.get("range", 460.0)))
+			var trap_target = aim
 			var trap_delay := float(s.get("delay", 0.55))
 			var trap_pos: Vector2 = h.pos + aim_dir * float(s.get("range", 460.0)) * 0.72
 			if trap_target != null:
@@ -3092,8 +3294,10 @@ func cast(h, s: Dictionary, index: int) -> void:
 			fx.emit("ring", Vector3(hz_pos.x, 6.0, hz_pos.y), color, radius)
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "再生水域！", color)
 		"multi":
-			var multi_target = nearest_enemy(h, float(s.get("range", 600.0)))
-			var center: Vector2 = multi_target.pos if multi_target != null else h.pos + aim_dir * 200.0
+			var multi_target = aim
+			var center: Vector2 = h.pos + aim_dir * 200.0
+			if multi_target != null:
+				center = _lead_point(h, multi_target, float(s.get("speed", 620.0)))
 			var delay := float(s.get("delay", 0.42))
 			var count := int(s.get("count", 3))
 			for k in range(count):

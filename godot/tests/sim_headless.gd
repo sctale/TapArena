@@ -1333,4 +1333,139 @@ func _fix_checks() -> Array:
 		issues.append("刺刺与尖尖属性仍然雷同，仅 %d 项不同" % diff_count)
 	if str(hedge_def.get("skills", [])[1].get("kind", "")) != "vanish":
 		issues.append("刺刺二技能不是尖刺伏击")
+	issues += _targeting_checks()
+	return issues
+
+
+func _targeting_checks() -> Array:
+	var issues: Array = []
+	# 1) 普攻优先英雄，其次补残血小兵，并有目标粘性。
+	var s = BattleSimScript.new()
+	s.setup("fox", 0, 9955)
+	var p = s.player
+	p.pos = Vector2(1000, 1200)
+	p.prev_pos = p.pos
+	var foe = null
+	for h in s.heroes:
+		if h.team == BattleSimScript.RED:
+			foe = h
+			break
+	foe.pos = p.pos + Vector2(180, 0)
+	foe.prev_pos = foe.pos
+	foe.invuln_t = 0.0
+	var mins: Array = []
+	s.spawn_wave(BattleSimScript.RED)
+	for m in s.minions:
+		if m.is_alive() and m.team == BattleSimScript.RED and m.kind == BattleSimScript.MINION:
+			mins.append(m)
+		if mins.size() >= 2:
+			break
+	if mins.size() < 2:
+		issues.append("目标测试没有生成小兵")
+	else:
+		for m in mins:
+			m.pos = Vector2(400, 300)
+			m.prev_pos = m.pos
+		mins[0].pos = p.pos + Vector2(60, 20)
+		mins[0].prev_pos = mins[0].pos
+		mins[1].pos = p.pos + Vector2(90, -20)
+		mins[1].prev_pos = mins[1].pos
+		var pick = s.pick_attack_target(p)
+		if pick != foe:
+			issues.append("普攻没有优先敌方英雄")
+		foe.pos = p.pos + Vector2(1400, 0)
+		foe.prev_pos = foe.pos
+		mins[0].hp = mins[0].max_hp * 0.2
+		mins[1].hp = mins[1].max_hp * 0.9
+		pick = s.pick_attack_target(p)
+		if pick != mins[0]:
+			issues.append("普攻没有先补残血小兵")
+		mins[0].hp = mins[0].max_hp * 0.5
+		mins[1].hp = mins[1].max_hp * 0.5
+		p.atk_target = mins[1]
+		pick = s.pick_attack_target(p)
+		if pick != mins[1]:
+			issues.append("普攻锁定目标没有粘性")
+	# 2) 远程普攻弹道追踪移动目标。
+	var s2 = BattleSimScript.new()
+	s2.setup("rabbit", 0, 9956)
+	var p2 = s2.player
+	p2.pos = Vector2(900, 1200)
+	p2.prev_pos = p2.pos
+	var e2 = null
+	for h in s2.heroes:
+		if h.team == BattleSimScript.RED:
+			e2 = h
+			break
+	e2.pos = p2.pos + Vector2(240, 0)
+	e2.prev_pos = e2.pos
+	e2.invuln_t = 0.0
+	e2.move_dir = Vector2(0, 1)
+	for m in s2.minions:
+		m.pos = Vector2(200, 200)
+		m.prev_pos = m.pos
+	var hp_before: float = e2.hp
+	p2.atk_timer = 0.0
+	s2.step_hero(p2, 0.016)
+	if s2.shots.is_empty():
+		issues.append("远程普攻没有发射弹道")
+	else:
+		for i in range(40):
+			s2.step_projectiles(0.016)
+		if e2.hp >= hp_before - 0.01:
+			issues.append("远程普攻弹道没有追踪命中")
+	# 3) 技能优先瞄英雄，并对移动目标做提前量。
+	var s3 = BattleSimScript.new()
+	s3.setup("fox", 0, 9957)
+	var p3 = s3.player
+	p3.pos = Vector2(900, 1200)
+	p3.prev_pos = p3.pos
+	p3.move_dir = Vector2(0, 1)
+	var e3 = null
+	for h in s3.heroes:
+		if h.team == BattleSimScript.RED:
+			e3 = h
+			break
+	e3.pos = p3.pos + Vector2(320, 0)
+	e3.prev_pos = e3.pos
+	e3.invuln_t = 0.0
+	var m3 = null
+	for m in s3.minions:
+		if m.is_alive() and m.team == BattleSimScript.RED and m.kind == BattleSimScript.MINION:
+			m3 = m
+			break
+	if m3 != null:
+		m3.pos = p3.pos + Vector2(100, 0)
+		m3.prev_pos = m3.pos
+	var sk: Dictionary = p3.skills[0]
+	var n0: int = s3.shots.size()
+	e3.move_dir = Vector2.ZERO
+	s3.cast(p3, sk, 0)
+	if s3.shots.size() <= n0:
+		issues.append("技能没有生成弹道")
+	else:
+		var d: Vector2 = s3.shots[n0].dir
+		var want: Vector2 = (e3.pos - p3.pos).normalized()
+		if d.dot(want) < 0.95:
+			issues.append("技能没有优先瞄准英雄")
+		e3.move_dir = Vector2(0, 1)
+		var n1: int = s3.shots.size()
+		s3.cast(p3, sk, 0)
+		if s3.shots.size() <= n1:
+			issues.append("移动目标技能没有生成弹道")
+		elif s3.shots[n1].dir.y < 0.05:
+			issues.append("技能没有对移动目标做提前量")
+	# 4) 月链首跳优先英雄。
+	var s4 = BattleSimScript.new()
+	s4.setup("owl", 0, 9958)
+	var p4 = s4.player
+	var e4 = null
+	for h in s4.heroes:
+		if h.team == BattleSimScript.RED:
+			e4 = h
+			break
+	e4.pos = p4.pos + Vector2(240, 0)
+	e4.prev_pos = e4.pos
+	if s4._chain_target(p4, p4.pos, 320.0, []) != e4:
+		issues.append("月链首跳没有优先英雄")
 	return issues
