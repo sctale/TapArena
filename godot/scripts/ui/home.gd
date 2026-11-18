@@ -75,6 +75,9 @@ func _ready() -> void:
 	_load_heroes()
 	_make_labels()
 	detail_open = "--detail" in OS.get_cmdline_user_args()
+	if detail_open:
+		# main 在 add_child 之后还会调一次 _apply_mode()，会关掉弹窗；延后一帧再开。
+		_open_detail_debug.call_deferred()
 	_refresh_labels()
 	set_process(true)
 
@@ -107,6 +110,12 @@ func _load_heroes() -> void:
 		d["cream_c"] = Color.from_string(str(d.get("cream", "#FFFFFF")), Color.WHITE)
 		d["accent_c"] = Color.from_string(str(d.get("accent", "#FFFFFF")), Color.WHITE)
 	_apply_mode()
+
+
+func _open_detail_debug() -> void:
+	detail_open = true
+	_refresh_labels()
+	queue_redraw()
 
 
 func _apply_mode() -> void:
@@ -222,17 +231,18 @@ func diff_tag_rect() -> Rect2:
 
 
 func detail_rect() -> Rect2:
+	# 4.14.1：弹窗收窄到 0.62，整体更紧凑，仍保证 1080p 下三行技能不叠字。
 	var safe := _safe()
-	var w := safe.size.x * 0.76
-	var h := safe.size.y * 0.68
+	var w := safe.size.x * 0.62
+	var h := safe.size.y * 0.64
 	return Rect2(safe.position.x + (safe.size.x - w) * 0.5,
-		safe.position.y + safe.size.y * 0.13, w, h)
+		safe.position.y + safe.size.y * 0.14, w, h)
 
 
 func detail_portrait_rect() -> Rect2:
 	var d := detail_rect()
-	var side := minf(d.size.x * 0.30, d.size.y * 0.58)
-	return Rect2(d.position.x + d.size.x * 0.035, d.position.y + d.size.y * 0.13,
+	var side := minf(d.size.x * 0.30, d.size.y * 0.54)
+	return Rect2(d.position.x + d.size.x * 0.035, d.position.y + d.size.y * 0.10,
 		side, side)
 
 
@@ -245,35 +255,35 @@ func detail_skill_rect(i: int) -> Rect2:
 	var d := detail_rect()
 	var x := detail_text_x()
 	var w := d.end.x - x - d.size.x * 0.035
-	var rh := d.size.y * 0.115
-	return Rect2(x, d.position.y + d.size.y * (0.40 + float(i) * 0.135), w, rh)
+	var rh := d.size.y * 0.105
+	return Rect2(x, d.position.y + d.size.y * (0.335 + float(i) * 0.125), w, rh)
 
 
 func detail_tip_rect() -> Rect2:
 	var d := detail_rect()
-	return Rect2(detail_text_x(), d.end.y - d.size.y * 0.205,
-		d.end.x - detail_text_x() - d.size.x * 0.035, d.size.y * 0.045)
+	return Rect2(detail_text_x(), d.end.y - d.size.y * 0.195,
+		d.end.x - detail_text_x() - d.size.x * 0.035, d.size.y * 0.042)
 
 
 func detail_close_rect() -> Rect2:
 	# 底部左侧次级按钮「返回列表」。
 	var d := detail_rect()
-	return Rect2(d.position.x + d.size.x * 0.035, d.end.y - d.size.y * 0.135,
-		d.size.x * 0.26, d.size.y * 0.115)
+	return Rect2(d.position.x + d.size.x * 0.035, d.end.y - d.size.y * 0.125,
+		d.size.x * 0.28, d.size.y * 0.105)
 
 
 func detail_start_rect() -> Rect2:
 	# 底部右侧主按钮「带它出发」。
 	var d := detail_rect()
-	return Rect2(d.end.x - d.size.x * 0.035 - d.size.x * 0.36, d.end.y - d.size.y * 0.135,
-		d.size.x * 0.36, d.size.y * 0.115)
+	return Rect2(d.end.x - d.size.x * 0.035 - d.size.x * 0.37, d.end.y - d.size.y * 0.125,
+		d.size.x * 0.37, d.size.y * 0.105)
 
 
 func detail_mode_rect() -> Rect2:
 	var d := detail_rect()
 	var x0 := detail_close_rect().end.x + d.size.x * 0.012
 	var x1 := detail_start_rect().position.x - d.size.x * 0.012
-	return Rect2(x0, d.end.y - d.size.y * 0.128, maxf(20.0, x1 - x0), d.size.y * 0.10)
+	return Rect2(x0, d.end.y - d.size.y * 0.118, maxf(20.0, x1 - x0), d.size.y * 0.095)
 
 
 # ---- 文本 ----
@@ -313,20 +323,20 @@ func _make_labels() -> void:
 		hero_blurb_labels.append(blurb)
 
 	# 详情弹窗文字：人物标题 / 定位 / 介绍 / 三技能。
-	lbl_detail_name = _mk_label(int(h * 0.042), GOLD, HORIZONTAL_ALIGNMENT_LEFT)
-	lbl_detail_sub = _mk_label(int(h * 0.024), CREAM, HORIZONTAL_ALIGNMENT_LEFT)
-	lbl_detail_blurb = _mk_label(int(h * 0.022), Color(0.95, 0.98, 0.92, 0.88), HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_detail_name = _mk_label(int(h * 0.038), GOLD, HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_detail_sub = _mk_label(int(h * 0.022), CREAM, HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_detail_blurb = _mk_label(int(h * 0.020), Color(0.95, 0.98, 0.92, 0.88), HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_detail_blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl_detail_tip = _mk_label(int(h * 0.019), Color(1, 0.94, 0.78, 0.62), HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_detail_mode = _mk_label(int(h * 0.021), Color(0.88, 0.95, 0.88, 0.80))
 	lbl_detail_close = _mk_label(int(h * 0.026), CREAM, HORIZONTAL_ALIGNMENT_CENTER)
 	lbl_detail_start = _mk_label(int(h * 0.036), INK, HORIZONTAL_ALIGNMENT_CENTER)
 	for i in range(3):
-		detail_skill_names.append(_mk_label(int(h * 0.028), GOLD, HORIZONTAL_ALIGNMENT_LEFT))
+		detail_skill_names.append(_mk_label(int(h * 0.026), GOLD, HORIZONTAL_ALIGNMENT_LEFT))
 		var hint := _mk_label(int(h * 0.020), Color(0.93, 0.97, 0.91, 0.84), HORIZONTAL_ALIGNMENT_LEFT)
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail_skill_hints.append(hint)
-		detail_skill_meta.append(_mk_label(int(h * 0.018), Color(0.82, 0.96, 0.88, 0.72),
+		detail_skill_meta.append(_mk_label(int(h * 0.0165), Color(0.82, 0.96, 0.88, 0.72),
 			HORIZONTAL_ALIGNMENT_RIGHT))
 
 
@@ -405,13 +415,16 @@ func _refresh_labels() -> void:
 			var icon_w := r.size.y * 0.72
 			var sx := r.position.x + icon_w + r.size.y * 0.18
 			var text_w := r.end.x - sx - r.size.x * 0.03
-			_place(detail_skill_names[i], Rect2(sx, r.position.y + 2.0, text_w * 0.72, r.size.y * 0.40))
+			_place(detail_skill_names[i], Rect2(sx, r.position.y + 2.0, text_w * 0.62, r.size.y * 0.40))
 			detail_skill_names[i].text = str(s.get("name", ""))
 			_place(detail_skill_hints[i], Rect2(sx, r.position.y + r.size.y * 0.42, text_w, r.size.y * 0.52))
 			detail_skill_hints[i].text = str(s.get("hint", ""))
-			_place(detail_skill_meta[i], Rect2(r.end.x - r.size.x * 0.27, r.position.y,
-				r.size.x * 0.25, r.size.y * 0.40))
-			detail_skill_meta[i].text = "2 级解锁" if s.get("unlock_at_2", false) else "冷却 %s 秒" % str(s.get("cd", "?"))
+			_place(detail_skill_meta[i], Rect2(r.end.x - r.size.x * 0.34, r.position.y,
+				r.size.x * 0.32, r.size.y * 0.40))
+			# 大招也要显示冷却：2 级解锁 + 实际 CD（整数不显示 .0）。
+			var cd_val := float(s.get("cd", 0.0))
+			var cd_text := ("冷却 %d 秒" % int(cd_val)) if absf(cd_val - roundf(cd_val)) < 0.05 				else ("冷却 %.1f 秒" % cd_val)
+			detail_skill_meta[i].text = ("2 级解锁 · " + cd_text) if s.get("unlock_at_2", false) else cd_text
 			for l in [detail_skill_names[i], detail_skill_hints[i], detail_skill_meta[i]]:
 				l.visible = detail_open
 		else:

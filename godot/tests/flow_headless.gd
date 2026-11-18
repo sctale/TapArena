@@ -24,6 +24,25 @@ func _process(_delta: float) -> bool:
 			main.home._tap(main.home.card_rect(1).get_center())
 			if not main.home.detail_open:
 				failures.append("选中卡片后没有弹出人物介绍")
+			# 4.14.1：弹窗更紧凑后，标题/技能/提示/按钮不得重叠；大招必须带冷却。
+			var dr: Rect2 = main.home.detail_rect()
+			var pr: Rect2 = main.home.detail_portrait_rect()
+			if pr.end.x > main.home.detail_text_x():
+				failures.append("详情头像压到正文")
+			var last_row: Rect2 = main.home.detail_skill_rect(2)
+			var tip: Rect2 = main.home.detail_tip_rect()
+			var close_r: Rect2 = main.home.detail_close_rect()
+			if last_row.end.y > tip.position.y:
+				failures.append("详情技能行压到提示行")
+			if tip.end.y > close_r.position.y:
+				failures.append("详情提示行压到底部按钮")
+			var ult_meta: String = main.home.detail_skill_meta[2].text
+			if not ult_meta.contains("冷却"):
+				failures.append("大招没有显示冷却：" + ult_meta)
+			if not ult_meta.contains("2 级解锁"):
+				failures.append("大招没有显示解锁等级：" + ult_meta)
+			if dr.end.y > main.home._safe().end.y + 1.0:
+				failures.append("详情弹窗超出安全区")
 	elif frame == 4:
 		if main.home != null and main.home.detail_open:
 			main.home._tap(main.home.detail_close_rect().get_center())

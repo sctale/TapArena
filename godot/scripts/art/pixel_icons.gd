@@ -35,21 +35,6 @@ func tex(name: String) -> ImageTexture:
 		return _cache[name]
 	if name.begins_with("hero_"):
 		push_warning("缺少英雄头像：" + name)
-	var alias := {
-		"skill_backstep": "skill_dash",
-		"skill_blink": "skill_dash",
-		"skill_beam": "skill_projectile",
-		"skill_boomerang": "skill_projectile",
-		"skill_chain": "skill_multi",
-		"skill_mark": "skill_pull",
-		"skill_taunt": "skill_shield",
-		"skill_fear": "skill_cone",
-		"skill_spin": "skill_radial",
-		"skill_trap": "skill_aoe",
-		"skill_heal_zone": "skill_heal",
-	}
-	if alias.has(name):
-		return tex(str(alias[name]))
 	if name.begins_with("skill_"):
 		return tex("skill_aoe")
 	return tex("ui_star")
@@ -210,6 +195,52 @@ func hero_portrait(hero_id: String, fur: Color, cream: Color, dark: Color, accen
 			_add(ops, _rect_mask(5, 6, 2, 2), dark)
 			_add(ops, _rect_mask(9, 6, 2, 2), dark)
 			_add(ops, _rect_mask(5, 9, 6, 3), cream)
+	# 4.14.1：HUD 小头像补一个最小配件记号，与 32×32 头像和 3D 模型一致。
+	match hero_id:
+		"tiger":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("60a868"))
+			_add(ops, _rect_mask(0, 11, 2, 3), Color("b28c5c"))
+		"fox":
+			_add(ops, _rect_mask(4, 1, 8, 2), Color("8060b8"))
+			_add(ops, _rect_mask(7, 0, 2, 1), Color("a486d6"))
+		"rabbit":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("f6aebc"))
+			_add(ops, _rect_mask(4, 2, 1, 1), Color("f6aebc"))
+			_add(ops, _rect_mask(11, 2, 1, 1), Color("f2c14e"))
+		"bear":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("60a868"))
+			_add(ops, _rect_mask(0, 11, 2, 3), Color("b28c5c"))
+		"frog":
+			_add(ops, _rect_mask(3, 2, 10, 2), Color("6fae4a"))
+			_add(ops, _rect_mask(11, 1, 1, 1), Color("f6aebc"))
+		"cat":
+			_add(ops, _rect_mask(2, 12, 12, 2), accent)
+			_add(ops, _rect_mask(7, 13, 2, 2), Color("f2c14e"))
+		"panda":
+			_add(ops, _rect_mask(2, 12, 12, 2), accent)
+			_add(ops, _rect_mask(13, 4, 1, 10), Color("7cbf4a"))
+		"owl":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("485474"))
+			_add(ops, _rect_mask(7, 13, 2, 2), Color("f2c14e"))
+		"axolotl":
+			_add(ops, _rect_mask(2, 12, 12, 2), accent)
+			_add(ops, _rect_mask(13, 7, 1, 4), Color("f6aebc"))
+		"deer":
+			_add(ops, _rect_mask(1, 11, 3, 4), Color("f0e8d2"))
+			_add(ops, _rect_mask(1, 11, 3, 1), Color("b28c5c"))
+		"turtle":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("e0604f"))
+		"hedgehog":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("e0604f"))
+			_add(ops, _rect_mask(13, 12, 2, 3), Color("d8485a"))
+		"redpanda":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("f2c14e"))
+		"wolf":
+			_add(ops, _rect_mask(2, 12, 12, 2), Color("485474"))
+			_add(ops, _rect_mask(6, 13, 1, 2), Color("f2f4f6"))
+			_add(ops, _rect_mask(9, 13, 1, 2), Color("f2f4f6"))
+		"crane":
+			_add(ops, _rect_mask(3, 12, 10, 1), Color("f2c14e"))
 	if with_bg:
 		_add(ops, _rect_mask(1, 1, 1, 14), accent)
 	var t := _compose(ops)
@@ -234,6 +265,19 @@ func _build_common() -> void:
 	_cache["skill_multi"] = _make_multi()
 	_cache["skill_radial"] = _make_radial()
 	_cache["skill_projectile"] = _make_projectile()
+	# 4.14.1：12 种机制各用独立图标，不再共用/别名。
+	_cache["skill_fear"] = _make_fear()
+	_cache["skill_backstep"] = _make_backstep()
+	_cache["skill_blink"] = _make_blink()
+	_cache["skill_chain"] = _make_chain()
+	_cache["skill_boomerang"] = _make_boomerang()
+	_cache["skill_mark"] = _make_mark()
+	_cache["skill_taunt"] = _make_taunt()
+	_cache["skill_vanish"] = _make_vanish()
+	_cache["skill_spin"] = _make_spin()
+	_cache["skill_trap"] = _make_trap()
+	_cache["skill_beam"] = _make_beam()
+	_cache["skill_heal_zone"] = _make_heal_zone()
 	# 界面图标
 	_cache["ui_heart"] = _make_heart()
 	_cache["ui_sword"] = _make_sword()
@@ -334,6 +378,137 @@ func _make_projectile() -> ImageTexture:
 	var ops: Array = []
 	_add(ops, _poly_mask([Vector2(10, 1), Vector2(4, 9), Vector2(8, 9), Vector2(6, 15),
 		Vector2(13, 7), Vector2(9, 7)]), YELLOW)
+	return _compose(ops)
+
+
+func _make_fear() -> ImageTexture:
+	# 震慑咆哮：气泡里一个感叹号，跟锥形/盾牌区分。
+	var ops: Array = []
+	_add(ops, _poly_mask([Vector2(2, 2), Vector2(13, 2), Vector2(13, 9), Vector2(8, 9),
+		Vector2(6, 13), Vector2(6, 9), Vector2(2, 9)]), YELLOW)
+	_add(ops, _rect_mask(7, 4, 2, 4), INK)
+	_add(ops, _rect_mask(7, 9, 2, 1), INK)
+	return _compose(ops)
+
+
+func _make_backstep() -> ImageTexture:
+	# 后跃散射：向左下的绿色回撤箭头。
+	var ops: Array = []
+	_add(ops, _line_mask(Vector2(13, 4), Vector2(5, 11), 3.4), GREEN)
+	_add(ops, _poly_mask([Vector2(1, 9), Vector2(9, 13), Vector2(7, 6)]), GREEN)
+	_add(ops, _rect_mask(11, 2, 2, 2), CREAM)
+	_add(ops, _rect_mask(14, 6, 1, 1), CREAM)
+	return _compose(ops)
+
+
+func _make_blink() -> ImageTexture:
+	# 幻影闪：三颗大小渐变的紫色星屑 + 白光点。
+	var ops: Array = []
+	_add(ops, _diamond_mask(4, 11, 2), PURPLE)
+	_add(ops, _diamond_mask(8, 7, 2), Color("c0a0f0"))
+	_add(ops, _diamond_mask(12, 3, 3), PURPLE)
+	_add(ops, _rect_mask(11, 2, 2, 2), Color.WHITE)
+	_add(ops, _rect_mask(2, 13, 2, 2), Color("e8dcff"))
+	return _compose(ops)
+
+
+func _make_chain() -> ImageTexture:
+	# 月链：三枚冰蓝圆环串成链。
+	var ops: Array = []
+	_add(ops, _line_mask(Vector2(5, 5), Vector2(8, 8), 1.6), PURPLE)
+	_add(ops, _line_mask(Vector2(8, 8), Vector2(11, 5), 1.6), PURPLE)
+	_add(ops, _ring_mask(4.0, 4.0, 3.0, 1.6), ICE)
+	_add(ops, _ring_mask(12.0, 4.0, 3.0, 1.6), ICE)
+	_add(ops, _ring_mask(8.0, 11.0, 3.0, 1.6), ICE)
+	return _compose(ops)
+
+
+func _make_boomerang() -> ImageTexture:
+	# 回旋尖刺：弯折的橙色回旋镖 + 回声弧。
+	var ops: Array = []
+	_add(ops, _line_mask(Vector2(3, 12), Vector2(8, 7), 3.2), ORANGE)
+	_add(ops, _line_mask(Vector2(8, 7), Vector2(14, 4), 3.2), ORANGE)
+	_add(ops, _line_mask(Vector2(3, 12), Vector2(8, 7), 1.4), YELLOW)
+	_add(ops, _line_mask(Vector2(8, 7), Vector2(14, 4), 1.4), YELLOW)
+	_add(ops, _rect_mask(1, 14, 2, 2), CREAM)
+	_add(ops, _rect_mask(13, 14, 2, 2), CREAM)
+	return _compose(ops)
+
+
+func _make_mark() -> ImageTexture:
+	# 猎杀标记：红准星 + 金中心。
+	var ops: Array = []
+	_add(ops, _ring_mask(8.0, 8.0, 6.0, 4.4), RED)
+	_add(ops, _rect_mask(7, 1, 2, 14), RED)
+	_add(ops, _rect_mask(1, 7, 14, 2), RED)
+	_add(ops, _disc_mask(8.0, 8.0, 1.8), YELLOW)
+	return _compose(ops)
+
+
+func _make_taunt() -> ImageTexture:
+	# 潮汐嘲讽：橙色号角 + 声波。
+	var ops: Array = []
+	_add(ops, _poly_mask([Vector2(1, 6), Vector2(8, 3), Vector2(8, 13), Vector2(1, 10)]), ORANGE)
+	_add(ops, _rect_mask(8, 5, 3, 6), BROWN)
+	_add(ops, _line_mask(Vector2(12, 3), Vector2(12, 13), 1.6), YELLOW)
+	_add(ops, _line_mask(Vector2(14, 5), Vector2(14, 11), 1.6), YELLOW)
+	return _compose(ops)
+
+
+func _make_vanish() -> ImageTexture:
+	# 尖刺伏击：淡出的小身影 + 星屑。
+	var ops: Array = []
+	_add(ops, _disc_mask(8.0, 9.5, 4.4), GRAY)
+	_add(ops, _disc_mask(8.0, 5.0, 2.6), GRAY)
+	_add(ops, _rect_mask(10, 1, 2, 2), ICE)
+	_add(ops, _rect_mask(3, 3, 2, 2), ICE)
+	_add(ops, _rect_mask(13, 5, 1, 1), ICE)
+	_add(ops, _line_mask(Vector2(2, 14), Vector2(14, 14), 2.0), DARKGRAY)
+	return _compose(ops)
+
+
+func _make_spin() -> ImageTexture:
+	# 滚动刺球：带箭头的旋转环 + 四根短刺。
+	var ops: Array = []
+	for k in range(6):
+		var a := TAU * float(k) / 6.0 + 0.25
+		_add(ops, _line_mask(Vector2(8, 8), Vector2(8.0 + cos(a) * 6.0, 8.0 + sin(a) * 6.0), 1.8), YELLOW)
+	_add(ops, _ring_mask(8.0, 8.0, 5.6, 3.8), ORANGE)
+	_add(ops, _poly_mask([Vector2(11, 1), Vector2(15, 2), Vector2(12, 5)]), YELLOW)
+	return _compose(ops)
+
+
+func _make_trap() -> ImageTexture:
+	# 竹叶陷阱：锯齿兽夹 + 红色触发芯。
+	var ops: Array = []
+	_add(ops, _poly_mask([Vector2(1, 13), Vector2(1, 9), Vector2(5, 7), Vector2(11, 7),
+		Vector2(15, 9), Vector2(15, 13)]), GRAY)
+	for x in [3, 6, 9, 12]:
+		_add(ops, _rect_mask(x, 3, 1, 3), Color("e8eef0"))
+	_add(ops, _rect_mask(6, 10, 4, 3), RED)
+	_add(ops, _rect_mask(7, 10, 2, 3), ORANGE)
+	return _compose(ops)
+
+
+func _make_beam() -> ImageTexture:
+	# 鹤羽贯日：横向光柱 + 针芒。
+	var ops: Array = []
+	_add(ops, _rect_mask(1, 6, 14, 4), BLUE)
+	_add(ops, _rect_mask(2, 7, 12, 2), Color.WHITE)
+	_add(ops, _rect_mask(1, 2, 2, 2), ICE)
+	_add(ops, _rect_mask(13, 12, 2, 2), ICE)
+	_add(ops, _rect_mask(7, 1, 2, 2), ICE)
+	return _compose(ops)
+
+
+func _make_heal_zone() -> ImageTexture:
+	# 再生水域：虚线绿环 + 中心十字。
+	var ops: Array = []
+	_add(ops, _ring_mask(8.0, 8.0, 7.0, 5.4), GREEN)
+	_add(ops, _rect_mask(6, 4, 4, 8), GREEN)
+	_add(ops, _rect_mask(4, 6, 8, 4), GREEN)
+	_add(ops, _rect_mask(7, 4, 2, 8), Color("8fe06a"))
+	_add(ops, _rect_mask(4, 7, 8, 2), Color("8fe06a"))
 	return _compose(ops)
 
 

@@ -44,9 +44,16 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 	_add(ops, _rect(15, 17, 2, 2), dark)
 	_add(ops, _rect(8, 15, 2, 2), _lighter(accent, 0.04))
 	_add(ops, _rect(22, 15, 2, 2), _lighter(accent, 0.04))
-	# 围巾/领口：每个角色的 accent 色在胸口形成一条识别带。
-	_add(ops, _rect(8, 24, 16, 3), accent)
-	_add(ops, _rect(13, 26, 6, 2), _lighter(accent, 0.10))
+	# 围巾/领口：按 3D 模型的实际配色（不再一律用 accent）。
+	var scarf: Color = {
+		"tiger": Color("60a868"), "fox": Color("8060b8"), "rabbit": Color("f6aebc"),
+		"bear": Color("60a868"), "frog": Color("6fae4a"), "cat": accent,
+		"panda": accent, "owl": Color("485474"), "axolotl": accent,
+		"deer": accent, "turtle": Color("e0604f"), "hedgehog": Color("e0604f"),
+		"redpanda": Color("f2c14e"), "wolf": Color("485474"), "crane": accent,
+	}.get(id, accent)
+	_add(ops, _rect(8, 24, 16, 3), scarf)
+	_add(ops, _rect(13, 26, 6, 2), _lighter(scarf, 0.10))
 
 	match id:
 		"tiger":
@@ -171,6 +178,83 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(5, 16, 4, 3), dark)
 			_add(ops, _rect(23, 16, 4, 3), dark)
 			_add(ops, _rect(10, 24, 12, 3), cream)
+
+	# 配件层：与 3D 模型一致，按角色补帽子/盾牌/法杖/花环/挎包等，保证选人卡能看出人设。
+	match id:
+		"tiger":
+			_add(ops, _rect(6, 23, 20, 4), Color("60a868"))
+			_add(ops, _rect(14, 27, 4, 4), Color("60a868"))
+			_add(ops, _disc(5, 27, 3.4), Color("b28c5c"))
+			_add(ops, _disc(5, 27, 1.6), Color("60a868"))
+		"fox":
+			_add(ops, _rect(5, 3, 22, 2), Color("8060b8"))
+			_add(ops, _rect(10, 0, 12, 3), Color("8060b8"))
+			_add(ops, _rect(13, 0, 6, 1), Color("a486d6"))
+			_add(ops, _rect(16, 3, 2, 1), Color("f2c14e"))
+			_add(ops, _rect(25, 27, 2, 5), Color("f2c14e"))
+			_add(ops, _diamond(26, 24, 2), Color("f2c14e"))
+		"rabbit":
+			# 花环压在额头前缘，粉/金交替，白花在白毛上看不出来。
+			for k in range(4):
+				var wx := 9 + k * 4
+				var wc: Color = [Color("f6aebc"), Color("f2c14e"), Color("f6aebc"), Color("f2c14e")][k]
+				_add(ops, _rect(wx, 5, 2, 2), wc)
+			_add(ops, _rect(9, 24, 14, 3), Color("f6aebc"))
+			_add(ops, _rect(15, 27, 2, 2), Color.WHITE)
+		"bear":
+			_add(ops, _rect(7, 23, 18, 4), Color("60a868"))
+			_add(ops, _rect(14, 27, 4, 4), Color("60a868"))
+			_add(ops, _disc(4, 26, 3.2), Color("b28c5c"))
+			_add(ops, _disc(4, 26, 1.4), Color("f2c14e"))
+		"frog":
+			_add(ops, _rect(5, 1, 22, 3), Color("6fae4a"))
+			_add(ops, _rect(4, 3, 24, 1), Color("5c8f3c"))
+			_add(ops, _rect(21, 0, 3, 2), Color("f6aebc"))
+			_add(ops, _rect(22, 0, 1, 1), Color("f2c14e"))
+		"cat":
+			_add(ops, _rect(8, 23, 16, 3), accent)
+			_add(ops, _disc(16, 27, 2.2), Color("f2c14e"))
+		"panda":
+			_add(ops, _rect(7, 23, 18, 3), accent)
+			_add(ops, _rect(27, 3, 2, 22), Color("7cbf4a"))
+			for y in [8, 14, 20]:
+				_add(ops, _rect(26, y, 4, 1), Color("4e8c34"))
+			_add(ops, _rect(25, 1, 4, 2), Color("9bd968"))
+		"owl":
+			_add(ops, _rect(7, 22, 18, 4), Color("485474"))
+			_add(ops, _rect(25, 24, 2, 4), Color("485474"))
+			_add(ops, _diamond(16, 27, 2), Color("f2c14e"))
+		"axolotl":
+			for sx in [-1, 1]:
+				for k in range(3):
+					var gy := 9 + k * 4
+					var gx := (4 - k) if sx < 0 else (26 + k)
+					_add(ops, _rect(gx, gy, 3, 2), Color("f6aebc"))
+					_add(ops, _rect(gx + (2 if sx > 0 else 0), gy, 1, 1), Color("f49ea6"))
+			_add(ops, _rect(27, 16, 3, 6), Color("f6aebc"))
+		"deer":
+			_add(ops, _rect(1, 24, 8, 6), Color("f0e8d2"))
+			_add(ops, _rect(1, 23, 8, 2), Color("b28c5c"))
+			_add(ops, _rect(8, 27, 1, 4), Color("b28c5c"))
+		"turtle":
+			_add(ops, _rect(7, 23, 18, 4), Color("e0604f"))
+			_add(ops, _rect(23, 25, 4, 3), Color("e0604f"))
+		"hedgehog":
+			_add(ops, _rect(7, 23, 18, 3), Color("e0604f"))
+			_add(ops, _rect(23, 21, 2, 7), Color("8a5a3b"))
+			_add(ops, _rect(25, 22, 4, 5), Color("b28c5c"))
+			_add(ops, _rect(26, 21, 2, 2), Color("d8485a"))
+		"redpanda":
+			_add(ops, _rect(7, 23, 18, 3), Color("f2c14e"))
+			_add(ops, _disc(9, 5, 1.3), Color("fff1dc"))
+			_add(ops, _disc(23, 5, 1.3), Color("fff1dc"))
+		"wolf":
+			_add(ops, _rect(7, 22, 18, 3), Color("485474"))
+			for k in range(3):
+				_add(ops, _rect(12 + k * 3, 25, 2, 3), Color("f2f4f6"))
+		"crane":
+			_add(ops, _rect(9, 23, 14, 2), Color("f2c14e"))
+			_add(ops, _rect(15, 22, 2, 2), Color("f2c14e"))
 
 
 func _bg(ops: Array, dark: Color) -> void:
