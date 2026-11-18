@@ -241,6 +241,45 @@ func hero_portrait(hero_id: String, fur: Color, cream: Color, dark: Color, accen
 			_add(ops, _rect_mask(9, 13, 1, 2), Color("f2f4f6"))
 		"crane":
 			_add(ops, _rect_mask(3, 12, 10, 1), Color("f2c14e"))
+	# 4.15：主武器记号线（左右空白列），和 32×32 头像一致。
+	match hero_id:
+		"tiger":
+			_add(ops, _rect_mask(13, 6, 1, 6), Color("dfe8f0"))
+			_add(ops, _rect_mask(12, 11, 3, 1), Color("f2c14e"))
+		"fox":
+			_add(ops, _rect_mask(13, 5, 1, 8), Color("f2c14e"))
+		"rabbit":
+			_add(ops, _rect_mask(13, 5, 1, 8), Color("f2c14e"))
+		"bear":
+			_add(ops, _rect_mask(13, 5, 2, 2), Color("8a5a3b"))
+			_add(ops, _rect_mask(13, 7, 1, 6), Color("b28c5c"))
+		"frog":
+			_add(ops, _rect_mask(13, 6, 2, 2), Color("9fe8f0"))
+			_add(ops, _rect_mask(13, 8, 1, 5), Color("b28c5c"))
+		"cat":
+			_add(ops, _rect_mask(0, 6, 1, 8), Color("b28c5c"))
+			_add(ops, _rect_mask(2, 6, 1, 8), Color("f5eedc"))
+		"panda":
+			_add(ops, _rect_mask(4, 2, 8, 1), Color("e8c98a"))
+		"owl":
+			_add(ops, _rect_mask(13, 6, 1, 8), Color("f2c14e"))
+		"axolotl":
+			_add(ops, _rect_mask(0, 7, 2, 5), Color("f0e8d2"))
+		"deer":
+			_add(ops, _rect_mask(0, 5, 1, 9), Color("b28c5c"))
+		"turtle":
+			_add(ops, _rect_mask(0, 7, 2, 5), Color("b28c5c"))
+		"hedgehog":
+			_add(ops, _rect_mask(13, 7, 1, 4), Color("dfe8f0"))
+			_add(ops, _rect_mask(0, 7, 1, 4), Color("dfe8f0"))
+		"redpanda":
+			_add(ops, _rect_mask(13, 6, 1, 6), Color("f27a32"))
+		"wolf":
+			_add(ops, _rect_mask(13, 7, 1, 4), Color("dfe8f0"))
+			_add(ops, _rect_mask(0, 7, 1, 4), Color("dfe8f0"))
+		"crane":
+			_add(ops, _rect_mask(13, 5, 1, 8), Color("f2c14e"))
+			_add(ops, _rect_mask(12, 4, 3, 1), Color("f5eedc"))
 	if with_bg:
 		_add(ops, _rect_mask(1, 1, 1, 14), accent)
 	var t := _compose(ops)

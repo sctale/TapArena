@@ -256,6 +256,86 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(9, 23, 14, 2), Color("f2c14e"))
 			_add(ops, _rect(15, 22, 2, 2), Color("f2c14e"))
 
+	# 重装备层：主武器/披风/盾画在左右空白列，不压脸。
+	var steel32 := Color("dfe8f0")
+	match id:
+		"tiger":
+			_add(ops, _rect(27, 9, 2, 12), steel32)
+			_add(ops, _rect(28, 7, 1, 2), Color("f4f8ff"))
+			_add(ops, _rect(25, 21, 6, 1), Color("f2c14e"))
+			_add(ops, _rect(27, 22, 2, 3), Color("b28c5c"))
+		"fox":
+			_add(ops, _rect(3, 24, 3, 7), Color("a486d6"))
+			_add(ops, _rect(26, 24, 3, 7), Color("a486d6"))
+			_add(ops, _rect(3, 30, 3, 1), Color("f2c14e"))
+			_add(ops, _rect(26, 30, 3, 1), Color("f2c14e"))
+		"rabbit":
+			_add(ops, _rect(28, 8, 2, 16), Color("b28c5c"))
+			_add(ops, _rect(26, 5, 6, 2), Color("f2c14e"))
+			_add(ops, _rect(25, 7, 2, 2), Color("f2c14e"))
+			_add(ops, _rect(31, 7, 1, 2), Color("f2c14e"))
+			_add(ops, _rect(0, 22, 4, 8), Color("f0e8d2"))
+			_add(ops, _rect(0, 22, 4, 2), Color("f6aebc"))
+			_add(ops, _rect(1, 25, 2, 1), Color("58c878"))
+			_add(ops, _rect(2, 24, 1, 3), Color("58c878"))
+		"bear":
+			_add(ops, _rect(28, 10, 2, 18), Color("b28c5c"))
+			_add(ops, _rect(24, 7, 8, 6), Color("8a5a3b"))
+			_add(ops, _rect(24, 8, 8, 1), Color("9aa39a"))
+			_add(ops, _rect(24, 12, 8, 1), Color("9aa39a"))
+		"frog":
+			_add(ops, _rect(28, 12, 2, 14), Color("b28c5c"))
+			_add(ops, _rect(26, 7, 5, 5), Color("9fe8f0"))
+			_add(ops, _rect(29, 4, 2, 2), Color("c8f4ff"))
+		"cat":
+			_add(ops, _rect(2, 8, 1, 16), Color("b28c5c"))
+			_add(ops, _rect(0, 7, 3, 1), Color("b28c5c"))
+			_add(ops, _rect(0, 24, 3, 1), Color("b28c5c"))
+			_add(ops, _rect(4, 8, 1, 16), Color("f5eedc"))
+		"panda":
+			_add(ops, _rect(7, 3, 18, 1), Color("e8c98a"))
+			_add(ops, _rect(12, 0, 8, 3), Color("d8b878"))
+			_add(ops, _rect(15, 0, 2, 1), Color("c8a864"))
+		"owl":
+			_add(ops, _rect(3, 24, 3, 7), Color("485474"))
+			_add(ops, _rect(26, 24, 3, 7), Color("485474"))
+			_add(ops, _rect(28, 8, 2, 16), Color("b28c5c"))
+			_add(ops, _rect(26, 5, 6, 2), Color("f2c14e"))
+			_add(ops, _rect(25, 7, 2, 2), Color("f2c14e"))
+			_add(ops, _rect(31, 7, 1, 2), Color("f2c14e"))
+		"axolotl":
+			_add(ops, _rect(0, 21, 5, 9), Color("f0e8d2"))
+			_add(ops, _rect(1, 23, 3, 1), Color("f6aebc"))
+			_add(ops, _rect(1, 26, 3, 1), Color("f6aebc"))
+			_add(ops, _rect(1, 29, 3, 1), Color("f6aebc"))
+		"deer":
+			_add(ops, _rect(2, 6, 1, 20), Color("b28c5c"))
+			_add(ops, _rect(0, 5, 3, 1), Color("b28c5c"))
+			_add(ops, _rect(0, 26, 3, 1), Color("b28c5c"))
+			_add(ops, _rect(4, 6, 1, 20), Color("f5eedc"))
+		"turtle":
+			_add(ops, _rect(0, 20, 6, 11), Color("b28c5c"))
+			_add(ops, _rect(0, 20, 6, 1), Color("f0e8d2"))
+			_add(ops, _rect(2, 24, 2, 4), Color("9aa39a"))
+		"hedgehog":
+			_add(ops, _rect(2, 10, 2, 7), steel32)
+			_add(ops, _rect(2, 17, 2, 3), Color("b28c5c"))
+			_add(ops, _rect(28, 10, 2, 7), steel32)
+			_add(ops, _rect(28, 17, 2, 3), Color("b28c5c"))
+		"redpanda":
+			_add(ops, _rect(28, 7, 2, 14), Color("f27a32"))
+			_add(ops, _rect(29, 9, 1, 10), Color("ffd08a"))
+			_add(ops, _rect(28, 5, 2, 2), Color("ffe0a8"))
+		"wolf":
+			_add(ops, _rect(2, 12, 1, 5), Color("dfe8f0"))
+			_add(ops, _rect(29, 12, 1, 5), Color("dfe8f0"))
+			_add(ops, _rect(4, 25, 3, 6), Color("9aa8b8"))
+			_add(ops, _rect(25, 25, 3, 6), Color("9aa8b8"))
+		"crane":
+			_add(ops, _rect(28, 8, 2, 16), Color("b28c5c"))
+			_add(ops, _rect(25, 5, 7, 2), Color("f5eedc"))
+			_add(ops, _rect(27, 3, 3, 3), Color("9fe8f0"))
+
 
 func _bg(ops: Array, dark: Color) -> void:
 	# 深色底 + 上方一点主题色光晕，卡片/弹窗缩放时仍能看清轮廓。

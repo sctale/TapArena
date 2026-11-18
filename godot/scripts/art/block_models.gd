@@ -351,7 +351,152 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 30, -13), Vector3(8, 10, 8), "fur", cream)
 		_:
 			pass
+	_gear_boxes(boxes, id, cream)
 	return boxes
+
+
+# 重装备：每人一把主武器/披风/盾，和选人卡头像同步。
+static func _gear_boxes(boxes: Array, id: String, cream: Color) -> void:
+	var steel := Color("dfe8f0")
+	match id:
+		"tiger":
+			# 右手短剑 + 左肩金护肩 + 腰带扣
+			_b(boxes, Vector3(27, 28, 8), Vector3(4, 10, 4), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 38, 8), Vector3(10, 3, 5), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 41, 8), Vector3(4, 24, 3), "flat", steel, {}, "arm_r")
+			_b(boxes, Vector3(27, 65, 8), Vector3(4, 5, 2), "flat", Color("f4f8ff"), {}, "arm_r")
+			_b(boxes, Vector3(-21, 53, 0), Vector3(9, 4, 11), "gold", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(0, 28, 10.6), Vector3(6, 4, 1.5), "gold", Color.WHITE)
+		"fox":
+			# 紫色短披风（金边）+ 法杖星辉
+			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "purple", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "purple_light", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(0, 24, -14.2), Vector3(32, 2, 1.6), "gold", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(27, 90, 6), Vector3(14, 2, 3), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 82, 6), Vector3(2, 14, 3), "gold", Color.WHITE, {}, "arm_r")
+		"rabbit":
+			# 月亮法杖 + 治愈挎包
+			_b(boxes, Vector3(27, 28, 6), Vector3(3.5, 40, 3.5), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 68, 6), Vector3(10, 4, 3), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(24, 72, 6), Vector3(4, 6, 3), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(30, 72, 6), Vector3(4, 6, 3), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(-14, 18, 10), Vector3(7, 9, 6), "cream", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(-14, 26, 10.4), Vector3(7.5, 3, 6.4), "pink", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(-14, 19, 16.2), Vector3(2, 6, 1), "flat", Color("58c878"), {}, "body")
+			_b(boxes, Vector3(-14, 21, 16.2), Vector3(6, 2, 1), "flat", Color("58c878"), {}, "body")
+		"bear":
+			# 木桩大锤 + 双肩护甲
+			_b(boxes, Vector3(27, 24, 4), Vector3(5, 52, 5), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 72, 4), Vector3(18, 14, 18), "log_side", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 75, 4), Vector3(19, 3, 19), "stone", Color(0.62, 0.63, 0.64), {}, "arm_r")
+			_b(boxes, Vector3(27, 82, 4), Vector3(19, 3, 19), "stone", Color(0.62, 0.63, 0.64), {}, "arm_r")
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(21.0 * sx, 53, 0), Vector3(9, 4, 11), "stone", Color(0.93, 0.90, 0.83),
+					{}, "arm_l" if sx < 0 else "arm_r")
+		"frog":
+			# 水泡法杖 + 腰带水壶
+			_b(boxes, Vector3(27, 30, 6), Vector3(3.5, 40, 3.5), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 68, 6), Vector3(10, 2, 10), "ice", Color(0.75, 0.95, 1.0), {}, "arm_r")
+			_b(boxes, Vector3(27, 70, 6), Vector3(8, 8, 8), "ice", Color(0.85, 0.97, 1.0), {}, "arm_r")
+			_b(boxes, Vector3(31, 82, 6), Vector3(4, 4, 4), "ice", Color(0.9, 0.98, 1.0), {}, "arm_r")
+			_b(boxes, Vector3(9, 28, 10.6), Vector3(4, 5, 3), "ice", Color(0.8, 0.95, 1.0))
+			_b(boxes, Vector3(9, 33, 10.6), Vector3(3, 2, 2), "wood", Color.WHITE)
+		"cat":
+			# 短弓（左臂）+ 背部箭袋
+			_b(boxes, Vector3(-30, 34, 8), Vector3(3, 8, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-29.5, 42, 8), Vector3(3, 10, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-29.5, 26, 8), Vector3(3, 10, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28, 49, 8), Vector3(4, 3, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28, 23, 8), Vector3(4, 3, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-27, 23, 8), Vector3(1, 28, 1), "flat", cream, {}, "arm_l")
+			_b(boxes, Vector3(10, 30, -14), Vector3(6, 16, 5), "wood", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(8, 46, -14), Vector3(2, 4, 1.5), "flat", Color("e0604f"), {}, "body")
+			_b(boxes, Vector3(10, 47, -14), Vector3(2, 4, 1.5), "flat", cream, {}, "body")
+			_b(boxes, Vector3(12, 46, -14), Vector3(2, 4, 1.5), "flat", Color("e0604f"), {}, "body")
+		"panda":
+			# 竹斗笠
+			_b(boxes, Vector3(0, 78, 0), Vector3(34, 3, 32), "wood", Color(0.98, 0.86, 0.62))
+			_b(boxes, Vector3(0, 81, 0), Vector3(18, 6, 18), "wood", Color(0.95, 0.82, 0.58))
+			_b(boxes, Vector3(0, 87, 0), Vector3(8, 4, 8), "wood", Color(0.92, 0.78, 0.55))
+		"owl":
+			# 星辰披风 + 月光法杖
+			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "navy", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "navy", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(-8, 30, -14.6), Vector3(2, 2, 1), "gold", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(2, 34, -14.6), Vector3(2, 2, 1), "gold", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(9, 26, -14.6), Vector3(2, 2, 1), "gold", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(27, 28, 6), Vector3(3.5, 44, 3.5), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 72, 6), Vector3(10, 4, 3), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(24, 76, 6), Vector3(4, 6, 3), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(30, 76, 6), Vector3(4, 6, 3), "gold", Color.WHITE, {}, "arm_r")
+		"axolotl":
+			# 贝壳盾 + 悬浮水球
+			_b(boxes, Vector3(-27, 32, 1), Vector3(5, 20, 18), "cream", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28.8, 36, 1), Vector3(2, 3, 16), "pink", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28.8, 42, 1), Vector3(2, 3, 16), "pink", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28.8, 48, 1), Vector3(2, 3, 12), "pink", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-29.6, 40, 1), Vector3(2, 6, 6), "pink", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(30, 60, 4), Vector3(6, 6, 6), "ice", Color(0.8, 0.96, 1.0), {}, "body")
+		"deer":
+			# 长弓 + 背部箭袋
+			_b(boxes, Vector3(-30, 36, 8), Vector3(3, 8, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-29.5, 44, 8), Vector3(3, 12, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-29.5, 24, 8), Vector3(3, 12, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28, 52, 8), Vector3(4, 3, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-28, 22, 8), Vector3(4, 3, 3), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-27, 22, 8), Vector3(1, 32, 1), "flat", cream, {}, "arm_l")
+			_b(boxes, Vector3(9, 28, -14), Vector3(6, 18, 5), "wood", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(7, 46, -14), Vector3(2, 5, 1.5), "flat", cream, {}, "body")
+			_b(boxes, Vector3(9, 47, -14), Vector3(2, 5, 1.5), "flat", Color("e0604f"), {}, "body")
+			_b(boxes, Vector3(11, 46, -14), Vector3(2, 5, 1.5), "flat", cream, {}, "body")
+		"turtle":
+			# 大型木盾 + 双肩护甲
+			_b(boxes, Vector3(-27.5, 33, 1), Vector3(4, 18, 20), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-27.5, 29, 1), Vector3(4, 4, 12), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-27.5, 51, 1), Vector3(4, 4, 12), "wood", Color.WHITE, {}, "arm_l")
+			_b(boxes, Vector3(-29.6, 37, 1), Vector3(2, 8, 8), "stone", Color(0.74, 0.77, 0.79), {}, "arm_l")
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(21.0 * sx, 53, 0), Vector3(9, 4, 11), "flat", SCARF_RED,
+					{}, "arm_l" if sx < 0 else "arm_r")
+		"hedgehog":
+			# 双持短匕 + 胸前投掷刺
+			for sx in [-1, 1]:
+				var part := "arm_l" if sx < 0 else "arm_r"
+				_b(boxes, Vector3(27.0 * sx, 30, 8), Vector3(3, 8, 3), "wood", Color.WHITE, {}, part)
+				_b(boxes, Vector3(27.0 * sx, 38, 8), Vector3(3, 12, 2), "flat", steel, {}, part)
+				_b(boxes, Vector3(27.0 * sx, 50, 8), Vector3(3, 4, 2), "flat", Color("f4f8ff"), {}, part)
+			_b(boxes, Vector3(10, 40, 10.5), Vector3(2, 6, 2), "stone", Color(0.55, 0.5, 0.48))
+			_b(boxes, Vector3(13, 42, 10.5), Vector3(2, 6, 2), "stone", Color(0.55, 0.5, 0.48))
+			_b(boxes, Vector3(16, 40, 10.5), Vector3(2, 6, 2), "stone", Color(0.55, 0.5, 0.48))
+		"redpanda":
+			# 火焰长刀 + 尾尖火焰
+			_b(boxes, Vector3(27, 28, 8), Vector3(4, 12, 4), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 40, 8), Vector3(10, 3, 4), "gold", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(27, 43, 8), Vector3(4, 24, 3), "flat", Color("f27a32"), {}, "arm_r")
+			_b(boxes, Vector3(27, 43, 8.8), Vector3(1.5, 20, 1), "flat", Color("ffd08a"), {}, "arm_r")
+			_b(boxes, Vector3(27, 67, 8), Vector3(4, 4, 2), "glow", Color(1.0, 0.85, 0.5), {}, "arm_r")
+			_b(boxes, Vector3(10, 48, -30), Vector3(6, 6, 5), "lava", Color.WHITE, {}, "tail")
+			_b(boxes, Vector3(10, 54, -30), Vector3(4, 5, 4), "glow", Color(1.0, 0.85, 0.5), {}, "tail")
+		"wolf":
+			# 双爪刃 + 灰毛披风
+			for sx in [-1, 1]:
+				var part := "arm_l" if sx < 0 else "arm_r"
+				_b(boxes, Vector3(27.0 * sx, 30, 4), Vector3(2.5, 10, 2), "flat", steel, {}, part)
+				_b(boxes, Vector3(27.0 * sx, 31, 7), Vector3(2.5, 11, 2), "flat", steel, {}, part)
+				_b(boxes, Vector3(27.0 * sx, 30, 10), Vector3(2.5, 10, 2), "flat", steel, {}, part)
+			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "fur", Color(0.72, 0.76, 0.82), {}, "body")
+			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "fur", Color(0.80, 0.84, 0.90), {}, "body")
+			_b(boxes, Vector3(0, 24, -14.2), Vector3(32, 3, 1.6), "flat", cream, {}, "body")
+		"crane":
+			# 鹤羽杖 + 背后云带
+			_b(boxes, Vector3(27, 28, 6), Vector3(3.5, 44, 3.5), "wood", Color.WHITE, {}, "arm_r")
+			_b(boxes, Vector3(24, 72, 6), Vector3(6, 10, 2), "flat", cream, {}, "arm_r")
+			_b(boxes, Vector3(27, 74, 6), Vector3(6, 10, 2), "flat", Color("fbfaf2"), {}, "arm_r")
+			_b(boxes, Vector3(30, 72, 6), Vector3(6, 10, 2), "flat", cream, {}, "arm_r")
+			_b(boxes, Vector3(27, 84, 6), Vector3(5, 5, 5), "ice", Color(0.85, 0.97, 1.0), {}, "arm_r")
+			_b(boxes, Vector3(-10, 40, -12), Vector3(14, 4, 3), "ice", Color(0.75, 0.93, 1.0), {}, "body")
+			_b(boxes, Vector3(-16, 34, -13), Vector3(10, 4, 3), "ice", Color(0.80, 0.95, 1.0), {}, "body")
+			_b(boxes, Vector3(-20, 28, -14), Vector3(8, 4, 3), "ice", Color(0.85, 0.96, 1.0), {}, "body")
 
 
 # 人形骨架：腿 / 鞋 / 躯干 / 腰带 / 手臂 / 手套 / 头 / 眼高光 / 腮红 / 嘴
