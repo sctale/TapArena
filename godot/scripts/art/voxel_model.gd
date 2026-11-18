@@ -2,7 +2,8 @@ class_name VoxelModel
 extends RefCounted
 
 # 把「盒子列表」合并成单个 ArrayMesh：一次绘制一个模型，贴图共用像素图集。
-# 面光照直接烘焙进调色板（上 1.0 / 侧 0.88 / 底 0.55）。
+# 面明暗以柔和常数烘焙进调色板（上 1.0 / 前后 0.97 / 左右 0.93 / 底 0.80），
+# 与实时太阳光叠加后不会双重压暗；每个面同时写真实法线供光照/阴影使用。
 # 关键：颜色不走顶点色（Android GLES/ANGLE 下顶点色会出现 G/B 通道互换），
 # 而是把颜色写进每个模型自己的 1×64 调色板纹理，顶点用 UV2.x 取色。
 
@@ -28,6 +29,7 @@ static func fade_material_for(atlas: PixelAtlas, palette: PackedColorArray) -> S
 static func _material(atlas: PixelAtlas, palette: PackedColorArray, shader_res: Shader) -> ShaderMaterial:
 	var img := Image.create(PALETTE_SIZE, 1, false, Image.FORMAT_RGBA8)
 	for i in range(PALETTE_SIZE):
+		# 调色板纹理按原始数值采样（与地面贴图同一套 sRGB 直出管线），保持设定色。
 		img.set_pixel(i, 0, palette[i] if i < palette.size() else Color.WHITE)
 	var palette_tex := ImageTexture.create_from_image(img)
 	var mat := ShaderMaterial.new()
@@ -41,10 +43,12 @@ static func mesh(atlas: PixelAtlas, boxes: Array) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var palette := PackedColorArray()
+	var stats := {"overflow": 0}
 	for b in boxes:
-		_add_box(st, atlas, b, palette)
+		_add_box(st, atlas, b, palette, stats)
 	var m := st.commit()
 	m.set_meta("palette", palette)
+	m.set_meta("palette_overflow", int(stats["overflow"]))
 	return m
 
 
@@ -64,25 +68,45 @@ static func _shade_for(face: String) -> float:
 		"top":
 			return 1.0
 		"bottom":
-			return 0.62
+			return 0.80
 		"front", "back":
-			return 0.94
+			return 0.97
 		"right", "left":
-			return 0.86
-	return 0.92
+			return 0.93
+	return 0.95
 
 
-static func _palette_index(palette: PackedColorArray, c: Color) -> int:
+static func _normal_for(face: String) -> Vector3:
+	match face:
+		"top":
+			return Vector3.UP
+		"bottom":
+			return Vector3.DOWN
+		"front":
+			return Vector3.BACK
+		"back":
+			return Vector3.FORWARD
+		"right":
+			return Vector3.RIGHT
+		"left":
+			return Vector3.LEFT
+	return Vector3.UP
+
+
+static func _palette_index(palette: PackedColorArray, c: Color, stats: Dictionary) -> int:
 	for i in range(palette.size()):
 		if palette[i].is_equal_approx(c):
 			return i
 	if palette.size() >= PALETTE_SIZE:
+		# 调色板满：用最后一个槽近似，并记录溢出供测试断言（正常模型不应触发）。
+		stats["overflow"] = int(stats.get("overflow", 0)) + 1
 		return PALETTE_SIZE - 1
 	palette.append(c)
 	return palette.size() - 1
 
 
-static func _add_box(st: SurfaceTool, atlas: PixelAtlas, b: Dictionary, palette: PackedColorArray) -> void:
+static func _add_box(st: SurfaceTool, atlas: PixelAtlas, b: Dictionary, palette: PackedColorArray,
+		stats: Dictionary) -> void:
 	var size: Vector3 = b.get("size", Vector3.ONE)
 	var c: Vector3 = b.get("pos", Vector3.ZERO)
 	var tint: Color = b.get("tint", Color.WHITE)
@@ -91,43 +115,44 @@ static func _add_box(st: SurfaceTool, atlas: PixelAtlas, b: Dictionary, palette:
 	var y0 := 0.0
 	var y1 := size.y
 
-	_quad(st, atlas, _tile_for(b, "front"), tint * _shade_for("front"), palette, [
+	_quad(st, atlas, _tile_for(b, "front"), tint * _shade_for("front"), palette, stats, [
 		c + Vector3(-hx, y0, hz), c + Vector3(hx, y0, hz),
 		c + Vector3(hx, y1, hz), c + Vector3(-hx, y1, hz),
-	])
-	_quad(st, atlas, _tile_for(b, "back"), tint * _shade_for("back"), palette, [
+	], _normal_for("front"))
+	_quad(st, atlas, _tile_for(b, "back"), tint * _shade_for("back"), palette, stats, [
 		c + Vector3(hx, y0, -hz), c + Vector3(-hx, y0, -hz),
 		c + Vector3(-hx, y1, -hz), c + Vector3(hx, y1, -hz),
-	])
-	_quad(st, atlas, _tile_for(b, "right"), tint * _shade_for("right"), palette, [
+	], _normal_for("back"))
+	_quad(st, atlas, _tile_for(b, "right"), tint * _shade_for("right"), palette, stats, [
 		c + Vector3(hx, y0, -hz), c + Vector3(hx, y0, hz),
 		c + Vector3(hx, y1, hz), c + Vector3(hx, y1, -hz),
-	])
-	_quad(st, atlas, _tile_for(b, "left"), tint * _shade_for("left"), palette, [
+	], _normal_for("right"))
+	_quad(st, atlas, _tile_for(b, "left"), tint * _shade_for("left"), palette, stats, [
 		c + Vector3(-hx, y0, hz), c + Vector3(-hx, y0, -hz),
 		c + Vector3(-hx, y1, -hz), c + Vector3(-hx, y1, hz),
-	])
-	_quad(st, atlas, _tile_for(b, "top"), tint * _shade_for("top"), palette, [
+	], _normal_for("left"))
+	_quad(st, atlas, _tile_for(b, "top"), tint * _shade_for("top"), palette, stats, [
 		c + Vector3(-hx, y1, -hz), c + Vector3(hx, y1, -hz),
 		c + Vector3(hx, y1, hz), c + Vector3(-hx, y1, hz),
-	])
-	_quad(st, atlas, _tile_for(b, "bottom"), tint * _shade_for("bottom"), palette, [
+	], _normal_for("top"))
+	_quad(st, atlas, _tile_for(b, "bottom"), tint * _shade_for("bottom"), palette, stats, [
 		c + Vector3(-hx, y0, hz), c + Vector3(hx, y0, hz),
 		c + Vector3(hx, y0, -hz), c + Vector3(-hx, y0, -hz),
-	])
+	], _normal_for("bottom"))
 
 
 static func _quad(st: SurfaceTool, atlas: PixelAtlas, tile: String, tint: Color,
-		palette: PackedColorArray, pts: Array) -> void:
+		palette: PackedColorArray, stats: Dictionary, pts: Array, normal: Vector3) -> void:
 	var r := atlas.uv(tile)
 	var uv := [
 		Vector2(r.position.x, r.end.y), Vector2(r.end.x, r.end.y),
 		Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.position.y),
 	]
-	var idx := _palette_index(palette, tint)
+	var idx := _palette_index(palette, tint, stats)
 	var uv2 := Vector2((float(idx) + 0.5) / float(PALETTE_SIZE), 0.5)
 	var order := [0, 1, 2, 0, 2, 3]
 	for k in order:
+		st.set_normal(normal)
 		st.set_uv(uv[k])
 		st.set_uv2(uv2)
 		st.add_vertex(pts[k])

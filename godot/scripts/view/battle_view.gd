@@ -2,7 +2,8 @@ class_name BattleView
 extends Node3D
 
 # 方块体素表现层：读取 BattleSim 状态，不反向修改规则。
-# 全部模型走像素图集 + 烘焙面光照（UNSHADED），无实时灯光/阴影。
+# 4.14 起视觉对齐宣传片：太阳光 + 实时阴影 + FILMIC 影调 + 环境点缀；
+# 模型仍走像素图集 + 调色板（不写 ALPHA），面明暗只做轻量烘焙避免双重压暗。
 
 const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
@@ -34,6 +35,9 @@ var fx_mesh_cache: Dictionary = {}
 var model_cache: Dictionary = {}
 var mesh_mats: Dictionary = {}
 var fade_mats: Dictionary = {}
+var cloud_nodes: Array = []
+# 性能兜底唯一开关：high = 2 级阴影 + 树/石投影 + glow；low = 单级阴影 + 近裁剪 + 树/石不投影。
+var shadow_quality := "high"
 var rng := RandomNumberGenerator.new()
 var sync_us_total := 0
 var sync_frames := 0
@@ -44,6 +48,9 @@ const C_RED := Color("f0845c")
 
 func attach(s) -> void:
 	sim = s
+	for arg in OS.get_cmdline_user_args():
+		if str(arg) == "--shadow-quality=low":
+			shadow_quality = "low"
 	atlas = load("res://scripts/art/pixel_atlas.gd").new()
 	icons = load("res://scripts/art/pixel_icons.gd").new()
 	rng.seed = 7127
@@ -58,11 +65,13 @@ func _team_color(team: int) -> Color:
 
 
 func _tile_material(tile: String, tint: Color, alpha := 1.0) -> StandardMaterial3D:
+	# 地面 / 兵线 / 河道 / 路缘 / 山丘走受光材质，能接太阳阴影；alpha 特效另用 _alpha_material。
 	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.albedo_texture = atlas.tile_texture(tile)
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
 	m.albedo_color = Color(tint.r, tint.g, tint.b, alpha)
+	m.roughness = 1.0
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	if alpha < 1.0:
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -84,11 +93,12 @@ func _model(key: String, factory: Callable):
 	return mesh
 
 
-func _make_instance(mesh: ArrayMesh) -> MeshInstance3D:
+func _make_instance(mesh: ArrayMesh, cast_shadow := true) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
 	node.material_override = _mesh_material(mesh)
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast_shadow \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return node
 
 
@@ -115,23 +125,61 @@ func _mesh_fade_material(mesh: ArrayMesh) -> ShaderMaterial:
 func _build_world() -> void:
 	var env_node := WorldEnvironment.new()
 	var env := Environment.new()
-	# 参考图的粉彩天空：顶部青蓝、地平线近白，远景不再是单一色块。
+	# 宣传片天空：顶部天蓝、地平线近白；环境光用冷色常量（Compatibility 下取天空会被地面绿色污染）。
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("79c8ec")
-	sky_mat.sky_horizon_color = Color("e6f7fd")
+	sky_mat.sky_top_color = Color("4aa8dc")
+	sky_mat.sky_horizon_color = Color("b9e4f5")
 	sky_mat.sky_curve = 0.15
-	sky_mat.ground_bottom_color = Color("cfeaf8")
-	sky_mat.ground_horizon_color = Color("e6f7fd")
+	sky_mat.ground_bottom_color = Color("8fa9b8")
+	sky_mat.ground_horizon_color = Color("d8e4e6")
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_energy = 1.0
-	env.ambient_light_color = Color("fff8ec")
-	env.fog_enabled = false
+	env.ambient_light_color = Color("cfe4f5")
+	env.ambient_light_energy = 0.28
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 0.85
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.06
+	env.glow_enabled = shadow_quality != "low"
+	env.glow_intensity = 0.22
+	env.glow_bloom = 0.02
+	env.glow_hdr_threshold = 1.25
+	env.fog_enabled = true
+	env.fog_light_color = Color("CCE7F6")
+	env.fog_light_energy = 0.38
+	env.fog_density = 0.00002
+	env.fog_sky_affect = 0.35
 	env_node.environment = env
 	add_child(env_node)
+
+	# 主太阳：暖白色，方向按本机俯视镜头微调（比宣传片更偏高）；移动端 2 级阴影，低画质切单级。
+	# 能量取 0.55：GL Compatibility 的光照近似是按 sRGB 直出叠加，2.6 会把浅色地面全部打爆。
+	var sun := DirectionalLight3D.new()
+	sun.light_color = Color("FFE6BC")
+	sun.light_energy = 0.55
+	sun.shadow_enabled = true
+	if shadow_quality == "low":
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		sun.directional_shadow_max_distance = 600.0
+	else:
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.directional_shadow_max_distance = 900.0
+	sun.shadow_bias = 0.6
+	sun.shadow_normal_bias = 2.0
+	add_child(sun)
+	sun.look_at_from_position(Vector3(60, 58, 74).normalized() * 700.0, Vector3.ZERO)
+
+	# 冷色补光：压一点暗部，不投影。
+	var fill := DirectionalLight3D.new()
+	fill.light_color = Color("D6ECFF")
+	fill.light_energy = 0.14
+	fill.shadow_enabled = false
+	add_child(fill)
+	fill.look_at_from_position(Vector3(-30, 22, 40).normalized() * 700.0, Vector3.ZERO)
 
 	var ground := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
@@ -139,7 +187,7 @@ func _build_world() -> void:
 	ground.mesh = plane
 	ground.position = Vector3(sim.map_w * 0.5, 0, sim.map_h * 0.5)
 	ground.material_override = _tiled_material("grass_top",
-		Vector2((sim.map_w + 600.0) / 48.0, (sim.map_h + 600.0) / 48.0))
+		Vector2((sim.map_w + 600.0) / 64.0, (sim.map_h + 600.0) / 64.0))
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ground)
 
@@ -190,7 +238,7 @@ func _build_river() -> void:
 	water.mesh = plane
 	water.position = Vector3(mid.x, 0.3, mid.y)
 	water.rotation.y = -atan2(b.y - a.y, b.x - a.x)
-	var mat := _tile_material("ice", Color(0.62, 0.86, 1.0), 0.86)
+	var mat := _tile_material("water", Color(0.92, 0.98, 1.0), 0.9)
 	mat.uv1_scale = Vector3(seg / 48.0, 260.0 / 48.0, 1.0)
 	water.material_override = mat
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -219,6 +267,15 @@ func _near_lane(x: float, z: float, margin := 145.0) -> bool:
 	return false
 
 
+func _near_structure(x: float, z: float, margin := 260.0) -> bool:
+	# 花草不压建筑：基地/塔附近留空，避免长在祭坛上。
+	for u in sim.units:
+		if u.kind == sim.TOWER or u.kind == sim.BASE:
+			if Vector2(x, z).distance_to(u.pos) < margin + u.radius:
+				return true
+	return false
+
+
 func _near_river(x: float, z: float, margin := 200.0) -> bool:
 	if not sim.five_v_five or sim.river.size() < 2:
 		return false
@@ -228,7 +285,7 @@ func _near_river(x: float, z: float, margin := 200.0) -> bool:
 func _build_lane_curb() -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(46, 22, 46)
-	var mat := _tile_material("stone", Color(1, 1, 1))
+	var mat := _tile_material("stone", Color(0.90, 0.885, 0.85))
 	var spots: Array = []
 	for path in _lane_paths():
 		if path.size() < 2:
@@ -290,12 +347,14 @@ func _build_hills() -> void:
 	var node := MultiMeshInstance3D.new()
 	node.multimesh = mm
 	node.material_override = _mesh_material(mesh)
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(node)
 
 
 func _build_scatter() -> void:
-	var leaf_tints := [Color("63b44a"), Color("559f3e"), Color("75c75b")]
+	var tree_shadow := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow_quality != "low" \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var leaf_tints := [Color(0.86, 0.86, 0.84), Color(1, 1, 1), Color(1.12, 1.16, 1.04)]
 	for v in range(3):
 		var mesh = _model("tree_%d" % v, func(): return BlockModels.tree(atlas, v, leaf_tints[v]))
 		var mm := MultiMesh.new()
@@ -318,7 +377,7 @@ func _build_scatter() -> void:
 		var node := MultiMeshInstance3D.new()
 		node.multimesh = mm
 		node.material_override = _mesh_material(mesh)
-		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.cast_shadow = tree_shadow
 		add_child(node)
 
 	for v in range(2):
@@ -341,7 +400,7 @@ func _build_scatter() -> void:
 		var rnode := MultiMeshInstance3D.new()
 		rnode.multimesh = rmm
 		rnode.material_override = _mesh_material(rmesh)
-		rnode.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		rnode.cast_shadow = tree_shadow
 		add_child(rnode)
 
 	var mush = _model("mushroom", func(): return BlockModels.mushroom(atlas))
@@ -359,6 +418,78 @@ func _build_scatter() -> void:
 		var node := _make_instance(sign_mesh)
 		node.position = p
 		add_child(node)
+
+	_build_ground_decor()
+
+
+func _build_ground_decor() -> void:
+	# 宣传片里的前景点缀：草丛 ~40、小花 ~24、体素云 6–8 朵。
+	var tuft = _model("grass_tuft", func(): return BlockModels.grass_tuft(atlas))
+	var tmm := MultiMesh.new()
+	tmm.transform_format = MultiMesh.TRANSFORM_3D
+	tmm.mesh = tuft
+	var tuft_spots: Array = []
+	for k in range(40):
+		for tries in range(10):
+			var x := rng.randf_range(90.0, sim.map_w - 90.0)
+			var z := rng.randf_range(90.0, sim.map_h - 90.0)
+			if _near_lane(x, z, 110.0) or _near_river(x, z, 150.0) or _near_structure(x, z):
+				continue
+			tuft_spots.append(Vector3(x, 0, z))
+			break
+	tmm.instance_count = tuft_spots.size()
+	for k in range(tuft_spots.size()):
+		var s := rng.randf_range(0.8, 1.4)
+		tmm.set_instance_transform(k, Transform3D(
+			Basis.IDENTITY.scaled(Vector3(s, s * rng.randf_range(0.85, 1.25), s))
+			.rotated(Vector3.UP, rng.randf_range(0.0, TAU)), tuft_spots[k]))
+	var tnode := MultiMeshInstance3D.new()
+	tnode.multimesh = tmm
+	tnode.material_override = _mesh_material(tuft)
+	tnode.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(tnode)
+
+	var petals := [Color("f6aebc"), Color("f2c14e"), Color("ffffff")]
+	for pi in range(3):
+		var fmesh = _model("flower_%d" % pi, func(): return BlockModels.flower(atlas, petals[pi]))
+		var fmm := MultiMesh.new()
+		fmm.transform_format = MultiMesh.TRANSFORM_3D
+		fmm.mesh = fmesh
+		var fspots: Array = []
+		for k in range(8):
+			for tries in range(10):
+				var x := rng.randf_range(100.0, sim.map_w - 100.0)
+				var z := rng.randf_range(100.0, sim.map_h - 100.0)
+				if _near_lane(x, z, 120.0) or _near_river(x, z, 160.0) or _near_structure(x, z):
+					continue
+				fspots.append(Vector3(x, 0, z))
+				break
+		fmm.instance_count = fspots.size()
+		for k in range(fspots.size()):
+			var s := rng.randf_range(0.9, 1.5)
+			fmm.set_instance_transform(k, Transform3D(
+				Basis.IDENTITY.scaled(Vector3(s, s, s)).rotated(Vector3.UP, rng.randf_range(0.0, TAU)),
+				fspots[k]))
+		var fnode := MultiMeshInstance3D.new()
+		fnode.multimesh = fmm
+		fnode.material_override = _mesh_material(fmesh)
+		fnode.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(fnode)
+
+	if "--top" in OS.get_cmdline_user_args():
+		return
+	var cloud_mesh = _model("cloud_vox", func(): return BlockModels.cloud(atlas))
+	for k in range(7):
+		var node := _make_instance(cloud_mesh, false)
+		node.position = Vector3(
+			rng.randf_range(-200.0, sim.map_w + 200.0),
+			rng.randf_range(320.0, 460.0),
+			rng.randf_range(-250.0, sim.map_h + 250.0))
+		var s := rng.randf_range(0.7, 1.1)
+		node.scale = Vector3(s, s, s)
+		node.rotation.y = rng.randf_range(0.0, TAU)
+		add_child(node)
+		cloud_nodes.append({"node": node, "speed": rng.randf_range(8.0, 18.0)})
 
 
 func _build_units() -> void:
@@ -386,7 +517,8 @@ func _add_hero(u) -> void:
 	add_child(root)
 
 	var parts: Dictionary = _model("hero_parts_" + u.hero_id, func(): return BlockModels.hero_parts(
-		u.hero_id, atlas, u.fur, u.def.get("cream_c", u.fur), u.def.get("dark_c", u.fur), u.accent))
+		u.hero_id, atlas, u.fur, u.def.get("cream_c", u.fur), u.def.get("dark_c", u.fur), u.accent,
+		str(u.def.get("pants", "navy"))))
 	var meshes: Dictionary = parts["mesh"]
 	var pivots: Dictionary = parts["pivots"]
 
@@ -541,6 +673,7 @@ func _process(delta: float) -> void:
 	_step_fx(delta)
 	_step_debris(delta)
 	_step_sprouts(delta)
+	_step_clouds(delta)
 	sync_us_total += Time.get_ticks_usec() - t0
 	sync_frames += 1
 	if sync_frames >= 300:
@@ -650,47 +783,11 @@ func _sync_potions() -> void:
 
 
 func _make_potion_node() -> Node3D:
+	# 不透明体素小瓶：绿玻璃 + 浅绿颈 + 木塞 + 白十字；脚下 alpha 光晕环保留。
 	var root := Node3D.new()
-	var glass := _alpha_material(Color(0.36, 0.86, 0.48, 0.95))
-	var light := _alpha_material(Color(0.72, 1.0, 0.76, 0.95))
-	var cork := _alpha_material(Color(0.52, 0.34, 0.20, 0.95))
-	var body := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(20, 24, 20)
-	body.mesh = bm
-	body.position.y = 14.0
-	body.material_override = glass
+	var mesh = _model("potion", func(): return BlockModels.potion(atlas))
+	var body := _make_instance(mesh)
 	root.add_child(body)
-	var neck := MeshInstance3D.new()
-	var nm := BoxMesh.new()
-	nm.size = Vector3(10, 10, 10)
-	neck.mesh = nm
-	neck.position.y = 31.0
-	neck.material_override = light
-	root.add_child(neck)
-	var cap := MeshInstance3D.new()
-	var cm := BoxMesh.new()
-	cm.size = Vector3(13, 4, 13)
-	cap.mesh = cm
-	cap.position.y = 38.0
-	cap.material_override = cork
-	root.add_child(cap)
-	# 白色十字，远处也能看出是回血药剂。
-	var cross_mat := _alpha_material(Color(1, 1, 1, 0.92))
-	var cv := MeshInstance3D.new()
-	var cvm := BoxMesh.new()
-	cvm.size = Vector3(5, 15, 3)
-	cv.mesh = cvm
-	cv.position = Vector3(0, 15, 10.6)
-	cv.material_override = cross_mat
-	root.add_child(cv)
-	var ch := MeshInstance3D.new()
-	var chm := BoxMesh.new()
-	chm.size = Vector3(15, 5, 3)
-	ch.mesh = chm
-	ch.position = Vector3(0, 15, 10.6)
-	ch.material_override = cross_mat
-	root.add_child(ch)
 	var glow := MeshInstance3D.new()
 	var gm := CylinderMesh.new()
 	gm.top_radius = 30.0
@@ -703,6 +800,14 @@ func _make_potion_node() -> Node3D:
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(glow)
 	return root
+
+
+func _step_clouds(delta: float) -> void:
+	for c in cloud_nodes:
+		var node: Node3D = c["node"]
+		node.position.x += float(c["speed"]) * delta
+		if node.position.x > sim.map_w + 500.0:
+			node.position.x = -500.0
 
 
 func _sync_hero(u, delta: float) -> void:

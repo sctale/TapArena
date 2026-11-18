@@ -15,9 +15,9 @@
       "radius": 34,
       "height": 80,
       "difficulty": 1,
-      "fur": "#F0B95C",
+      "fur": "#F29842",
       "dark": "#8A5A32",
-      "cream": "#F8E9C9",
+      "cream": "#FAEEDA",
       "accent": "#D9822B",
       "skills": [
         {
@@ -76,9 +76,9 @@
       "radius": 32,
       "height": 66,
       "difficulty": 2,
-      "fur": "#F07A2E",
+      "fur": "#EE9648",
       "dark": "#6B4429",
-      "cream": "#F1E6D2",
+      "cream": "#F8EFDE",
       "accent": "#7B54C7",
       "skills": [
         {
@@ -138,10 +138,11 @@
       "radius": 31,
       "height": 56,
       "difficulty": 1,
-      "fur": "#C4B3A0",
+      "fur": "#F6F0E8",
       "dark": "#7D6656",
-      "cream": "#F3EEE4",
+      "cream": "#FAF3E8",
       "accent": "#EE8FB8",
+      "pants": "pink",
       "skills": [
         {
           "name": "胡萝卜星镖",
@@ -198,10 +199,11 @@
       "radius": 42,
       "height": 90,
       "difficulty": 1,
-      "fur": "#6E5340",
+      "fur": "#B07E54",
       "dark": "#3A2E26",
-      "cream": "#D9B58A",
+      "cream": "#F2E0C4",
       "accent": "#4E9A63",
+      "pants": "wood",
       "skills": [
         {
           "name": "荷叶拍击",
@@ -260,9 +262,9 @@
       "radius": 32,
       "height": 56,
       "difficulty": 2,
-      "fur": "#79B84F",
+      "fur": "#87CE58",
       "dark": "#3F6B33",
-      "cream": "#E8E3CC",
+      "cream": "#F6EFDC",
       "accent": "#4FA88F",
       "skills": [
         {
@@ -323,9 +325,9 @@
       "radius": 30,
       "height": 58,
       "difficulty": 3,
-      "fur": "#C49A6E",
+      "fur": "#DBAC7B",
       "dark": "#7B5A43",
-      "cream": "#F2E9DA",
+      "cream": "#FAF1E2",
       "accent": "#4C8F9E",
       "skills": [
         {
@@ -444,9 +446,9 @@
       "radius": 30,
       "height": 70,
       "difficulty": 2,
-      "fur": "#9A7BC8",
+      "fur": "#AC8AE0",
       "dark": "#5A4570",
-      "cream": "#E8DFF5",
+      "cream": "#F5EEFA",
       "accent": "#F5C542",
       "skills": [
         {
@@ -508,9 +510,9 @@
       "radius": 35,
       "height": 76,
       "difficulty": 2,
-      "fur": "#F3A6B5",
+      "fur": "#92C2E8",
       "dark": "#A95870",
-      "cream": "#FFF0F2",
+      "cream": "#FDF3E8",
       "accent": "#5FD5C8",
       "skills": [
         {
@@ -569,7 +571,7 @@
       "radius": 30,
       "height": 72,
       "difficulty": 3,
-      "fur": "#C98A5A",
+      "fur": "#E19B65",
       "dark": "#6B4A32",
       "cream": "#F6EBDD",
       "accent": "#E8B44A",
@@ -636,9 +638,9 @@
       "radius": 44,
       "height": 88,
       "difficulty": 1,
-      "fur": "#78B96A",
+      "fur": "#86CF76",
       "dark": "#3E6B45",
-      "cream": "#E8EFC8",
+      "cream": "#F4F1D8",
       "accent": "#4FA88F",
       "skills": [
         {
@@ -698,7 +700,7 @@
       "radius": 30,
       "height": 68,
       "difficulty": 3,
-      "fur": "#D9B98F",
+      "fur": "#EFCB9D",
       "dark": "#9C7B55",
       "cream": "#FFF1DC",
       "accent": "#E0604F",
@@ -763,9 +765,9 @@
       "radius": 36,
       "height": 78,
       "difficulty": 2,
-      "fur": "#C76A3A",
+      "fur": "#DF7741",
       "dark": "#6B3B28",
-      "cream": "#F7E3D2",
+      "cream": "#FAEEDA",
       "accent": "#F2C14E",
       "skills": [
         {
@@ -825,9 +827,9 @@
       "radius": 33,
       "height": 74,
       "difficulty": 3,
-      "fur": "#8C98A8",
+      "fur": "#9DAABC",
       "dark": "#4A5260",
-      "cream": "#E8EDF3",
+      "cream": "#F2F4F6",
       "accent": "#7B54C7",
       "skills": [
         {

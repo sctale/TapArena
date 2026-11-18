@@ -3,6 +3,7 @@ extends RefCounted
 
 # 16×16 像素瓦片图集：运行时生成，最近邻采样，所有方块模型共用一张贴图。
 # 风格约束：16px、无渐变、最多 3-4 档明暗、纯色像素噪点。
+# 4.14.0 起配方对齐宣传片：整体提亮、每像素微噪、草叶/花朵/亮斑点缀。
 
 const TILE := 16
 const COLS := 16
@@ -13,6 +14,8 @@ const ORDER := [
 	"log_side", "log_top", "leaves", "planks", "path", "crystal",
 	"fur", "flat", "face_slime", "flag", "glow", "cloud", "mushroom", "gold",
 	"ice", "lava", "face_angry", "mushroom_blue",
+	"water", "moss", "blush", "navy", "wood", "purple", "purple_light", "pink", "cream",
+	"boss_stone",
 ]
 
 var texture: ImageTexture
@@ -71,6 +74,28 @@ func _fill(ox: int, oy: int, c: Color) -> void:
 			_px(ox, oy, x, y, c)
 
 
+# 视频配方：每个像素在基色上做 ±amp 的微噪（按通道独立抖动），干净又有颗粒。
+func _grain(ox: int, oy: int, base: Color, amp: float, seed_v: int) -> void:
+	for y in range(TILE):
+		for x in range(TILE):
+			var r := (_h(x, y, seed_v) * 2.0 - 1.0) * amp / 255.0
+			var g := (_h(x, y, seed_v + 1) * 2.0 - 1.0) * amp / 255.0
+			var b := (_h(x, y, seed_v + 2) * 2.0 - 1.0) * amp / 255.0
+			_px(ox, oy, x, y, Color(
+				clampf(base.r + r, 0.0, 1.0),
+				clampf(base.g + g, 0.0, 1.0),
+				clampf(base.b + b, 0.0, 1.0), base.a))
+
+
+func _speck(ox: int, oy: int, c: Color, count: int, seed_v: int, size := 1) -> void:
+	for k in range(count):
+		var sx := int(_h(k, 2, seed_v) * float(TILE - size))
+		var sy := int(_h(k, 3, seed_v + 1) * float(TILE - size))
+		for yy in range(size):
+			for xx in range(size):
+				_px(ox, oy, sx + xx, sy + yy, c)
+
+
 func _noise(ox: int, oy: int, base: Color, shades: Array, seed_v: int, density := 0.42) -> void:
 	for y in range(TILE):
 		for x in range(TILE):
@@ -86,22 +111,31 @@ func _paint(tile: String, i: int) -> void:
 	var oy := (i / COLS) * TILE
 	match tile:
 		"grass_top":
-			_noise(ox, oy, Color("6fb84f"), [Color("7cc95a"), Color("5fa845"), Color("8ad468")], 11)
+			# 宣传片草地：干净基色 + 3 条深色草叶 + 2 粒奶油小花。
+			_grain(ox, oy, Color("6fb84f"), 8.0, 11)
+			var blades := [Color("55a23d"), Color("59a641"), Color("5a9f3c")]
+			for k in range(3):
+				var bx := int(_h(k, 4, 12) * 15.0)
+				var by := int(_h(k, 5, 13) * 12.0)
+				for yy in range(4):
+					_px(ox, oy, bx, by + yy, blades[k])
+			_speck(ox, oy, Color("f6ecb2"), 2, 14)
 		"grass_side":
-			_noise(ox, oy, Color("a97b52"), [Color("96694a"), Color("b98a5f")], 12, 0.5)
+			_grain(ox, oy, Color("b98a5f"), 8.0, 12)
+			# 山丘侧面以草为主，只在底部留一条泥土，远看是明亮的绿色丘陵。
 			for x in range(TILE):
-				var drop := 3 + int(_h(x, 0, 13) * 3.0)
+				var drop := 13 + int(_h(x, 0, 13) * 2.0)
 				for y in range(drop):
 					var c := Color("6fb84f")
 					if _h(x, y, 14) < 0.3:
 						c = Color("5fa845")
 					_px(ox, oy, x, y, c)
 		"dirt":
-			_noise(ox, oy, Color("a97b52"), [Color("96694a"), Color("b98a5f"), Color("8a5d40")], 15)
+			_grain(ox, oy, Color("b08355"), 9.0, 15)
+			_speck(ox, oy, Color("9c7146"), 6, 16)
 		"stone":
-			_noise(ox, oy, Color("d8d2c2"), [Color("c6c0b0"), Color("e4ded0"), Color("b8b2a2")], 16, 0.55)
-			for k in range(5):
-				_px(ox, oy, 2 + k, 8 + int(_h(k, 1, 17) * 3.0), Color("b2ac9c"))
+			_grain(ox, oy, Color("d8d2c2"), 8.0, 16)
+			_speck(ox, oy, Color("c0baaa"), 4, 17)
 		"stone_brick":
 			_fill(ox, oy, Color("b7b0a0"))
 			for row in range(4):
@@ -117,13 +151,20 @@ func _paint(tile: String, i: int) -> void:
 								c = Color("e8e1d1") if y == 0 else c
 							_px(ox, oy, xx, row * 4 + y, c)
 		"sand":
-			_noise(ox, oy, Color("e8d9b0"), [Color("dccba0"), Color("f2e6c6")], 19, 0.4)
+			_grain(ox, oy, Color("e8d9b0"), 7.0, 19)
+			_speck(ox, oy, Color("dccba0"), 5, 20)
 		"log_side":
-			_noise(ox, oy, Color("a9794c"), [Color("96693f"), Color("b98a5e")], 20, 0.3)
-			for x in range(TILE):
-				if _h(x, 0, 21) < 0.22:
-					for y in range(TILE):
-						_px(ox, oy, x, y, Color("8c6039"))
+			# 宣传片树皮：基色微噪 + 每 3px 竖纹 + 少量亮斑。
+			_grain(ox, oy, Color("96704c"), 8.0, 20)
+			for x in range(0, TILE, 3):
+				for y in range(TILE):
+					_px(ox, oy, x, y, Color("7e5c3c"))
+			for k in range(3):
+				var bx := int(_h(k, 6, 21) * 13.0)
+				var by := int(_h(k, 7, 22) * 13.0)
+				for yy in range(3):
+					for xx in range(2):
+						_px(ox, oy, bx + xx, by + yy, Color("a88058"))
 		"log_top":
 			_fill(ox, oy, Color("b98a5e"))
 			for y in range(TILE):
@@ -136,19 +177,25 @@ func _paint(tile: String, i: int) -> void:
 					if d < 1.6:
 						_px(ox, oy, x, y, Color("d0a374"))
 		"leaves":
-			_noise(ox, oy, Color("5fad4a"), [Color("4f9a3d"), Color("72c25a"), Color("559f40")], 22, 0.55)
-			for k in range(6):
-				_px(ox, oy, int(_h(k, 2, 23) * 16.0), int(_h(k, 3, 24) * 16.0), Color("3e8433"))
+			# 宣传片叶簇：基色微噪 + 3 块 2×2 亮斑。
+			_grain(ox, oy, Color("5ca84a"), 9.0, 22)
+			var bright := [Color("70ba58"), Color("6eb858"), Color("6ab656")]
+			for k in range(3):
+				var bx := int(_h(k, 8, 23) * 14.0)
+				var by := int(_h(k, 9, 24) * 14.0)
+				for yy in range(2):
+					for xx in range(2):
+						_px(ox, oy, bx + xx, by + yy, bright[k])
 		"planks":
 			_fill(ox, oy, Color("c08f5e"))
 			for y in range(TILE):
 				if y % 4 == 3:
 					for x in range(TILE):
 						_px(ox, oy, x, y, Color("a0764a"))
-			for k in range(8):
-				_px(ox, oy, int(_h(k, 4, 25) * 16.0), int(_h(k, 5, 26) * 15.0), Color("cd9d6c"))
+			_speck(ox, oy, Color("cd9d6c"), 8, 25)
 		"path":
-			_noise(ox, oy, Color("dcc9a4"), [Color("cdb98f"), Color("e8d8b6"), Color("bfa97e")], 27, 0.5)
+			_grain(ox, oy, Color("cfbd99"), 7.0, 27)
+			_speck(ox, oy, Color("c4b08c"), 5, 28)
 		"crystal":
 			_fill(ox, oy, Color("d9faff"))
 			for y in range(TILE):
@@ -158,7 +205,7 @@ func _paint(tile: String, i: int) -> void:
 					elif (x + y) % 6 == 3:
 						_px(ox, oy, x, y, Color("ffffff"))
 		"fur":
-			_noise(ox, oy, Color("efe8d9"), [Color("e0d7c8"), Color("faf4e8")], 28, 0.45)
+			_grain(ox, oy, Color("efe8d9"), 5.0, 28)
 		"flat":
 			_fill(ox, oy, Color("ffffff"))
 		"face_slime":
@@ -184,9 +231,11 @@ func _paint(tile: String, i: int) -> void:
 					if x % 4 == 0 and y % 4 == 0:
 						_px(ox, oy, x, y, Color("fff4c0"))
 		"cloud":
-			_noise(ox, oy, Color("f4f8fa"), [Color("e6edf0"), Color("ffffff")], 29, 0.35)
+			_grain(ox, oy, Color("f4f8fa"), 3.0, 29)
+			_speck(ox, oy, Color("ffffff"), 8, 30)
 		"mushroom":
-			_fill(ox, oy, Color("e2644a"))
+			# 红方队色菌盖：亮橙红 + 奶油白斑。
+			_grain(ox, oy, Color("f0845c"), 6.0, 30)
 			for k in range(7):
 				var cx := 2 + int(_h(k, 6, 30) * 12.0)
 				var cy := 2 + int(_h(k, 7, 31) * 12.0)
@@ -194,7 +243,8 @@ func _paint(tile: String, i: int) -> void:
 					for x in range(2):
 						_px(ox, oy, cx + x, cy + y, Color("fff2de"))
 		"gold":
-			_noise(ox, oy, Color("f2c14e"), [Color("dca832"), Color("ffd970")], 32, 0.45)
+			_grain(ox, oy, Color("f2c14e"), 6.0, 32)
+			_speck(ox, oy, Color("ffd970"), 5, 33)
 		"ice":
 			_fill(ox, oy, Color("e4faff"))
 			for y in range(TILE):
@@ -232,12 +282,42 @@ func _paint(tile: String, i: int) -> void:
 				else:
 					_px(ox, oy, x, 12, Color("232323"))
 		"mushroom_blue":
-			_fill(ox, oy, Color("34a9c2"))
+			# 蓝方队色菌盖：亮天蓝 + 近白斑点。
+			_grain(ox, oy, Color("4fc3e8"), 6.0, 34)
 			for k in range(8):
 				var cx := 2 + int(_h(k, 8, 34) * 12.0)
 				var cy := 2 + int(_h(k, 9, 35) * 12.0)
 				for y in range(2):
 					for x in range(2):
 						_px(ox, oy, cx + x, cy + y, Color("eafbff"))
+		"water":
+			_grain(ox, oy, Color("7ec6e2"), 6.0, 36)
+			_speck(ox, oy, Color("b8e8f6"), 3, 37, 2)
+		"moss":
+			_grain(ox, oy, Color("6c9852"), 7.0, 38)
+			_speck(ox, oy, Color("5c8846"), 4, 39)
+		"blush":
+			_grain(ox, oy, Color("f49ea6"), 3.0, 40)
+			_speck(ox, oy, Color("ee909a"), 3, 41, 2)
+		"navy":
+			_grain(ox, oy, Color("485474"), 4.0, 42)
+		"wood":
+			_grain(ox, oy, Color("b28c5c"), 7.0, 43)
+			for x in range(0, TILE, 5):
+				for y in range(TILE):
+					if _h(x, y, 44) < 0.5:
+						_px(ox, oy, x, y, Color("a07a4c"))
+		"purple":
+			_grain(ox, oy, Color("8060b8"), 5.0, 45)
+		"purple_light":
+			_grain(ox, oy, Color("a486d6"), 4.0, 46)
+		"pink":
+			_grain(ox, oy, Color("f6aebc"), 4.0, 47)
+		"cream":
+			_grain(ox, oy, Color("f0e8d2"), 4.0, 48)
+		"boss_stone":
+			# 巨兽暖灰石甲：直接吃贴图色，不再靠深色 tint 压暗。
+			_grain(ox, oy, Color("8a867e"), 9.0, 49)
+			_speck(ox, oy, Color("706c66"), 6, 50, 2)
 		_:
 			_fill(ox, oy, Color("ff00ff"))

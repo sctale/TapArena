@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 		for id in ["fox", "rabbit", "frog", "cat", "owl"]:
 			if not main.sfx._streams.has("shoot_" + id):
 				failures.append("缺少普攻音效 shoot_" + id)
+		_check_palette("3v3")
 	elif frame == 66:
 		if main.sim != null and main.sim.clock <= 0.0:
 			failures.append("战斗没有推进时钟")
@@ -90,6 +91,7 @@ func _process(_delta: float) -> bool:
 			failures.append("5v5 标记没有传入战斗")
 		elif main.sim.heroes.size() != 10:
 			failures.append("5v5 战斗英雄数量不是 10")
+		_check_palette("5v5")
 		if failures.is_empty():
 			print("FLOW_OK home->battle->home->5v5")
 		else:
@@ -97,3 +99,23 @@ func _process(_delta: float) -> bool:
 				print("FLOW_FAIL " + f)
 		quit(0 if failures.is_empty() else 1)
 	return false
+
+
+func _check_palette(tag: String) -> void:
+	# 调色板纪律：每个模型 ≤64 色，且不允许溢出（溢出说明配色被压近似色）。
+	if main.view == null:
+		failures.append("%s 调色板检查时没有视图" % tag)
+		return
+	var checked := 0
+	for key in main.view.model_cache:
+		var mesh = main.view.model_cache[key]
+		if not (mesh is ArrayMesh):
+			continue
+		var palette: PackedColorArray = mesh.get_meta("palette", PackedColorArray())
+		if palette.size() > 64:
+			failures.append("%s 模型 %s 调色板 %d 超过 64" % [tag, key, palette.size()])
+		if int(mesh.get_meta("palette_overflow", 0)) > 0:
+			failures.append("%s 模型 %s 调色板溢出 %d 次" % [tag, key, int(mesh.get_meta("palette_overflow", 0))])
+		checked += 1
+	if checked < 15:
+		failures.append("%s 调色板检查模型过少 %d" % [tag, checked])
