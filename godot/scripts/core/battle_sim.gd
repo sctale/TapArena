@@ -1328,7 +1328,6 @@ func step(dt: float) -> void:
 
 	for i in range(units.size()):
 		step_unit(units[i], dt)
-	separate_units()
 	for h in heroes:
 		if h.is_alive():
 			add_xp(h, xp_passive_per_sec * dt)
@@ -1738,7 +1737,7 @@ func step_hero_ai(h, dt: float) -> void:
 			# 射程甜区站定输出：早期沿目标切向侧移会无限绕圈。
 			h.moving = false
 	else:
-		var keep: float = h.attack_range * 0.84
+		var keep: float = minf(h.attack_range * 0.84, h.radius + t.radius + 14.0)
 		if dist > keep:
 			move_ai(h, to_t, dt, 1.0)
 		else:
@@ -2099,8 +2098,9 @@ func has_healer_near(h, radius: float) -> bool:
 
 
 func step_minion(m, dt: float) -> void:
-	var foe = nearest_enemy(m, m.attack_range + 40.0)
-	if foe != null:
+	# 贴身接战：走到双方身体几乎接触才停（不再在 158 像素外隔着空气站桩）。
+	var foe = nearest_enemy(m, m.radius + 130.0)
+	if foe != null and m.pos.distance_to(foe.pos) <= m.radius + foe.radius + 20.0:
 		m.moving = false
 		m.facing = 1.0 if foe.pos.x >= m.pos.x else -1.0
 		m.face_dir = (foe.pos - m.pos).normalized()
@@ -2160,6 +2160,7 @@ func step_structure(s) -> void:
 
 
 func move_to(u, p: Vector2) -> void:
+	# 单位之间不做碰撞：身体可互相穿透（王者荣耀式），只有普攻/技能造成伤害与推挤。
 	p.x = clampf(p.x, 60.0, map_w - 60.0)
 	p.y = clampf(p.y, 60.0, map_h - 60.0)
 	u.pos = p
@@ -2882,31 +2883,6 @@ func cleanup_dead() -> void:
 			continue
 		units.remove_at(i)
 	minions = minions.filter(func(m): return m.is_alive())
-
-
-func separate_units() -> void:
-	for iter in range(2):
-		for i in range(units.size()):
-			var a = units[i]
-			if not a.is_alive() or a.kind == TOWER or a.kind == BASE:
-				continue
-			for j in range(i + 1, units.size()):
-				var b = units[j]
-				if not b.is_alive() or b.kind == TOWER or b.kind == BASE:
-					continue
-				var min_d: float = (a.radius + b.radius) * 0.82
-				var d: Vector2 = a.pos - b.pos
-				var sq := d.length_squared()
-				if sq >= min_d * min_d:
-					continue
-				var dist := sqrt(sq)
-				if dist < 0.001:
-					d = Vector2(1, 0)
-					dist = 1.0
-				var push := minf(12.0, (min_d - dist) * 0.5)
-				var n := d / dist
-				move_to(a, a.pos + n * push)
-				move_to(b, b.pos - n * push)
 
 
 func end_match(winner_team: int, reason := "水晶被摧毁") -> void:

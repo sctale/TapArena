@@ -170,6 +170,14 @@ func _init() -> void:
 		for issue in fix_issues:
 			print("FIX_FAIL " + issue)
 
+	var pass_issues := _pass_checks()
+	if pass_issues.is_empty():
+		print("PASS_OK hero_through_minion/hero")
+	else:
+		failures += 1
+		for issue in pass_issues:
+			print("PASS_FAIL " + issue)
+
 	var lv_issues := _level_checks()
 	if lv_issues.is_empty():
 		print("LEVEL_OK xp5/stat_growth/skill_power/3v3_frozen/diagonal_face")
@@ -496,6 +504,51 @@ func _rule_checks() -> Array:
 		if simu.player.cds[2] <= 0.0:
 			issues.append("%s 大招未立即进入冷却" % id)
 
+	return issues
+
+
+func _pass_checks() -> Array:
+	# 王者荣耀式无碰撞：英雄可以直接穿过友方小兵/友方英雄/敌方英雄，移动不被身体挡住。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 7300)
+	var p = sim.player
+	p.pos = Vector2(400, 800)
+	p.prev_pos = p.pos
+	p.invuln_t = 99.0
+	sim.spawn_wave(BattleSimScript.BLUE)
+	var ally_minion = null
+	for m in sim.minions:
+		if m.team == BattleSimScript.BLUE and m.is_alive():
+			ally_minion = m
+			break
+	if ally_minion == null:
+		issues.append("穿透测试没有生成友方小兵")
+	else:
+		ally_minion.pos = Vector2(450, 800)
+		ally_minion.prev_pos = ally_minion.pos
+	var ally_hero = null
+	for h in sim.heroes:
+		if h.team == BattleSimScript.BLUE and h != p:
+			ally_hero = h
+			break
+	if ally_hero != null:
+		ally_hero.pos = Vector2(490, 800)
+		ally_hero.prev_pos = ally_hero.pos
+	var foe = null
+	for h in sim.heroes:
+		if h.team == BattleSimScript.RED:
+			foe = h
+			break
+	if foe != null:
+		foe.pos = Vector2(540, 800)
+		foe.prev_pos = foe.pos
+	sim.player_move = Vector2(1, 0)
+	p.move_dir = Vector2(1, 0)
+	for i in range(60):
+		sim.step(1.0 / 60.0)
+	if p.pos.x < 600.0:
+		issues.append("英雄没有穿过身前单位 x=%.0f" % p.pos.x)
 	return issues
 
 
