@@ -562,7 +562,9 @@ func _draw_detail() -> void:
 				isz, isz)
 			var sc: Color = Color.from_string(str(s.get("color", "#FFFFFF")), GOLD)
 			draw_circle(ir.get_center(), isz * 0.58, Color(sc.r, sc.g, sc.b, 0.22))
-			draw_texture_rect(icons.tex("skill_" + str(s.get("kind", "aoe"))), ir, false)
+			var icon_tex: Texture2D = icons.ult_icon(str(dsel.get("id", "tiger"))) if i == 2 \
+				else icons.tex("skill_" + str(s.get("kind", "aoe")))
+			draw_texture_rect(icon_tex, ir, false)
 
 	var close := detail_close_rect()
 	draw_rect(Rect2(d.position.x + d.size.x * 0.035, close.position.y - d.size.y * 0.028,

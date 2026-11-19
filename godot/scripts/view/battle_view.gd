@@ -536,7 +536,13 @@ func _add_hero(u) -> void:
 
 	var s := _hero_scale(u)
 	root.scale = Vector3(s, s, s)
-	hero_nodes[u.uid] = {"root": root, "body": body, "limbs": limbs, "scale": s}
+	var item := {"root": root, "body": body, "limbs": limbs, "scale": s, "atk_active": false,
+		"entrance_t": 0.0}
+	if u.hero_id in ["turtle", "hedgehog", "redpanda", "wolf", "crane"]:
+		# 5v5 五位英雄的开局招牌姿势：1.1 秒，仅首次创建时播放。
+		item["entrance_t"] = 1.1
+		_entrance_fx(u)
+	hero_nodes[u.uid] = item
 
 
 func _add_minion(u) -> void:
@@ -820,6 +826,11 @@ func _sync_hero(u, delta: float) -> void:
 	var rp: Vector2 = sim.render_pos(u)
 	root.position = Vector3(rp.x, 0, rp.y)
 	_face_yaw(item, u, delta)
+	# 攻击起始帧：按英雄的主武器放一次挥砍/弓弦/法杖闪光。
+	var atk_now: bool = u.atk_anim > 0.0
+	if atk_now and not bool(item.get("atk_active", false)):
+		_weapon_strike(u)
+	item["atk_active"] = atk_now
 	var step := 1.0 / 30.0
 	var wt: float = u.walk_t
 	if u.moving:
@@ -903,6 +914,36 @@ func _sync_hero(u, delta: float) -> void:
 	var tail: Node3D = limbs["tail"]
 	tail.rotation.y = sin(phase * 4.2) * (0.38 + (0.18 if u.moving else 0.0))
 	tail.rotation.x = sin(phase * 3.1) * 0.12 - swing * 0.10
+
+	# 入场姿势：1.1 秒内覆盖手臂/头部，之后自然回到常规动画。
+	var et: float = float(item.get("entrance_t", 0.0))
+	if et > 0.0:
+		et = maxf(0.0, et - delta)
+		item["entrance_t"] = et
+		var ek := sin((1.0 - et / 1.1) * PI)
+		match u.hero_id:
+			"turtle":
+				arm_l.rotation.x = -2.1 * ek
+				arm_r.rotation.x = 0.35 * ek
+				head.rotation.x = 0.14 * ek
+			"hedgehog":
+				arm_l.rotation.x = -2.3 * ek
+				arm_r.rotation.x = -2.3 * ek
+				head.rotation.x = -0.12 * ek
+			"redpanda":
+				arm_r.rotation.x = -2.6 * ek
+				arm_l.rotation.x = 0.5 * ek
+				head.rotation.x = -0.20 * ek
+				tail.rotation.x = 0.5 * ek
+			"wolf":
+				head.rotation.x = -0.5 * ek
+				arm_l.rotation.x = 0.55 * ek
+				arm_r.rotation.x = 0.55 * ek
+			"crane":
+				arm_l.rotation.z = 1.15 * ek
+				arm_r.rotation.z = -1.15 * ek
+				arm_r.rotation.x = -1.7 * ek
+				head.rotation.x = -0.10 * ek
 
 
 func _sync_minion(u, delta: float) -> void:
@@ -1222,6 +1263,82 @@ func _add_fx_mesh(mesh: Mesh, mat: Material, at: Vector3, life: float, start: fl
 	if spin != Vector3.ZERO:
 		item["spin"] = spin
 	fx_items.append(item)
+
+
+func _weapon_strike(u) -> void:
+	# 每次攻击只触发一次，纯表现；不消耗逻辑随机数。
+	var rp: Vector2 = sim.render_pos(u)
+	var at := Vector3(rp.x, 0.0, rp.y)
+	match u.hero_id:
+		"tiger":
+			_spawn_slashes(at + Vector3(0, 30, 0), Color("ffffff"), 3, 100.0)
+		"wolf":
+			_spawn_slashes(at + Vector3(0, 30, 0), Color("f4f8ff"), 3, 96.0)
+		"hedgehog":
+			_spawn_slashes(at + Vector3(0, 28, 0), Color("ffffff"), 3, 84.0)
+		"bear":
+			_spawn_ring(at, Color("8a6a4a"), 62.0, 0.50)
+			_spawn_ring(at, Color("d8c09a"), 44.0, 0.40)
+			_spawn_burst(at + Vector3(0, 8, 0), Color("c8a87a"), 0.24)
+			_spawn_debris(at + Vector3(0, 6, 0), Color("8a6a4a"), 6)
+		"turtle":
+			_spawn_ring(at, Color("e0604f"), 54.0, 0.42)
+			_spawn_burst(at + Vector3(0, 8, 0), Color("c8a87a"), 0.22)
+			_spawn_debris(at + Vector3(0, 4, 0), Color("b28c5c"), 4)
+		"panda":
+			_spawn_style("leaf", at, Color("9bd968"), 60.0)
+		"redpanda":
+			_spawn_slashes(at + Vector3(0, 30, 0), Color("ff9a4a"), 3, 104.0)
+		"cat", "deer":
+			var line_c := Color("f5eedc") if u.hero_id == "cat" else Color("e8f6c8")
+			_spawn_arrow_line(at, u.face_dir, line_c)
+		"fox":
+			_spawn_burst(at + Vector3(0, 48, 0), Color("c9a6ff"), 0.12)
+		"owl":
+			_spawn_burst(at + Vector3(0, 48, 0), Color("d9c2ff"), 0.12)
+		"rabbit":
+			_spawn_burst(at + Vector3(0, 44, 0), Color("ffe7a8"), 0.12)
+		"frog":
+			_spawn_burst(at + Vector3(0, 44, 0), Color("bfe9ff"), 0.14)
+		"crane":
+			_spawn_burst(at + Vector3(0, 46, 0), Color("e8e4ff"), 0.12)
+		"axolotl":
+			_spawn_ring(at, Color("8ff0e0"), 38.0, 0.30)
+
+
+func _spawn_arrow_line(pos: Vector3, dir: Vector2, c: Color) -> void:
+	# 弓弦箭线：沿朝向拉出一根细亮线，和真实弹道区分开。
+	if dir.length_squared() < 0.001:
+		return
+	var d := dir.normalized()
+	var mesh := _fx_mesh("fx_arrow_line", func():
+		var bm := BoxMesh.new()
+		bm.size = Vector3(46, 2.4, 2.4)
+		return bm)
+	var at := Vector3(pos.x, 30.0, pos.z) + Vector3(d.x, 0.0, d.y) * 34.0
+	_add_fx_mesh(mesh, _fx_mat(c, 0.85), at, 0.16, 1.0, 1.0, Vector3.ZERO, Vector3.ZERO,
+		Vector3(0.0, atan2(-d.y, d.x), 0.0))
+
+
+func _entrance_fx(u) -> void:
+	# 5v5 五位英雄的开场小特效。
+	var rp: Vector2 = sim.render_pos(u)
+	var at := Vector3(rp.x, 0.0, rp.y)
+	match u.hero_id:
+		"turtle":
+			_spawn_ring(at, Color("e0604f"), 46.0, 0.40)
+			_spawn_debris(at + Vector3(0, 4, 0), Color("b28c5c"), 3)
+		"hedgehog":
+			_spawn_ring(at, Color("e0604f"), 40.0, 0.35)
+			_spawn_burst(at + Vector3(0, 30, 0), Color("f4f8ff"), 0.22)
+		"redpanda":
+			_spawn_ring(at, Color("f27a32"), 52.0, 0.45)
+			_spawn_slashes(at + Vector3(0, 30, 0), Color("ffb066"), 3, 90.0)
+		"wolf":
+			_spawn_roar(at, Color("9aa8b8"), 110.0)
+		"crane":
+			_spawn_ring(at, Color("9fe8f0"), 60.0, 0.45)
+			_spawn_feathers(at, Color("c8e8ff"), 100.0)
 
 
 func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> void:

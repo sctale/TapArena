@@ -108,6 +108,8 @@ class Unit:
 
 	var ai_think: float = 0.0
 	var ai_target = null
+	# 撤退状态粘滞：避免站在血量/人数阈值上来回翻转（表现为原地转圈）。
+	var retreat_t: float = 0.0
 	# 普攻锁定目标：王者式优先级（英雄 > 残血单位 > 建筑），粘性避免来回切换。
 	var atk_target = null
 	var lane_index: int = 0
@@ -1633,9 +1635,19 @@ func step_hero_ai(h, dt: float) -> void:
 	var retreat_hp := float(ai_cfg.get("retreat_hp", 0.24))
 	var retreat_enemy_hp := float(ai_cfg.get("retreat_with_enemy_hp", 0.40))
 	var outnumbered_hp := float(ai_cfg.get("outnumbered_hp", 0.56))
-	var retreat: bool = hp_p < retreat_hp \
-		or (hp_p < retreat_enemy_hp and enemy_near and not has_healer_near(h, 380.0)) \
-		or (hp_p < outnumbered_hp and foe_heroes >= ally_heroes + 2)
+	var retreat_enter: bool = hp_p < retreat_hp 		or (hp_p < retreat_enemy_hp and enemy_near and not has_healer_near(h, 380.0)) 		or (hp_p < outnumbered_hp and foe_heroes >= ally_heroes + 2)
+	# 撤退带粘滞：一旦开始至少 1.2 秒；之后要血量回到 0.55 以上且不再被包夹才解除。
+	# 早期 AI 会在“撤退/推进”阈值上每帧翻转，模型表现为原地转圈。
+	if h.retreat_t > 0.0:
+		h.retreat_t -= dt
+		var safe_back: bool = hp_p > float(ai_cfg.get("retreat_exit_hp", 0.55)) 			and foe_heroes < ally_heroes + 2
+		if safe_back:
+			h.retreat_t = 0.0
+		else:
+			h.retreat_t = maxf(h.retreat_t, 0.5)
+	elif retreat_enter:
+		h.retreat_t = 1.2
+	var retreat: bool = h.retreat_t > 0.0
 
 	h.ai_think -= dt
 	var think: bool = h.ai_think <= 0.0
@@ -1723,8 +1735,8 @@ func step_hero_ai(h, dt: float) -> void:
 			# 拆塔时站定输出，别绕圈绕到水晶背后。
 			h.moving = false
 		else:
-			var side := Vector2(-to_t.y, to_t.x) * (1.0 if (h.uid % 2) == 0 else -1.0)
-			move_ai(h, side, dt, 0.35)
+			# 射程甜区站定输出：早期沿目标切向侧移会无限绕圈。
+			h.moving = false
 	else:
 		var keep: float = h.attack_range * 0.84
 		if dist > keep:

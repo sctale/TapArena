@@ -1128,8 +1128,8 @@ func _draw_skill_icons(safe: Rect2, h: float) -> void:
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
 		var c := r.get_center()
-		var icon_name := "skill_" + str(s.get("kind", "aoe"))
-		var icon: Texture2D = icons.tex(icon_name)
+		var icon: Texture2D = icons.ult_icon(str(p.hero_id)) if i == 2 \
+			else icons.tex("skill_" + str(s.get("kind", "aoe")))
 		var isz := r.size.x * 0.62
 		var icon_rect := Rect2(c - Vector2(isz, isz) * 0.5, Vector2(isz, isz))
 		var tint := Color(1, 1, 1, 1) if not locked else Color(0.62, 0.64, 0.62, 0.9)

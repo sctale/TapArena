@@ -551,6 +551,133 @@ func _make_heal_zone() -> ImageTexture:
 	return _compose(ops)
 
 
+func ult_icon(hero_id: String) -> ImageTexture:
+	# 15 位英雄的大招专属图标：金色外环 + 每个大招独立的图案。
+	var key := "ult_" + hero_id
+	if _cache.has(key):
+		return _cache[key]
+	var ops: Array = []
+	_add(ops, _ring_mask(8.0, 8.0, 7.5, 6.4), YELLOW)
+	_add(ops, _ring_mask(8.0, 8.0, 6.2, 5.7), Color("b8862a"))
+	match hero_id:
+		"tiger":
+			# 旋风爪：橙色旋风 + 两道白色爪痕
+			_add(ops, _line_mask(Vector2(3, 11), Vector2(7, 6), 2.0), ORANGE)
+			_add(ops, _line_mask(Vector2(7, 6), Vector2(12, 8), 2.0), ORANGE)
+			_add(ops, _line_mask(Vector2(12, 8), Vector2(9, 12), 2.0), ORANGE)
+			_add(ops, _line_mask(Vector2(5, 4), Vector2(8, 7), 1.4), CREAM)
+			_add(ops, _line_mask(Vector2(8, 3), Vector2(11, 6), 1.4), CREAM)
+		"fox":
+			# 星河坠落：三颗带尾的星
+			_add(ops, _line_mask(Vector2(4, 4), Vector2(2, 8), 1.2), PURPLE)
+			_add(ops, _line_mask(Vector2(10, 7), Vector2(8, 11), 1.2), PURPLE)
+			_add(ops, _line_mask(Vector2(12, 3), Vector2(11, 6), 1.2), PURPLE)
+			_add(ops, _diamond_mask(4, 3, 2), YELLOW)
+			_add(ops, _diamond_mask(10, 6, 2), Color("c0a0f0"))
+			_add(ops, _diamond_mask(12, 2, 1), YELLOW)
+		"rabbit":
+			# 满月祝福：大满月 + 粉心
+			_add(ops, _disc_mask(8.0, 8.0, 4.6), Color("ffe7a8"))
+			_add(ops, _ring_mask(8.0, 8.0, 6.0, 5.2), Color("fff2c8"))
+			_add(ops, _diamond_mask(13, 12, 1), PINK)
+			_add(ops, _diamond_mask(11, 12, 1), PINK)
+		"bear":
+			# 山崩地裂：地面 + 落石 + 裂缝
+			_add(ops, _rect_mask(2, 11, 12, 2), BROWN)
+			_add(ops, _disc_mask(5.0, 8.0, 2.4), GRAY)
+			_add(ops, _disc_mask(10.0, 7.0, 2.0), Color("9aa39a"))
+			_add(ops, _line_mask(Vector2(8, 11), Vector2(6, 14), 1.0), INK)
+			_add(ops, _line_mask(Vector2(8, 11), Vector2(10, 14), 1.0), INK)
+		"frog":
+			# 瀑布冲击：三层水浪 + 泡沫
+			_add(ops, _line_mask(Vector2(2, 5), Vector2(13, 5), 2.0), BLUE)
+			_add(ops, _line_mask(Vector2(3, 8), Vector2(12, 8), 2.0), ICE)
+			_add(ops, _line_mask(Vector2(2, 11), Vector2(13, 11), 2.0), BLUE)
+			_add(ops, _rect_mask(3, 3, 2, 2), Color.WHITE)
+			_add(ops, _rect_mask(11, 2, 2, 2), Color("e8faff"))
+			_add(ops, _rect_mask(7, 13, 2, 2), Color("e8faff"))
+		"cat":
+			# 万爪齐发：五道放射爪痕
+			for k in range(5):
+				var a := TAU * float(k) / 5.0 - 0.4
+				var p0 := Vector2(8.0 + cos(a) * 2.0, 8.0 + sin(a) * 2.0)
+				var p1 := Vector2(8.0 + cos(a) * 6.2, 8.0 + sin(a) * 6.2)
+				_add(ops, _line_mask(p0, p1, 1.6), CREAM)
+			_add(ops, _disc_mask(8.0, 8.0, 2.0), YELLOW)
+		"panda":
+			# 竹林震地：三根竹竿 + 冲击弧
+			for i in range(3):
+				var bx := 4 + i * 3
+				_add(ops, _rect_mask(bx, 4 - (i % 2), 1, 8), Color("7cbf4a"))
+				_add(ops, _rect_mask(bx - 1, 5 + i, 3, 1), Color("4e8c34"))
+			_add(ops, _line_mask(Vector2(2, 13), Vector2(7, 13), 1.2), Color("d8f0b0"))
+			_add(ops, _line_mask(Vector2(9, 13), Vector2(14, 13), 1.2), Color("d8f0b0"))
+		"owl":
+			# 夜枭俯冲：夜色 + 月光眼 + 羽刃
+			_add(ops, _disc_mask(8.0, 8.0, 5.4), Color("2f2f5a"))
+			_add(ops, _disc_mask(5.8, 7.0, 1.6), YELLOW)
+			_add(ops, _disc_mask(10.2, 7.0, 1.6), YELLOW)
+			_add(ops, _rect_mask(5, 7, 1, 1), INK)
+			_add(ops, _rect_mask(10, 7, 1, 1), INK)
+			_add(ops, _line_mask(Vector2(8, 10), Vector2(11, 13), 1.6), CREAM)
+		"axolotl":
+			# 再生水域：水环 + 绿十字
+			_add(ops, _ring_mask(8.0, 8.0, 6.2, 5.0), ICE)
+			_add(ops, _rect_mask(7, 4, 2, 8), GREEN)
+			_add(ops, _rect_mask(5, 6, 6, 2), GREEN)
+			_add(ops, _rect_mask(7, 4, 1, 8), Color("8fe06a"))
+		"deer":
+			# 林间箭雨：三支向下箭
+			for i in range(3):
+				var ax := 3 + i * 4 + (i % 2)
+				_add(ops, _line_mask(Vector2(ax, 2), Vector2(ax, 10), 1.2), BROWN)
+				_add(ops, _poly_mask([Vector2(ax - 1, 9), Vector2(ax + 1, 9), Vector2(ax, 12)]), CREAM)
+				_add(ops, _rect_mask(ax - 1, 1, 3, 1), Color("e0604f"))
+		"turtle":
+			# 龟甲震地：龟壳 + 冲击弧
+			_add(ops, _disc_mask(8.0, 8.0, 4.4), GREEN)
+			_add(ops, _rect_mask(4, 8, 9, 3), DGREEN)
+			_add(ops, _rect_mask(6, 5, 1, 7), DGREEN)
+			_add(ops, _rect_mask(10, 5, 1, 7), DGREEN)
+			_add(ops, _line_mask(Vector2(1, 13), Vector2(5, 13), 1.2), CREAM)
+			_add(ops, _line_mask(Vector2(11, 13), Vector2(15, 13), 1.2), CREAM)
+		"hedgehog":
+			# 滚动刺球：橙色球 + 八向尖刺
+			_add(ops, _disc_mask(8.0, 8.0, 3.6), ORANGE)
+			for k in range(8):
+				var a := TAU * float(k) / 8.0
+				_add(ops, _line_mask(Vector2(8.0 + cos(a) * 3.4, 8.0 + sin(a) * 3.4),
+					Vector2(8.0 + cos(a) * 6.2, 8.0 + sin(a) * 6.2), 1.2), YELLOW)
+			_add(ops, _disc_mask(8.0, 8.0, 1.4), Color("ffd08a"))
+		"redpanda":
+			# 烈焰冲锋：火焰 + 前冲箭头
+			_add(ops, _poly_mask([Vector2(2, 12), Vector2(4, 6), Vector2(7, 9), Vector2(10, 4),
+				Vector2(13, 12)]), ORANGE)
+			_add(ops, _poly_mask([Vector2(4, 12), Vector2(6, 8), Vector2(8, 11), Vector2(10, 7),
+				Vector2(11, 12)]), YELLOW)
+			_add(ops, _line_mask(Vector2(11, 3), Vector2(14, 3), 1.4), CREAM)
+		"wolf":
+			# 猎影突袭：狼头剪影 + 红斩
+			_add(ops, _poly_mask([Vector2(3, 8), Vector2(3, 12), Vector2(6, 14), Vector2(10, 14),
+				Vector2(13, 12), Vector2(13, 8)]), GRAY)
+			_add(ops, _poly_mask([Vector2(3, 8), Vector2(4, 3), Vector2(7, 7)]), GRAY)
+			_add(ops, _poly_mask([Vector2(13, 8), Vector2(12, 3), Vector2(9, 7)]), GRAY)
+			_add(ops, _rect_mask(5, 9, 1, 1), YELLOW)
+			_add(ops, _rect_mask(10, 9, 1, 1), YELLOW)
+			_add(ops, _line_mask(Vector2(12, 12), Vector2(15, 9), 1.2), RED)
+		"crane":
+			# 风之领域：三股旋风 + 白羽
+			_add(ops, _line_mask(Vector2(2, 5), Vector2(11, 5), 1.4), ICE)
+			_add(ops, _line_mask(Vector2(4, 8), Vector2(13, 8), 1.4), Color("b8f0ff"))
+			_add(ops, _line_mask(Vector2(2, 11), Vector2(10, 11), 1.4), ICE)
+			_add(ops, _line_mask(Vector2(6, 3), Vector2(10, 13), 1.4), CREAM)
+		_:
+			_add(ops, _diamond_mask(8, 8, 4), YELLOW)
+	var t := _compose(ops)
+	_cache[key] = t
+	return t
+
+
 func _make_heart() -> ImageTexture:
 	var ops: Array = []
 	_add(ops, _disc_mask(5.4, 6.0, 3.2), RED)
