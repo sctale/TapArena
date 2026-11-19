@@ -340,9 +340,9 @@ func _build_hills() -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
-	mm.instance_count = 8
-	for i in range(8):
-		var x := 120.0 + float(i) * 360.0 + rng.randf_range(-70.0, 70.0)
+	mm.instance_count = 12
+	for i in range(12):
+		var x := 120.0 + float(i) * 300.0 + rng.randf_range(-70.0, 70.0)
 		var z := rng.randf_range(-300.0, -90.0)
 		var s := rng.randf_range(0.9, 1.7)
 		var basis := Basis.IDENTITY.scaled(Vector3(s, s * rng.randf_range(0.8, 1.2), s))
@@ -364,7 +364,7 @@ func _build_scatter() -> void:
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.mesh = mesh
 		var spots: Array = []
-		for k in range(6):
+		for k in range(13):
 			for tries in range(8):
 				var x := rng.randf_range(140.0, sim.map_w - 140.0)
 				var z := rng.randf_range(140.0, sim.map_h - 140.0)
@@ -389,7 +389,7 @@ func _build_scatter() -> void:
 		rmm.transform_format = MultiMesh.TRANSFORM_3D
 		rmm.mesh = rmesh
 		var rock_spots: Array = []
-		for k in range(5):
+		for k in range(11):
 			for tries in range(8):
 				var x := rng.randf_range(180.0, sim.map_w - 180.0)
 				var z := rng.randf_range(180.0, sim.map_h - 180.0)
@@ -407,7 +407,7 @@ func _build_scatter() -> void:
 		add_child(rnode)
 
 	var mush = _model("mushroom", func(): return BlockModels.mushroom(atlas))
-	var mush_spots := [Vector2(560, 1500), Vector2(1840, 900), Vector2(1000, 1900), Vector2(1400, 500)]
+	var mush_spots := [Vector2(840, 2250), Vector2(2760, 1350), Vector2(1500, 2850), Vector2(2100, 750)]
 	for k in range(mush_spots.size()):
 		var node := _make_instance(mush)
 		var p: Vector2 = mush_spots[k]
@@ -417,7 +417,7 @@ func _build_scatter() -> void:
 		add_child(node)
 
 	var sign_mesh = _model("sign", func(): return BlockModels.sign(atlas))
-	for p in [Vector3(430, 0, 1470), Vector3(1970, 0, 930)]:
+	for p in [Vector3(645, 0, 2205), Vector3(2955, 0, 1395)]:
 		var node := _make_instance(sign_mesh)
 		node.position = p
 		add_child(node)
@@ -432,7 +432,7 @@ func _build_ground_decor() -> void:
 	tmm.transform_format = MultiMesh.TRANSFORM_3D
 	tmm.mesh = tuft
 	var tuft_spots: Array = []
-	for k in range(40):
+	for k in range(90):
 		for tries in range(10):
 			var x := rng.randf_range(90.0, sim.map_w - 90.0)
 			var z := rng.randf_range(90.0, sim.map_h - 90.0)
@@ -459,7 +459,7 @@ func _build_ground_decor() -> void:
 		fmm.transform_format = MultiMesh.TRANSFORM_3D
 		fmm.mesh = fmesh
 		var fspots: Array = []
-		for k in range(8):
+		for k in range(18):
 			for tries in range(10):
 				var x := rng.randf_range(100.0, sim.map_w - 100.0)
 				var z := rng.randf_range(100.0, sim.map_h - 100.0)
@@ -482,7 +482,7 @@ func _build_ground_decor() -> void:
 	if "--top" in OS.get_cmdline_user_args():
 		return
 	var cloud_mesh = _model("cloud_vox", func(): return BlockModels.cloud(atlas))
-	for k in range(7):
+	for k in range(10):
 		var node := _make_instance(cloud_mesh, false)
 		node.position = Vector3(
 			rng.randf_range(-200.0, sim.map_w + 200.0),

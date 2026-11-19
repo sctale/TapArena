@@ -963,8 +963,8 @@ func _map_checks() -> Array:
 	var issues: Array = []
 	var sim = BattleSimScript.new()
 	sim.setup("fox", 0, 9500, true)
-	if sim.map_w != 2400.0 or sim.map_h != 2400.0:
-		issues.append("5v5 地图不是 2400×2400")
+	if sim.map_w != 3600.0 or sim.map_h != 3600.0:
+		issues.append("5v5 地图不是 3600×3600（实际 %.0fx%.0f）" % [sim.map_w, sim.map_h])
 	if sim.lane_paths.size() != 3:
 		issues.append("5v5 不是三条路")
 	# 塔位置：蓝塔在路径 30-45%，红塔在 55-70%。
@@ -993,7 +993,7 @@ func _map_checks() -> Array:
 		var pr: Array = sim.lane_paths[2 - l]
 		for i in range(pb.size()):
 			var src: Vector2 = pb[i]
-			var mirror := Vector2(2400.0 - src.x, 2400.0 - src.y)
+			var mirror := Vector2(sim.map_w - src.x, sim.map_h - src.y)
 			var dst: Vector2 = pr[pr.size() - 1 - i]
 			if mirror.distance_to(dst) > 1.0:
 				issues.append("第 %d 路不满足 180° 旋转对称" % l)
@@ -1013,7 +1013,7 @@ func _map_checks() -> Array:
 				issues.append("河蟹不在河道里 %.0f" % river_d)
 		elif river_d < 300.0:
 			issues.append("%s 离河道太近 %.0f" % [u.display_name, river_d])
-		var mirror_c := Vector2(2400.0 - u.pos.x, 2400.0 - u.pos.y)
+		var mirror_c := Vector2(sim.map_w - u.pos.x, sim.map_h - u.pos.y)
 		var found := false
 		for o in sim.units:
 			if o.kind == BattleSimScript.JUNGLE and o.jungle_kind == u.jungle_kind \
@@ -1030,9 +1030,9 @@ func _map_checks() -> Array:
 	for k in range(1800):
 		sim2.step(1.0 / 60.0)
 		for m in sim2.minions:
-			if m.lane_id == 0 and m.pos.x < 430.0 and m.pos.y < 1450.0:
+			if m.lane_id == 0 and m.pos.x < sim2.map_w * 0.18 and m.pos.y < sim2.map_h * 0.60:
 				top_vertical = true
-			if m.lane_id == 2 and m.pos.y > 1970.0 and m.pos.x > 1500.0:
+			if m.lane_id == 2 and m.pos.y > sim2.map_h * 0.82 and m.pos.x > sim2.map_w * 0.625:
 				bot_vertical = true
 	if sim2.minions.size() == 0:
 		issues.append("5v5 30 秒没有小兵")
