@@ -105,8 +105,24 @@ static func _palette_index(palette: PackedColorArray, c: Color, stats: Dictionar
 	return palette.size() - 1
 
 
+static func _face(st: SurfaceTool, atlas: PixelAtlas, b: Dictionary, face: String, tint: Color,
+		palette: PackedColorArray, stats: Dictionary, rb: Basis, has_rot: bool,
+		origin: Vector3, pts: Array) -> void:
+	var p: Array = pts
+	if has_rot:
+		var out: Array = []
+		for v in pts:
+			out.append(origin + rb * ((v as Vector3) - origin))
+		p = out
+	var n := _normal_for(face)
+	if has_rot:
+		n = (rb * n).normalized()
+	_quad(st, atlas, _tile_for(b, face), tint * _shade_for(face), palette, stats, p, n)
+
+
 static func _add_box(st: SurfaceTool, atlas: PixelAtlas, b: Dictionary, palette: PackedColorArray,
 		stats: Dictionary) -> void:
+	# 可选 rot/rot_origin：武器/盾牌绕手掌等支点做静态旋转，读起来是“握着”而不是贴着手臂。
 	var size: Vector3 = b.get("size", Vector3.ONE)
 	var c: Vector3 = b.get("pos", Vector3.ZERO)
 	var tint: Color = b.get("tint", Color.WHITE)
@@ -114,31 +130,35 @@ static func _add_box(st: SurfaceTool, atlas: PixelAtlas, b: Dictionary, palette:
 	var hz := size.z * 0.5
 	var y0 := 0.0
 	var y1 := size.y
+	var rot: Vector3 = b.get("rot", Vector3.ZERO)
+	var has_rot := rot.length_squared() > 0.000001
+	var rb := Basis.from_euler(rot)
+	var origin: Vector3 = b.get("rot_origin", Vector3(c.x, (y0 + y1) * 0.5, c.z))
 
-	_quad(st, atlas, _tile_for(b, "front"), tint * _shade_for("front"), palette, stats, [
+	_face(st, atlas, b, "front", tint, palette, stats, rb, has_rot, origin, [
 		c + Vector3(-hx, y0, hz), c + Vector3(hx, y0, hz),
 		c + Vector3(hx, y1, hz), c + Vector3(-hx, y1, hz),
-	], _normal_for("front"))
-	_quad(st, atlas, _tile_for(b, "back"), tint * _shade_for("back"), palette, stats, [
+	])
+	_face(st, atlas, b, "back", tint, palette, stats, rb, has_rot, origin, [
 		c + Vector3(hx, y0, -hz), c + Vector3(-hx, y0, -hz),
 		c + Vector3(-hx, y1, -hz), c + Vector3(hx, y1, -hz),
-	], _normal_for("back"))
-	_quad(st, atlas, _tile_for(b, "right"), tint * _shade_for("right"), palette, stats, [
+	])
+	_face(st, atlas, b, "right", tint, palette, stats, rb, has_rot, origin, [
 		c + Vector3(hx, y0, -hz), c + Vector3(hx, y0, hz),
 		c + Vector3(hx, y1, hz), c + Vector3(hx, y1, -hz),
-	], _normal_for("right"))
-	_quad(st, atlas, _tile_for(b, "left"), tint * _shade_for("left"), palette, stats, [
+	])
+	_face(st, atlas, b, "left", tint, palette, stats, rb, has_rot, origin, [
 		c + Vector3(-hx, y0, hz), c + Vector3(-hx, y0, -hz),
 		c + Vector3(-hx, y1, -hz), c + Vector3(-hx, y1, hz),
-	], _normal_for("left"))
-	_quad(st, atlas, _tile_for(b, "top"), tint * _shade_for("top"), palette, stats, [
+	])
+	_face(st, atlas, b, "top", tint, palette, stats, rb, has_rot, origin, [
 		c + Vector3(-hx, y1, -hz), c + Vector3(hx, y1, -hz),
 		c + Vector3(hx, y1, hz), c + Vector3(-hx, y1, hz),
-	], _normal_for("top"))
-	_quad(st, atlas, _tile_for(b, "bottom"), tint * _shade_for("bottom"), palette, stats, [
+	])
+	_face(st, atlas, b, "bottom", tint, palette, stats, rb, has_rot, origin, [
 		c + Vector3(-hx, y0, hz), c + Vector3(hx, y0, hz),
 		c + Vector3(hx, y0, -hz), c + Vector3(-hx, y0, -hz),
-	], _normal_for("bottom"))
+	])
 
 
 static func _quad(st: SurfaceTool, atlas: PixelAtlas, tile: String, tint: Color,
