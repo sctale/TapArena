@@ -410,9 +410,12 @@ func _on_fx(kind: String, _pos: Vector3, _color: Color, radius: float) -> void:
 		cam.add_shake(3.0)
 
 
-func _on_sfx(key: String) -> void:
+func _on_sfx(key: String, pos: Vector2) -> void:
+	var listener := Vector2.ZERO
+	if sim != null and sim.player != null:
+		listener = sim.render_pos(sim.player)
 	if sfx != null:
-		sfx.play(key)
+		sfx.play(key, 0.0, pos, listener)
 	if key == "boom" and cam != null:
 		cam.add_shake(9.0)
 

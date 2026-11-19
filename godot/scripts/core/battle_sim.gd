@@ -8,7 +8,7 @@ signal banner(text: String, duration: float)
 signal float_text(pos: Vector3, text: String, color: Color)
 signal fx(kind: String, pos: Vector3, color: Color, radius: float)
 signal beam_fx(from: Vector3, to: Vector3, color: Color, width: float)
-signal sfx(key: String)
+signal sfx(key: String, pos: Vector2)
 signal hitstop(seconds: float)
 signal level_up(unit)
 signal match_ended(winner: int)
@@ -871,7 +871,7 @@ func step_potions(dt: float) -> void:
 				"+" + str(roundi(gained)), Color(0.55, 1.0, 0.65))
 			fx.emit("potion_pick", Vector3(p.pos.x, 12.0, p.pos.y),
 				Color(0.55, 1.0, 0.65), p.radius)
-			sfx.emit("pickup")
+			sfx.emit("pickup", p.pos)
 			break
 
 
@@ -928,7 +928,7 @@ func spawn_boss(team: int) -> void:
 		banner.emit("峡谷巨兽出现！%s巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	else:
 		banner.emit("终极对决！%s峡谷巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
-	sfx.emit("ult")
+	sfx.emit("ult", u.pos)
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(team), 200.0)
 
 
@@ -1138,7 +1138,7 @@ func _begin_boss_cast(u, kind: String, cfg: Dictionary, index: int, target = nul
 	float_text.emit(Vector3(u.pos.x, u.height + 34.0, u.pos.y), label, col)
 	fx.emit("cast_" + style, Vector3(u.pos.x, 20.0, u.pos.y), col, telegraph)
 	fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, telegraph)
-	sfx.emit("boom" if kind == "slam" else "ult")
+	sfx.emit("boom" if kind == "slam" else "ult", u.pos)
 
 
 func _resolve_boss_cast(u) -> void:
@@ -1157,7 +1157,7 @@ func _resolve_boss_cast(u) -> void:
 			fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
 			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
 			fx.emit("debris", Vector3(u.pos.x, 24.0, u.pos.y), col, radius)
-			sfx.emit("boom")
+			sfx.emit("boom", u.pos)
 		"roar":
 			var radius := float(cfg.get("radius", 330.0))
 			for o in units:
@@ -1177,7 +1177,7 @@ func _resolve_boss_cast(u) -> void:
 					a.hp = minf(a.max_hp, a.hp + a.max_hp * 0.10)
 			fx.emit("cast_roar", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
 			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
-			sfx.emit("ult")
+			sfx.emit("ult", u.pos)
 		"meteor":
 			var radius := float(cfg.get("radius", 260.0))
 			var center: Vector2 = u.pos + Vector2(u.facing, 0.0) * 220.0
@@ -1188,14 +1188,14 @@ func _resolve_boss_cast(u) -> void:
 			fx.emit("cast_starfall_ult", Vector3(center.x, 20.0, center.y), col, radius)
 			fx.emit("ring", Vector3(center.x, 6.0, center.y), col, radius)
 			fx.emit("debris", Vector3(center.x, 30.0, center.y), col, radius)
-			sfx.emit("boom")
+			sfx.emit("boom", center)
 		"cyclone":
 			var radius := float(cfg.get("radius", 300.0))
 			area_damage(u.pos, radius, float(cfg.get("dmg", 130.0)), u, u.team,
 				float(cfg.get("slow", 1.5)), 0.0, float(cfg.get("knock", 60.0)))
 			fx.emit("cast_clawstorm", Vector3(u.pos.x, 20.0, u.pos.y), col, radius)
 			fx.emit("ring", Vector3(u.pos.x, 6.0, u.pos.y), col, radius)
-			sfx.emit("ult")
+			sfx.emit("ult", u.pos)
 		"charge":
 			var dur := float(cfg.get("duration", 0.5))
 			u.boss_charge_t = dur
@@ -1304,7 +1304,7 @@ func step(dt: float) -> void:
 		sudden_death = true
 		# 3v3 巨兽与终极对决同帧，播报合并到 spawn_boss 里只出一条，避免横幅叠字；
 		# 5v5 巨兽 4:00 先出场，终极对决 5:00 只切状态（HUD 常驻提示），不再发横幅。
-		sfx.emit("ult")
+		sfx.emit("ult", Vector2.INF)
 	if not boss_spawned and clock >= boss_time:
 		boss_spawned = true
 		spawn_boss(leading_team())
@@ -2193,7 +2193,7 @@ func shoot(src, dir: Vector2, dmg: float, color: Color, speed: float,
 	p.style = style
 	shots.append(p)
 	if src != null and src.kind == HERO and src.attack_range > 250.0:
-		sfx.emit("shoot_" + src.hero_id)
+		sfx.emit("shoot_" + src.hero_id, src.pos)
 	fx.emit("muzzle", Vector3(p.pos.x, src.height * 0.45, p.pos.y), color, 0.0)
 
 
@@ -2262,7 +2262,7 @@ func step_projectiles(dt: float) -> void:
 				area_damage(p.pos, p.splash_radius, p.dmg, p.src, p.team, p.slow, 0.0, 0.0)
 				fx.emit("burst", Vector3(p.pos.x, 20.0, p.pos.y), p.color, 0.0)
 				fx.emit("ring", Vector3(p.pos.x, 6.0, p.pos.y), p.color, p.splash_radius)
-				sfx.emit("boom")
+				sfx.emit("boom", p.pos)
 			else:
 				hit_with_fx(u, p.dmg, p.src, 0.0, p.color)
 				if p.slow > 0.0:
@@ -2302,7 +2302,7 @@ func hit_with_fx(target, amount: float, src, stun := 0.0, col = null) -> void:
 	var hit_key := "hit"
 	if src != null and src.kind == HERO:
 		hit_key = "hit_" + src.hero_id
-	sfx.emit(hit_key)
+	sfx.emit(hit_key, target.pos)
 	if src != null and src.is_player and src.dash_t <= 0.0 and amount >= hitstop_threshold:
 		hitstop.emit(hitstop_duration)
 
@@ -2386,7 +2386,7 @@ func kill(target, killer) -> void:
 			score_blue += 1
 		var killer_name: String = killer.display_name if killer != null else "？"
 		banner.emit("%s 击败了 %s" % [killer_name, target.display_name], 1.8)
-		sfx.emit("ult")
+		sfx.emit("ult", target.pos)
 
 	elif target.kind == JUNGLE:
 		target.respawn_t = float(jungle_cfg.get("respawn", 45.0))
@@ -2408,11 +2408,11 @@ func kill(target, killer) -> void:
 				if a != killer and a.is_alive() and a.team == killer.team \
 						and a.pos.distance_to(target.pos) < 700.0:
 					add_xp(a, xp_gain * 0.5)
-		sfx.emit("pickup")
+		sfx.emit("pickup", target.pos)
 	elif target.kind == BOSS:
 		target.respawn_t = boss_respawn
 		banner.emit("峡谷巨兽被击退了！", 2.4)
-		sfx.emit("boom")
+		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
 		if killer != null and killer.kind == HERO:
@@ -2420,7 +2420,7 @@ func kill(target, killer) -> void:
 
 	elif target.kind == TOWER:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
-		sfx.emit("boom")
+		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
 		for a in heroes:
@@ -2436,7 +2436,7 @@ func kill(target, killer) -> void:
 					add_xp(a, xp_minion_assist)
 
 	elif target.kind == BASE:
-		sfx.emit("boom")
+		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius * 1.2)
 
@@ -2458,7 +2458,7 @@ func add_xp(h, add: float) -> void:
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "二级解锁大招！", Color(1, 0.95, 0.6))
 			if h.is_player:
 				banner.emit("大招解锁！按右上的技能键放出来", 1.8)
-				sfx.emit("ult")
+				sfx.emit("ult", h.pos)
 		elif five_v_five:
 			float_text.emit(Vector3(h.pos.x, h.height + 24.0, h.pos.y), "Lv%d 属性提升！" % h.level, Color(1, 0.95, 0.6))
 		level_up.emit(h)
@@ -2793,7 +2793,7 @@ func _spawn_boomerang(h, dir: Vector2, dmg: float, color: Color, s: Dictionary) 
 	_shot_view += 1
 	shots.append(p)
 	fx.emit("muzzle", Vector3(p.pos.x, h.height * 0.45, p.pos.y), color, 0.0)
-	sfx.emit("shoot_" + h.hero_id)
+	sfx.emit("shoot_" + h.hero_id, h.pos)
 
 
 func nearest_hero(from, radius: float):
@@ -2914,7 +2914,7 @@ func end_match(winner_team: int, reason := "水晶被摧毁") -> void:
 	winner = winner_team
 	end_reason = reason
 	banner.emit("胜利！水晶亮起来了" if winner_team == BLUE else "水晶被点亮了…再来一局？", 6.0)
-	sfx.emit("win" if winner_team == BLUE else "lose")
+	sfx.emit("win" if winner_team == BLUE else "lose", Vector2.INF)
 	match_ended.emit(winner_team)
 
 
@@ -2935,7 +2935,7 @@ func try_cast(h, index: int) -> void:
 	# 小技能收招更快：技能 1/2 的施法姿势 0.34 秒，大招保留 0.5 秒。
 	h.cast_total = 0.34 if index < 2 else 0.5
 	h.cast_anim = h.cast_total
-	sfx.emit(("ult_" if index == 2 else "cast_") + h.hero_id)
+	sfx.emit(("ult_" if index == 2 else "cast_") + h.hero_id, h.pos)
 	if h.is_player and index == 2:
 		fx.emit("punch", Vector3(h.pos.x, 40.0, h.pos.y), Color.WHITE, 0.0)
 	cast(h, s, index)
@@ -3175,7 +3175,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 			beam_fx.emit(Vector3(h.pos.x, 34.0, h.pos.y), Vector3(beam_end.x, 34.0, beam_end.y), color, width)
 			fx.emit("ring", Vector3(beam_end.x, 6.0, beam_end.y), color, 70.0)
 			if hit_any:
-				sfx.emit("hit")
+				sfx.emit("hit", beam_end)
 		"chain":
 			# 月链：在敌人之间弹跳，每跳一次伤害衰减，最多 count 次；优先英雄。
 			var chain_hit: Array = []
@@ -3248,7 +3248,7 @@ func cast(h, s: Dictionary, index: int) -> void:
 					u.slow_t = maxf(u.slow_t, float(s.get("slow", 0.6)))
 			fx.emit("cast_roar", Vector3(h.pos.x, 20.0, h.pos.y), color, radius)
 			fx.emit("ring", Vector3(h.pos.x, 6.0, h.pos.y), color, radius)
-			sfx.emit("ult")
+			sfx.emit("ult", h.pos)
 		"spin":
 			# 滚动刺球：进入一段时间的高速旋身，持续伤害周围敌人。
 			h.spin_t = float(s.get("duration", 2.4))
@@ -3392,5 +3392,5 @@ func step_pending(dt: float) -> void:
 					continue
 				a.hp = minf(a.max_hp, a.hp + a.max_hp * heal_pct)
 				float_text.emit(Vector3(a.pos.x, a.height + 24.0, a.pos.y), "+" + str(roundi(a.max_hp * heal_pct)), color)
-		sfx.emit("boom")
+		sfx.emit("boom", center)
 		pending.remove_at(i)

@@ -45,11 +45,14 @@ func _ready() -> void:
 	_bgm.play()
 
 
-func play(key: String, volume_db := 0.0) -> void:
+func play(key: String, volume_db := 0.0, at := Vector2.INF, listener := Vector2.ZERO) -> void:
 	if not enabled:
 		return
 	var stream = _streams.get(key)
 	if stream == null:
+		return
+	var extra := attenuation_db(key, at, listener)
+	if extra <= -60.0:
 		return
 	var now := Time.get_ticks_msec()
 	if key.begins_with("hit") and now - int(_last_ms.get(key, -999)) < 45:
@@ -58,8 +61,22 @@ func play(key: String, volume_db := 0.0) -> void:
 	var p: AudioStreamPlayer = _players[_next]
 	_next = (_next + 1) % _players.size()
 	p.stream = stream
-	p.volume_db = -9.0 + volume_db
+	p.volume_db = -9.0 + volume_db + extra
 	p.play()
+
+
+func attenuation_db(key: String, at: Vector2, listener: Vector2) -> float:
+	# 近大远小：260 单位内满音量；到 1200（大招/爆炸 1600）衰减 -20dB；再远直接不播。
+	# at 不是有限值时视为 UI/全局音效，不衰减。
+	if not (is_finite(at.x) and is_finite(at.y)):
+		return 0.0
+	var far := 1600.0 if (key.begins_with("ult") or key == "boom") else 1200.0
+	var near := 260.0
+	var d := at.distance_to(listener)
+	if d >= far * 1.2:
+		return -99.0
+	var t := clampf((d - near) / (far - near), 0.0, 1.0)
+	return -20.0 * pow(t, 1.35)
 
 
 func set_enabled(on: bool) -> void:
