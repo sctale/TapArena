@@ -1328,6 +1328,7 @@ func step(dt: float) -> void:
 
 	for i in range(units.size()):
 		step_unit(units[i], dt)
+	soft_separate_minions()
 	for h in heroes:
 		if h.is_alive():
 			add_xp(h, xp_passive_per_sec * dt)
@@ -2883,6 +2884,31 @@ func cleanup_dead() -> void:
 			continue
 		units.remove_at(i)
 	minions = minions.filter(func(m): return m.is_alive())
+
+
+func soft_separate_minions() -> void:
+	# 只对同队小兵做极轻软分离，避免整波叠成一坨；英雄与任何单位、敌我小兵之间依然完全穿透。
+	for i in range(minions.size()):
+		var a = minions[i]
+		if not a.is_alive():
+			continue
+		for j in range(i + 1, minions.size()):
+			var b = minions[j]
+			if not b.is_alive() or a.team != b.team:
+				continue
+			var min_d: float = (a.radius + b.radius) * 0.40
+			var d: Vector2 = a.pos - b.pos
+			var sq := d.length_squared()
+			if sq >= min_d * min_d:
+				continue
+			var dist := sqrt(sq)
+			if dist < 0.001:
+				d = Vector2(1, 0)
+				dist = 1.0
+			var push := minf(2.0, (min_d - dist) * 0.25)
+			var n := d / dist
+			move_to(a, a.pos + n * push)
+			move_to(b, b.pos - n * push)
 
 
 func end_match(winner_team: int, reason := "水晶被摧毁") -> void:
