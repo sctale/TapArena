@@ -38,6 +38,9 @@ var fade_mats: Dictionary = {}
 var cloud_nodes: Array = []
 # 性能兜底唯一开关：high = 2 级阴影 + 树/石投影 + glow；low = 单级阴影 + 近裁剪 + 树/石不投影。
 var shadow_quality := "high"
+# 待机武器微光：每 0.55 秒轮转一位英雄，交错闪烁。
+var glint_t := 0.0
+var glint_idx := 0
 var rng := RandomNumberGenerator.new()
 var sync_us_total := 0
 var sync_frames := 0
@@ -537,7 +540,7 @@ func _add_hero(u) -> void:
 	var s := _hero_scale(u)
 	root.scale = Vector3(s, s, s)
 	var item := {"root": root, "body": body, "limbs": limbs, "scale": s, "atk_active": false,
-		"entrance_t": 0.0}
+		"entrance_t": 0.0, "hero_id": u.hero_id}
 	if u.hero_id in ["turtle", "hedgehog", "redpanda", "wolf", "crane"]:
 		# 5v5 五位英雄的开局招牌姿势：1.1 秒，仅首次创建时播放。
 		item["entrance_t"] = 1.1
@@ -680,6 +683,10 @@ func _process(delta: float) -> void:
 	_step_debris(delta)
 	_step_sprouts(delta)
 	_step_clouds(delta)
+	glint_t += delta
+	if glint_t >= 0.55:
+		glint_t = 0.0
+		_spawn_idle_glint()
 	sync_us_total += Time.get_ticks_usec() - t0
 	sync_frames += 1
 	if sync_frames >= 300:
@@ -1271,39 +1278,117 @@ func _weapon_strike(u) -> void:
 	var at := Vector3(rp.x, 0.0, rp.y)
 	match u.hero_id:
 		"tiger":
-			_spawn_slashes(at + Vector3(0, 30, 0), Color("ffffff"), 3, 100.0)
+			_spawn_swing_arc(at, u.face_dir, Color("ffffff"))
+			_spawn_tip_spark(at, u.face_dir, Color("e8f2ff"))
 		"wolf":
-			_spawn_slashes(at + Vector3(0, 30, 0), Color("f4f8ff"), 3, 96.0)
+			_spawn_swing_arc(at, u.face_dir, Color("f4f8ff"))
+			_spawn_tip_spark(at, u.face_dir, Color("e8f2ff"))
 		"hedgehog":
-			_spawn_slashes(at + Vector3(0, 28, 0), Color("ffffff"), 3, 84.0)
+			_spawn_swing_arc(at, u.face_dir, Color("ffffff"))
+			_spawn_tip_spark(at, u.face_dir, Color("f4f8ff"))
 		"bear":
+			_spawn_swing_arc(at, u.face_dir, Color("d8c09a"), 54.0)
 			_spawn_ring(at, Color("8a6a4a"), 62.0, 0.50)
 			_spawn_ring(at, Color("d8c09a"), 44.0, 0.40)
-			_spawn_burst(at + Vector3(0, 8, 0), Color("c8a87a"), 0.24)
 			_spawn_debris(at + Vector3(0, 6, 0), Color("8a6a4a"), 6)
+			_spawn_tip_spark(at, u.face_dir, Color("ffe0b0"))
 		"turtle":
+			_spawn_swing_arc(at, u.face_dir, Color("e8c8a8"), 52.0)
 			_spawn_ring(at, Color("e0604f"), 54.0, 0.42)
-			_spawn_burst(at + Vector3(0, 8, 0), Color("c8a87a"), 0.22)
 			_spawn_debris(at + Vector3(0, 4, 0), Color("b28c5c"), 4)
 		"panda":
+			_spawn_swing_arc(at, u.face_dir, Color("9bd968"), 50.0)
 			_spawn_style("leaf", at, Color("9bd968"), 60.0)
 		"redpanda":
-			_spawn_slashes(at + Vector3(0, 30, 0), Color("ff9a4a"), 3, 104.0)
+			_spawn_swing_arc(at, u.face_dir, Color("ff9a4a"), 52.0)
+			_spawn_tip_spark(at, u.face_dir, Color("ffd08a"))
 		"cat", "deer":
 			var line_c := Color("f5eedc") if u.hero_id == "cat" else Color("e8f6c8")
 			_spawn_arrow_line(at, u.face_dir, line_c)
+			_spawn_burst(at + Vector3(0, 30, 0), line_c, 0.10)
 		"fox":
+			_spawn_tip_spark(at, u.face_dir, Color("ffe08a"))
 			_spawn_burst(at + Vector3(0, 48, 0), Color("c9a6ff"), 0.12)
 		"owl":
+			_spawn_tip_spark(at, u.face_dir, Color("ffe08a"))
 			_spawn_burst(at + Vector3(0, 48, 0), Color("d9c2ff"), 0.12)
 		"rabbit":
+			_spawn_tip_spark(at, u.face_dir, Color("ffe7a8"))
 			_spawn_burst(at + Vector3(0, 44, 0), Color("ffe7a8"), 0.12)
 		"frog":
+			_spawn_tip_spark(at, u.face_dir, Color("bfe9ff"))
 			_spawn_burst(at + Vector3(0, 44, 0), Color("bfe9ff"), 0.14)
 		"crane":
+			_spawn_tip_spark(at, u.face_dir, Color("e8f8ff"))
 			_spawn_burst(at + Vector3(0, 46, 0), Color("e8e4ff"), 0.12)
 		"axolotl":
+			_spawn_tip_spark(at, u.face_dir, Color("b8f0ff"))
 			_spawn_ring(at, Color("8ff0e0"), 38.0, 0.30)
+
+
+func _spawn_swing_arc(center: Vector3, dir: Vector2, c: Color, radius := 46.0) -> void:
+	# 近战挥砍：朝向前方铺 3 段弧形亮痕，0.18 秒内放大淡出。
+	if dir.length_squared() < 0.001:
+		return
+	var d := dir.normalized()
+	var side := Vector2(-d.y, d.x)
+	var mesh := _fx_mesh("fx_swing_arc", func():
+		var bm := BoxMesh.new()
+		bm.size = Vector3(40, 3, 6)
+		return bm)
+	var reach := radius * 0.72
+	for i in range(3):
+		var off := (float(i) - 1.0) * 15.0
+		var at := center + Vector3(d.x, 0.0, d.y) * reach + Vector3(side.x, 0.0, side.y) * off
+		at.y = 31.0 + float(i) * 5.0
+		var yaw := atan2(-side.y, side.x) + 0.5 * (float(i) - 1.0)
+		_add_fx_mesh(mesh, _fx_mat(c, 0.9), at, 0.16 + 0.02 * float(i), 0.8, 1.15,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.10, yaw, 0.55))
+
+
+func _spawn_spark(pos: Vector3, c: Color, size := 7.0) -> void:
+	var mesh := _fx_mesh("fx_spark_%d" % int(size), func():
+		var bm := BoxMesh.new()
+		bm.size = Vector3(size, size, size)
+		return bm)
+	_add_fx_mesh(mesh, _fx_mat(c, 0.95), pos, 0.14, 0.6, 1.5)
+
+
+func _spawn_tip_spark(at: Vector3, dir: Vector2, c: Color) -> void:
+	var d := dir.normalized() if dir.length_squared() > 0.001 else Vector2(0, 1)
+	_spawn_spark(at + Vector3(d.x * 40.0, 40.0, d.y * 40.0), c, 9.0)
+
+
+func _spawn_idle_glint() -> void:
+	# 待机微光：轮转一位存活英雄，在武器尖端闪一颗小星点。
+	if hero_nodes.is_empty():
+		return
+	var keys := hero_nodes.keys()
+	glint_idx = (glint_idx + 1) % keys.size()
+	var item: Dictionary = hero_nodes[keys[glint_idx]]
+	var root: Node3D = item.get("root")
+	if root == null or not root.visible:
+		return
+	var yaw := float(item.get("yaw", 0.0))
+	var tip := root.position + Vector3(sin(yaw), 0.0, cos(yaw)) * 30.0 + Vector3(0, 40.0, 0)
+	_spawn_spark(tip, _glint_color(str(item.get("hero_id", "tiger"))), 6.0)
+
+
+func _glint_color(id: String) -> Color:
+	match id:
+		"tiger", "wolf", "hedgehog":
+			return Color("ffffff")
+		"fox", "owl", "rabbit":
+			return Color("ffe08a")
+		"frog", "axolotl", "crane":
+			return Color("b8f0ff")
+		"bear", "turtle", "panda":
+			return Color("ffd9a0")
+		"cat", "deer":
+			return Color("f5eedc")
+		"redpanda":
+			return Color("ffb066")
+	return Color("ffffff")
 
 
 func _spawn_arrow_line(pos: Vector3, dir: Vector2, c: Color) -> void:

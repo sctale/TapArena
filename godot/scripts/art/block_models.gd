@@ -376,38 +376,46 @@ static func _wrap(boxes: Array, pos: Vector3, dark: Color, part: String) -> void
 
 static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> void:
 	var steel := Color("dfe8f0")
+	var lit := Color("f8fbff")
+	var spine := Color("8e9aa6")
 	match id:
 		"tiger":
-			# 右手短剑（绕手掌前倾外张）+ 左前臂圆盾（向前外侧转）
+			# 右手短剑（刃口高光 + 刃脊）+ 左前臂圆盾（包边/盾心高光）
 			_wrap(boxes, Vector3(20, 31, 4), dark, "arm_r")
 			var trot := Vector3(deg_to_rad(12.0), 0, deg_to_rad(-16.0))
 			var o := Vector3(20, 30, 4)
 			_w(boxes, Vector3(20, 26, 4), Vector3(3.4, 10, 3.4), "wood", Color.WHITE, "arm_r", trot, o)
 			_w(boxes, Vector3(20, 24, 4), Vector3(4.4, 2, 4.4), "gold", Color.WHITE, "arm_r", trot, o)
 			_w(boxes, Vector3(20, 36, 4), Vector3(9, 2.5, 4), "gold", Color.WHITE, "arm_r", trot, o)
-			_w(boxes, Vector3(20, 38.5, 4), Vector3(3.4, 24, 2.4), "flat", steel, "arm_r", trot, o)
-			_w(boxes, Vector3(20, 62.5, 4), Vector3(3.4, 4, 1.6), "flat", Color("f4f8ff"), "arm_r", trot, o)
+			_w(boxes, Vector3(20, 38.5, 4), Vector3(3.4, 26, 2.4), "flat", steel, "arm_r", trot, o)
+			_w(boxes, Vector3(20, 38.5, 5.15), Vector3(1.2, 26, 0.8), "flat", lit, "arm_r", trot, o)
+			_w(boxes, Vector3(20, 38.5, 2.95), Vector3(1.2, 26, 0.6), "flat", spine, "arm_r", trot, o)
+			_w(boxes, Vector3(20, 64.5, 4), Vector3(3.4, 4, 1.6), "flat", lit, "arm_r", trot, o)
 			var srot := Vector3(0, deg_to_rad(18.0), deg_to_rad(3.0))
 			var so := Vector3(-20, 32, 2)
 			_w(boxes, Vector3(-22.6, 33, 2), Vector3(4, 18, 20), "wood", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-22.6, 29, 2), Vector3(4, 4, 12), "wood", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-22.6, 51, 2), Vector3(4, 4, 12), "wood", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-24.3, 37, 2), Vector3(1.6, 8, 8), "flat", SCARF_GREEN, "arm_l", srot, so)
+			_w(boxes, Vector3(-24.9, 37, 2), Vector3(0.8, 3, 3), "flat", Color("e8f6ec"), "arm_l", srot, so)
+			_w(boxes, Vector3(-24.8, 49, 2), Vector3(1.0, 1.4, 19), "cream", Color.WHITE, "arm_l", srot, so)
+			_w(boxes, Vector3(-24.8, 31, 2), Vector3(1.0, 1.4, 19), "cream", Color.WHITE, "arm_l", srot, so)
 			_b(boxes, Vector3(-21, 53, 0), Vector3(9, 4, 11), "gold", Color.WHITE, {}, "arm_l")
 			_b(boxes, Vector3(0, 28, 10.6), Vector3(6, 4, 1.5), "gold", Color.WHITE)
 		"fox":
-			# 法杖：握在手里，杖身略微外倾，星辉绕手掌旋转
+			# 法杖：杖头星辉放大 + 发光核心
 			_wrap(boxes, Vector3(20, 31, 4), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(8.0), 0, deg_to_rad(-8.0))
 			var o := Vector3(20, 30, 4)
 			_w(boxes, Vector3(20, 26, 4), Vector3(3.2, 42, 3.2), "wood", Color.WHITE, "arm_r", rot, o)
-			_w(boxes, Vector3(20, 68, 4), Vector3(9, 9, 3), "gold", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 68, 4), Vector3(10, 10, 3), "gold", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(20, 71, 4), Vector3(18, 3.5, 3.5), "gold", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 70.5, 5.0), Vector3(3, 3, 2), "glow", Color(1.0, 0.95, 0.7), "arm_r", rot, o)
 			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "purple", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "purple_light", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(0, 24, -14.2), Vector3(32, 2, 1.6), "gold", Color.WHITE, {}, "body")
 		"rabbit":
-			# 月亮法杖握在右手；治愈挎包在左胯
+			# 月亮法杖：月牙 + 发光核心；治愈挎包
 			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(8.0), 0, deg_to_rad(-8.0))
 			var o := Vector3(20, 30, 5)
@@ -415,12 +423,13 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_w(boxes, Vector3(20, 66, 5), Vector3(10, 4, 3), "gold", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(17, 70, 5), Vector3(4, 6, 3), "gold", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(23, 70, 5), Vector3(4, 6, 3), "gold", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 68, 5.0), Vector3(3, 3, 2), "glow", Color(1.0, 0.95, 0.75), "arm_r", rot, o)
 			_b(boxes, Vector3(-14, 18, 10), Vector3(7, 9, 6), "cream", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(-14, 26, 10.4), Vector3(7.5, 3, 6.4), "pink", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(-14, 19, 16.2), Vector3(2, 6, 1), "flat", Color("58c878"), {}, "body")
 			_b(boxes, Vector3(-14, 21, 16.2), Vector3(6, 2, 1), "flat", Color("58c878"), {}, "body")
 		"bear":
-			# 木桩大锤：握在手里、锤头往后扛在肩上
+			# 木桩大锤：顶面高光 + 绳结；双肩护甲
 			_wrap(boxes, Vector3(20, 31, 4), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(-18.0), 0, deg_to_rad(-6.0))
 			var o := Vector3(20, 30, 4)
@@ -428,37 +437,43 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_w(boxes, Vector3(20, 68, 4), Vector3(18, 14, 18), "log_side", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(20, 71, 4), Vector3(19, 3, 19), "stone", Color(0.62, 0.63, 0.64), "arm_r", rot, o)
 			_w(boxes, Vector3(20, 78, 4), Vector3(19, 3, 19), "stone", Color(0.62, 0.63, 0.64), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 81, 4), Vector3(19, 2, 19), "log_side", Color(0.88, 0.83, 0.74), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 65.5, 4), Vector3(6, 2.5, 6), "flat", Color("d8c09a"), "arm_r", rot, o)
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(21.0 * sx, 53, 0), Vector3(9, 4, 11), "stone", Color(0.93, 0.90, 0.83),
 					{}, "arm_l" if sx < 0 else "arm_r")
 		"frog":
-			# 水泡法杖握在右手
+			# 水泡法杖：泡内高光核心 + 小泡
 			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(10.0), 0, deg_to_rad(-8.0))
 			var o := Vector3(20, 30, 5)
 			_w(boxes, Vector3(20, 28, 5), Vector3(3.2, 36, 3.2), "wood", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(20, 62, 5), Vector3(10, 2, 10), "ice", Color(0.75, 0.95, 1.0), "arm_r", rot, o)
 			_w(boxes, Vector3(20, 64, 5), Vector3(8, 8, 8), "ice", Color(0.85, 0.97, 1.0), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 66.5, 5), Vector3(3, 3, 3), "glow", Color(0.95, 1.0, 1.0), "arm_r", rot, o)
 			_w(boxes, Vector3(24, 74, 5), Vector3(4, 4, 4), "ice", Color(0.9, 0.98, 1.0), "arm_r", rot, o)
 			_b(boxes, Vector3(9, 28, 10.6), Vector3(4, 5, 3), "ice", Color(0.8, 0.95, 1.0))
 			_b(boxes, Vector3(9, 33, 10.6), Vector3(3, 2, 2), "wood", Color.WHITE)
 		"cat":
-			# 短弓握在左手，弓身略外倾，弦靠近身体
+			# 短弓：弓臂加厚 + 搭箭；背部箭袋
 			_wrap(boxes, Vector3(-20, 31, 6), dark, "arm_l")
 			var rot := Vector3(deg_to_rad(6.0), 0, deg_to_rad(-6.0))
 			var o := Vector3(-20, 30, 6)
-			_w(boxes, Vector3(-21.5, 26, 6), Vector3(3, 10, 3), "wood", Color.WHITE, "arm_l", rot, o)
-			_w(boxes, Vector3(-21, 35, 6), Vector3(3, 10, 3), "wood", Color.WHITE, "arm_l", rot, o)
-			_w(boxes, Vector3(-21, 17, 6), Vector3(3, 10, 3), "wood", Color.WHITE, "arm_l", rot, o)
+			_w(boxes, Vector3(-21.5, 26, 6), Vector3(3.6, 10, 3.6), "wood", Color.WHITE, "arm_l", rot, o)
+			_w(boxes, Vector3(-21, 35, 6), Vector3(3.6, 10, 3.6), "wood", Color.WHITE, "arm_l", rot, o)
+			_w(boxes, Vector3(-21, 17, 6), Vector3(3.6, 10, 3.6), "wood", Color.WHITE, "arm_l", rot, o)
 			_w(boxes, Vector3(-20, 44, 6), Vector3(4, 3, 3), "wood", Color.WHITE, "arm_l", rot, o)
 			_w(boxes, Vector3(-20, 14, 6), Vector3(4, 3, 3), "wood", Color.WHITE, "arm_l", rot, o)
 			_w(boxes, Vector3(-19.2, 14, 6), Vector3(1, 33, 1), "flat", cream, "arm_l", rot, o)
+			_w(boxes, Vector3(-20, 31, 13), Vector3(1.2, 1.2, 14), "wood", Color.WHITE, "arm_l")
+			_w(boxes, Vector3(-20, 31, 21), Vector3(1.6, 1.6, 3), "flat", steel, "arm_l")
+			_w(boxes, Vector3(-20, 31, 7), Vector3(2.4, 2.4, 3), "flat", Color("e0604f"), "arm_l")
 			_b(boxes, Vector3(10, 30, -14), Vector3(6, 16, 5), "wood", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(8, 46, -14), Vector3(2, 4, 1.5), "flat", Color("e0604f"), {}, "body")
 			_b(boxes, Vector3(10, 47, -14), Vector3(2, 4, 1.5), "flat", cream, {}, "body")
 			_b(boxes, Vector3(12, 46, -14), Vector3(2, 4, 1.5), "flat", Color("e0604f"), {}, "body")
 		"panda":
-			# 竹斗笠；竹竿握在手里、向后外倾
+			# 竹斗笠；竹竿（竹节高光）
 			_b(boxes, Vector3(0, 78, 0), Vector3(34, 3, 32), "wood", Color(0.98, 0.86, 0.62))
 			_b(boxes, Vector3(0, 81, 0), Vector3(18, 6, 18), "wood", Color(0.95, 0.82, 0.58))
 			_b(boxes, Vector3(0, 87, 0), Vector3(8, 4, 8), "wood", Color(0.92, 0.78, 0.55))
@@ -468,9 +483,10 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_w(boxes, Vector3(20, 26, 5), Vector3(4, 54, 4), "leaves", Color("7cbf4a"), "arm_r", rot, o)
 			_w(boxes, Vector3(20, 40, 5), Vector3(5.4, 3, 5.4), "leaves", Color("4e8c34"), "arm_r", rot, o)
 			_w(boxes, Vector3(20, 54, 5), Vector3(5.4, 3, 5.4), "leaves", Color("4e8c34"), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 40, 5.4), Vector3(5.6, 0.9, 0.8), "flat", Color("9bd968"), "arm_r", rot, o)
 			_w(boxes, Vector3(24, 76, 5), Vector3(10, 4, 3), "leaves", Color("9bd968"), "arm_r", rot, o)
 		"owl":
-			# 月光法杖握在右手；披风不变
+			# 月光法杖：月牙 + 发光核心；披风不变
 			_wrap(boxes, Vector3(20, 31, 6), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(8.0), 0, deg_to_rad(-8.0))
 			var o := Vector3(20, 30, 6)
@@ -478,13 +494,14 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_w(boxes, Vector3(20, 70, 6), Vector3(10, 4, 3), "gold", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(17, 74, 6), Vector3(4, 6, 3), "gold", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(23, 74, 6), Vector3(4, 6, 3), "gold", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 72.5, 6.0), Vector3(3, 3, 2), "glow", Color(1.0, 0.95, 0.72), "arm_r", rot, o)
 			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "navy", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "navy", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(-8, 30, -14.6), Vector3(2, 2, 1), "gold", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(2, 34, -14.6), Vector3(2, 2, 1), "gold", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(9, 26, -14.6), Vector3(2, 2, 1), "gold", Color.WHITE, {}, "body")
 		"axolotl":
-			# 贝壳盾贴前臂、向外转；悬浮水球不变
+			# 贝壳盾：盾心高光 + 浅色包边；悬浮水球
 			var srot := Vector3(0, deg_to_rad(20.0), deg_to_rad(2.0))
 			var so := Vector3(-21, 32, 2)
 			_w(boxes, Vector3(-23, 32, 2), Vector3(5, 20, 18), "cream", Color.WHITE, "arm_l", srot, so)
@@ -492,35 +509,46 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_w(boxes, Vector3(-24.6, 42, 2), Vector3(2, 3, 16), "pink", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-24.6, 48, 2), Vector3(2, 3, 12), "pink", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-25.4, 40, 2), Vector3(2, 6, 6), "pink", Color.WHITE, "arm_l", srot, so)
+			_w(boxes, Vector3(-25.9, 41, 2), Vector3(0.8, 3, 3), "flat", Color("fff3f5"), "arm_l", srot, so)
+			_w(boxes, Vector3(-24.9, 31, 2), Vector3(1.0, 1.2, 19), "flat", Color("fff3f5"), "arm_l", srot, so)
+			_w(boxes, Vector3(-24.9, 49, 2), Vector3(1.0, 1.2, 19), "flat", Color("fff3f5"), "arm_l", srot, so)
 			_b(boxes, Vector3(30, 60, 4), Vector3(6, 6, 6), "ice", Color(0.8, 0.96, 1.0), {}, "body")
 		"deer":
-			# 长弓握在左手；箭袋不变
+			# 长弓：弓臂加厚 + 搭箭；箭袋不变
 			_wrap(boxes, Vector3(-20, 31, 7), dark, "arm_l")
 			var rot := Vector3(deg_to_rad(6.0), 0, deg_to_rad(-6.0))
 			var o := Vector3(-20, 30, 7)
-			_w(boxes, Vector3(-21.5, 26, 7), Vector3(3, 10, 3), "wood", Color.WHITE, "arm_l", rot, o)
-			_w(boxes, Vector3(-21, 36, 7), Vector3(3, 12, 3), "wood", Color.WHITE, "arm_l", rot, o)
-			_w(boxes, Vector3(-21, 16, 7), Vector3(3, 12, 3), "wood", Color.WHITE, "arm_l", rot, o)
+			_w(boxes, Vector3(-21.5, 26, 7), Vector3(3.6, 10, 3.6), "wood", Color.WHITE, "arm_l", rot, o)
+			_w(boxes, Vector3(-21, 36, 7), Vector3(3.6, 12, 3.6), "wood", Color.WHITE, "arm_l", rot, o)
+			_w(boxes, Vector3(-21, 16, 7), Vector3(3.6, 12, 3.6), "wood", Color.WHITE, "arm_l", rot, o)
 			_w(boxes, Vector3(-20, 46, 7), Vector3(4, 3, 3), "wood", Color.WHITE, "arm_l", rot, o)
 			_w(boxes, Vector3(-20, 12, 7), Vector3(4, 3, 3), "wood", Color.WHITE, "arm_l", rot, o)
 			_w(boxes, Vector3(-19.2, 12, 7), Vector3(1, 37, 1), "flat", cream, "arm_l", rot, o)
+			_w(boxes, Vector3(-20, 31, 15), Vector3(1.2, 1.2, 14), "wood", Color.WHITE, "arm_l")
+			_w(boxes, Vector3(-20, 31, 23), Vector3(1.6, 1.6, 3), "flat", steel, "arm_l")
+			_w(boxes, Vector3(-20, 31, 9), Vector3(2.4, 2.4, 3), "flat", Color("e0604f"), "arm_l")
 			_b(boxes, Vector3(9, 28, -14), Vector3(6, 18, 5), "wood", Color.WHITE, {}, "body")
 			_b(boxes, Vector3(7, 46, -14), Vector3(2, 5, 1.5), "flat", cream, {}, "body")
 			_b(boxes, Vector3(9, 47, -14), Vector3(2, 5, 1.5), "flat", Color("e0604f"), {}, "body")
 			_b(boxes, Vector3(11, 46, -14), Vector3(2, 5, 1.5), "flat", cream, {}, "body")
 		"turtle":
-			# 大型木盾贴前臂、向外转；红肩甲不变
+			# 大型木盾：包边 + 盾心高光；红肩甲
 			var srot := Vector3(0, deg_to_rad(18.0), deg_to_rad(2.0))
 			var so := Vector3(-21, 32, 1)
 			_w(boxes, Vector3(-23.5, 33, 1), Vector3(4, 18, 20), "wood", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-23.5, 29, 1), Vector3(4, 4, 12), "wood", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-23.5, 51, 1), Vector3(4, 4, 12), "wood", Color.WHITE, "arm_l", srot, so)
 			_w(boxes, Vector3(-25.4, 37, 1), Vector3(2, 8, 8), "stone", Color(0.74, 0.77, 0.79), "arm_l", srot, so)
+			_w(boxes, Vector3(-25.9, 38, 1), Vector3(0.8, 3, 3), "flat", Color("f2f5f7"), "arm_l", srot, so)
+			_w(boxes, Vector3(-25.65, 50, 1), Vector3(1.0, 1.6, 19), "cream", Color.WHITE, "arm_l", srot, so)
+			_w(boxes, Vector3(-25.65, 30, 1), Vector3(1.0, 1.6, 19), "cream", Color.WHITE, "arm_l", srot, so)
+			_w(boxes, Vector3(-25.65, 33, 10.2), Vector3(1.0, 18, 1.2), "cream", Color.WHITE, "arm_l", srot, so)
+			_w(boxes, Vector3(-25.65, 33, -8.2), Vector3(1.0, 18, 1.2), "cream", Color.WHITE, "arm_l", srot, so)
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(21.0 * sx, 53, 0), Vector3(9, 4, 11), "flat", SCARF_RED,
 					{}, "arm_l" if sx < 0 else "arm_r")
 		"hedgehog":
-			# 双持短匕：绕各自手掌前倾/外张
+			# 双持短匕：刃口高光 + 握把遮挡
 			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
 			_wrap(boxes, Vector3(-20, 31, 5), dark, "arm_l")
 			for sx in [-1, 1]:
@@ -529,24 +557,26 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 				var o := Vector3(20.0 * sx, 30, 5)
 				_w(boxes, Vector3(20.0 * sx, 28, 5), Vector3(3, 8, 3), "wood", Color.WHITE, part, rot, o)
 				_w(boxes, Vector3(20.0 * sx, 36, 5), Vector3(3, 12, 2), "flat", steel, part, rot, o)
-				_w(boxes, Vector3(20.0 * sx, 48, 5), Vector3(3, 4, 2), "flat", Color("f4f8ff"), part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 36, 6.1), Vector3(1.0, 12, 0.6), "flat", lit, part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 48, 5), Vector3(3, 4, 2), "flat", lit, part, rot, o)
 			_b(boxes, Vector3(10, 40, 10.5), Vector3(2, 6, 2), "stone", Color(0.55, 0.5, 0.48))
 			_b(boxes, Vector3(13, 42, 10.5), Vector3(2, 6, 2), "stone", Color(0.55, 0.5, 0.48))
 			_b(boxes, Vector3(16, 40, 10.5), Vector3(2, 6, 2), "stone", Color(0.55, 0.5, 0.48))
 		"redpanda":
-			# 火焰长刀握在右手；尾焰不变
+			# 火焰长刀：刃口高光 + 发光尖；尾焰不变
 			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(10.0), 0, deg_to_rad(-15.0))
 			var o := Vector3(20, 30, 5)
 			_w(boxes, Vector3(20, 26, 5), Vector3(4, 10, 4), "wood", Color.WHITE, "arm_r", rot, o)
 			_w(boxes, Vector3(20, 36, 5), Vector3(10, 3, 4), "gold", Color.WHITE, "arm_r", rot, o)
-			_w(boxes, Vector3(20, 38.5, 5), Vector3(4, 24, 3), "flat", Color("f27a32"), "arm_r", rot, o)
-			_w(boxes, Vector3(20, 38.5, 5.8), Vector3(1.5, 20, 1), "flat", Color("ffd08a"), "arm_r", rot, o)
-			_w(boxes, Vector3(20, 62.5, 5), Vector3(4, 4, 2), "glow", Color(1.0, 0.85, 0.5), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 38.5, 5), Vector3(4, 26, 3), "flat", Color("f27a32"), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 38.5, 5.8), Vector3(1.5, 22, 1), "flat", Color("ffd08a"), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 38.5, 6.2), Vector3(1.0, 26, 0.5), "flat", Color("fff4d8"), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 64.5, 5), Vector3(4, 4, 2), "glow", Color(1.0, 0.85, 0.5), "arm_r", rot, o)
 			_b(boxes, Vector3(10, 48, -30), Vector3(6, 6, 5), "lava", Color.WHITE, {}, "tail")
 			_b(boxes, Vector3(10, 54, -30), Vector3(4, 5, 4), "glow", Color(1.0, 0.85, 0.5), {}, "tail")
 		"wolf":
-			# 双爪刃：从拳面伸出，略向下压
+			# 双爪刃：刃尖提亮 + 灰毛披风
 			for sx in [-1, 1]:
 				var part := "arm_l" if sx < 0 else "arm_r"
 				var rot := Vector3(deg_to_rad(-8.0), 0, deg_to_rad(-10.0 * sx))
@@ -555,11 +585,14 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 				_w(boxes, Vector3(20.0 * sx, 30, 1), Vector3(2.5, 10, 2), "flat", steel, part, rot, o)
 				_w(boxes, Vector3(20.0 * sx, 31, 4), Vector3(2.5, 11, 2), "flat", steel, part, rot, o)
 				_w(boxes, Vector3(20.0 * sx, 30, 7), Vector3(2.5, 10, 2), "flat", steel, part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 40, 1), Vector3(2.2, 1.6, 2), "flat", lit, part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 41, 4), Vector3(2.2, 1.6, 2), "flat", lit, part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 40, 7), Vector3(2.2, 1.6, 2), "flat", lit, part, rot, o)
 			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "fur", Color(0.72, 0.76, 0.82), {}, "body")
 			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "fur", Color(0.80, 0.84, 0.90), {}, "body")
 			_b(boxes, Vector3(0, 24, -14.2), Vector3(32, 3, 1.6), "flat", cream, {}, "body")
 		"crane":
-			# 鹤羽杖握在右手；云带不变
+			# 鹤羽杖：珠光核心；云带不变
 			_wrap(boxes, Vector3(20, 31, 6), dark, "arm_r")
 			var rot := Vector3(deg_to_rad(8.0), 0, deg_to_rad(-8.0))
 			var o := Vector3(20, 30, 6)
@@ -568,6 +601,7 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_w(boxes, Vector3(20, 72, 6), Vector3(6, 10, 2), "flat", Color("fbfaf2"), "arm_r", rot, o)
 			_w(boxes, Vector3(23, 70, 6), Vector3(6, 10, 2), "flat", cream, "arm_r", rot, o)
 			_w(boxes, Vector3(20, 82, 6), Vector3(5, 5, 5), "ice", Color(0.85, 0.97, 1.0), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 83, 6.2), Vector3(2.4, 2.4, 2), "glow", Color(0.95, 1.0, 1.0), "arm_r", rot, o)
 			_b(boxes, Vector3(-10, 40, -12), Vector3(14, 4, 3), "ice", Color(0.75, 0.93, 1.0), {}, "body")
 			_b(boxes, Vector3(-16, 34, -13), Vector3(10, 4, 3), "ice", Color(0.80, 0.95, 1.0), {}, "body")
 			_b(boxes, Vector3(-20, 28, -14), Vector3(8, 4, 3), "ice", Color(0.85, 0.96, 1.0), {}, "body")
