@@ -54,6 +54,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
   gh release create v<版本> "TapArena-v<版本>.apk" --title "..." --notes-file <临时 md 文件>
   ```
   Release 说明从 CHANGELOG 最新条目同步；含 `[x]` 等字符时**必须**用 `--notes-file`，不要用 `--notes`。
+- 发布后**同步更新 SCTale 工坊站点**（技能 `sctale-workshop-publish`）：改 `D:\V-Coding\sctale-workshop\site-data.js` 的 TapArena `release` 段 → `sync-dist.sh` → `verify-site.mjs` → Qoder Sites 发布并核验线上版本。
 
 ## 4. 版本与文档规则
 
