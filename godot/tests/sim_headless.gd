@@ -186,6 +186,14 @@ func _init() -> void:
 		for issue in lv_issues:
 			print("LEVEL_FAIL " + issue)
 
+	var boss_issues := _boss_checks()
+	if boss_issues.is_empty():
+		print("BOSS_OK attack/ai/flying/ground")
+	else:
+		failures += 1
+		for issue in boss_issues:
+			print("BOSS_FAIL " + issue)
+
 	if failures == 0:
 		print("SIM_OK matches=%d dt=%.4f" % [MATCHES, DT])
 		quit(0)
@@ -1521,4 +1529,55 @@ func _targeting_checks() -> Array:
 	e4.prev_pos = e4.pos
 	if s4._chain_target(p4, p4.pos, 320.0, []) != e4:
 		issues.append("月链首跳没有优先英雄")
+	return issues
+
+
+func _boss_checks() -> Array:
+	# 4.22：巨兽（含飞行形态）必须进入英雄普攻/AI 选敌，并真的掉血。
+	var issues: Array = []
+	for flying in [false, true]:
+		var tag: String = "飞行" if flying else "地面"
+		var sim = BattleSimScript.new()
+		sim.setup("tiger", 0, 880)
+		# 巨兽属于领先方；给红方，蓝方玩家与队友就是它的敌人。
+		sim.spawn_boss(BattleSimScript.RED)
+		var boss = sim.boss
+		if boss == null:
+			issues.append(tag + "巨兽没有生成")
+			continue
+		boss.boss_phase = 2 if flying else 1
+		boss.boss_flying = flying
+		boss.stun_t = 4.0
+		boss.invuln_t = 0.0
+		# 清掉红方英雄/小兵：巨兽刷在红方基地旁，不清场会被优先打英雄，测不到选敌分支。
+		for u in sim.heroes:
+			if u.team == BattleSimScript.RED:
+				u.hp = 0.0
+		for m in sim.minions:
+			if m.team == BattleSimScript.RED:
+				m.hp = 0.0
+		var h = sim.player
+		h.pos = boss.pos + Vector2(60, 0)
+		h.prev_pos = h.pos
+		h.hp = h.max_hp
+		h.atk_timer = 0.0
+		if sim.pick_attack_target(h) != boss:
+			issues.append(tag + "巨兽普攻选不中")
+		var before: float = boss.hp
+		sim.step(1.0 / 60.0)
+		if boss.hp >= before:
+			issues.append(tag + "巨兽贴脸一步后没有掉血")
+		# AI 英雄：红方英雄已清场，巨兽是唯一敌方目标，验证 ai_target 会集火。
+		var ally = null
+		for u in sim.heroes:
+			if u != h and u.team == h.team:
+				ally = u
+				break
+		if ally == null:
+			issues.append(tag + "缺少蓝方 AI 队友")
+		else:
+			ally.pos = boss.pos + Vector2(0, 70)
+			ally.prev_pos = ally.pos
+			if sim.ai_target(ally) != boss:
+				issues.append(tag + "巨兽 AI 不集火")
 	return issues

@@ -131,6 +131,8 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	view.process_priority = 0
 	add_child(view)
 	view.attach(sim)
+	if sfx != null:
+		view.set_audio_enabled(sfx.enabled)
 
 	cam = CameraRigScript.new()
 	add_child(cam)
@@ -171,6 +173,14 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 		camera_follow = false
 		cam.set_target(Vector3(1900, 0, 800))
 		cam.snap()
+	# 调试：--look-at=540,3060 对准任意地图坐标，用于 5v5 基地/河道近景核对。
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--look-at="):
+			var parts: PackedStringArray = str(a).substr(10).split(",")
+			if parts.size() == 2:
+				camera_follow = false
+				cam.set_target(Vector3(float(parts[0]), 0.0, float(parts[1])))
+				cam.snap()
 	# 调试：把玩家放到蓝方内塔后方，检查建筑半透明。
 	if "--behind" in OS.get_cmdline_user_args():
 		sim.player.pos = Vector2(700, 650)
@@ -424,6 +434,8 @@ func _toggle_sound() -> void:
 	if sfx == null:
 		return
 	sfx.set_enabled(not sfx.enabled)
+	if view != null:
+		view.set_audio_enabled(sfx.enabled)
 	if hud != null:
 		hud.sound_on = sfx.enabled
 		hud.queue_redraw()

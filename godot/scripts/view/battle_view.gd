@@ -46,11 +46,17 @@ var audio_atk: Dictionary = {}
 var audio_ult: Dictionary = {}
 var audio_pool: Array = []
 var audio_next := 0
+var voice_pool: Array = []
+var voice_next := 0
 var audio_queue: Array = []
 var ult_last_ms: Dictionary = {}
+var bgm_bus := -1
+var bgm_duck_t := 0.0
 var rng := RandomNumberGenerator.new()
 var sync_us_total := 0
 var sync_frames := 0
+# 散布点快照（调试/自检用，不参与渲染）。
+var scatter_spots: Dictionary = {}
 
 const C_BLUE := Color("4fc3e8")
 const C_RED := Color("f0845c")
@@ -278,11 +284,14 @@ func _near_lane(x: float, z: float, margin := 145.0) -> bool:
 	return false
 
 
-func _near_structure(x: float, z: float, margin := 260.0) -> bool:
-	# 花草不压建筑：基地/塔附近留空，避免长在祭坛上。
+func _near_structure(x: float, z: float, margin := 260.0, base_margin := -1.0) -> bool:
+	# 花草/树木不压建筑：塔与基地可给不同边距，树冠比草大，基地要留得更开。
 	for u in sim.units:
 		if u.kind == sim.TOWER or u.kind == sim.BASE:
-			if Vector2(x, z).distance_to(u.pos) < margin + u.radius:
+			var m := margin
+			if u.kind == sim.BASE and base_margin > 0.0:
+				m = base_margin
+			if Vector2(x, z).distance_to(u.pos) < m + u.radius:
 				return true
 	return false
 
@@ -376,16 +385,19 @@ func _build_scatter() -> void:
 			for tries in range(8):
 				var x := rng.randf_range(140.0, sim.map_w - 140.0)
 				var z := rng.randf_range(140.0, sim.map_h - 140.0)
-				if _near_lane(x, z, 170.0) or _near_river(x, z, 210.0):
+				if _near_lane(x, z, 170.0) or _near_river(x, z, 210.0) \
+						or _near_structure(x, z, 300.0, 600.0):
 					continue
 				spots.append(Vector3(x, 0, z))
 				break
 		mm.instance_count = spots.size()
+		scatter_spots["tree_%d" % v] = spots.duplicate()
 		for k in range(spots.size()):
 			var s := rng.randf_range(0.85, 1.35)
 			mm.set_instance_transform(k, Transform3D(
 				Basis.IDENTITY.scaled(Vector3(s, s, s)).rotated(Vector3.UP, rng.randf_range(0.0, TAU)), spots[k]))
 		var node := MultiMeshInstance3D.new()
+		node.name = "scatter_tree_%d" % v
 		node.multimesh = mm
 		node.material_override = _mesh_material(mesh)
 		node.cast_shadow = tree_shadow
@@ -401,14 +413,17 @@ func _build_scatter() -> void:
 			for tries in range(8):
 				var x := rng.randf_range(180.0, sim.map_w - 180.0)
 				var z := rng.randf_range(180.0, sim.map_h - 180.0)
-				if _near_lane(x, z, 170.0) or _near_river(x, z, 210.0):
+				if _near_lane(x, z, 170.0) or _near_river(x, z, 210.0) \
+						or _near_structure(x, z, 260.0, 400.0):
 					continue
 				rock_spots.append(Vector3(x, 0, z))
 				break
 		rmm.instance_count = rock_spots.size()
+		scatter_spots["rock_%d" % v] = rock_spots.duplicate()
 		for k in range(rock_spots.size()):
 			rmm.set_instance_transform(k, Transform3D(Basis.IDENTITY, rock_spots[k]))
 		var rnode := MultiMeshInstance3D.new()
+		rnode.name = "scatter_rock_%d" % v
 		rnode.multimesh = rmm
 		rnode.material_override = _mesh_material(rmesh)
 		rnode.cast_shadow = tree_shadow
@@ -692,6 +707,7 @@ func _process(delta: float) -> void:
 	_step_sprouts(delta)
 	_step_clouds(delta)
 	_flush_audio()
+	_step_bgm_duck(delta)
 	glint_t += delta
 	if glint_t >= 0.55:
 		glint_t = 0.0
@@ -1306,6 +1322,19 @@ func _build_audio() -> void:
 		p.bus = bus
 		add_child(p)
 		audio_pool.append(p)
+	# 台词单独成池：普攻每秒约 9 次，会和 1–3 秒的台词抢同一个播放器把话掐断。
+	# 低通也要关掉，默认 -24 dB @5 kHz 会把台词的辅音削成闷声。
+	for i in range(4):
+		var v := AudioStreamPlayer3D.new()
+		v.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+		v.unit_size = 600.0
+		v.max_distance = 1500.0
+		v.max_db = 0.0
+		v.attenuation_filter_db = 0.0
+		v.bus = bus
+		add_child(v)
+		voice_pool.append(v)
+	bgm_bus = AudioServer.get_bus_index("BGM")
 
 
 func _queue_atk(u) -> void:
@@ -1329,36 +1358,102 @@ func _queue_ult(u) -> void:
 	ult_last_ms[id] = now
 	var rp: Vector2 = sim.render_pos(u)
 	audio_queue.append({"stream": stream, "pos": Vector3(rp.x, 34.0, rp.y),
-		"pitch": 1.0, "volume": -5.0})
+		"pitch": 1.0, "volume": -1.0, "voice": true})
 
 
 func _flush_audio() -> void:
-	# 同帧最多 6 个音效源；超出按与听者（玩家）距离丢弃最远的。
+	# 同帧最多 6 个音效源：语音单独成池并先占位（最多 2 条），普攻音效再补满，
+	# 不再出现「脚边 6 个普攻把远处队友台词按距离丢掉」。
 	if audio_queue.is_empty():
 		return
 	var listen := Vector2.ZERO
 	if sim.player != null:
 		listen = sim.render_pos(sim.player)
-	var reqs: Array = []
+	var voices: Array = []
+	var effects: Array = []
 	for req in audio_queue:
 		var p: Vector3 = req["pos"]
 		var d: float = Vector2(p.x, p.z).distance_to(listen)
-		if d <= 1500.0:
-			req["d"] = d
-			reqs.append(req)
+		if d > 1500.0:
+			continue
+		req["d"] = d
+		if bool(req.get("voice", false)):
+			voices.append(req)
+		else:
+			effects.append(req)
 	audio_queue.clear()
-	if reqs.is_empty():
+	voices.sort_custom(func(a, b): return float(a["d"]) < float(b["d"]))
+	effects.sort_custom(func(a, b): return float(a["d"]) < float(b["d"]))
+	var played := 0
+	for req in voices:
+		if played >= 2:
+			break
+		_play_voice(req)
+		played += 1
+	for req in effects:
+		if played >= 6:
+			break
+		_play_effect(req)
+		played += 1
+
+
+func _play_voice(req: Dictionary) -> void:
+	var player: AudioStreamPlayer3D = null
+	for p in voice_pool:
+		if not p.playing:
+			player = p
+			break
+	if player == null and not voice_pool.is_empty():
+		player = voice_pool[voice_next]
+		voice_next = (voice_next + 1) % voice_pool.size()
+	if player == null:
 		return
-	reqs.sort_custom(func(a, b): return float(a["d"]) < float(b["d"]))
-	for i in range(mini(6, reqs.size())):
-		var req: Dictionary = reqs[i]
-		var player: AudioStreamPlayer3D = audio_pool[audio_next]
-		audio_next = (audio_next + 1) % audio_pool.size()
-		player.stream = req["stream"]
-		player.position = req["pos"]
-		player.pitch_scale = float(req["pitch"])
-		player.volume_db = float(req["volume"])
-		player.play()
+	player.stream = req["stream"]
+	player.position = req["pos"]
+	player.pitch_scale = float(req.get("pitch", 1.0))
+	player.volume_db = float(req["volume"])
+	player.play()
+	# 近距台词把 BGM 压下去，保证字听得清；远处队友台词只保留 3D 衰减，不打扰音乐。
+	if bgm_bus != -1 and float(req["d"]) <= 700.0:
+		var length: float = 2.0
+		var stream = req["stream"]
+		if stream != null:
+			length = float(stream.get_length())
+		bgm_duck_t = maxf(bgm_duck_t, length + 0.25)
+
+
+func _play_effect(req: Dictionary) -> void:
+	var player: AudioStreamPlayer3D = audio_pool[audio_next]
+	audio_next = (audio_next + 1) % audio_pool.size()
+	player.stream = req["stream"]
+	player.position = req["pos"]
+	player.pitch_scale = float(req["pitch"])
+	player.volume_db = float(req["volume"])
+	player.play()
+
+
+func _step_bgm_duck(delta: float) -> void:
+	if bgm_bus == -1:
+		return
+	bgm_duck_t = maxf(0.0, bgm_duck_t - delta)
+	var target := -9.0 if bgm_duck_t > 0.0 else 0.0
+	var cur := AudioServer.get_bus_volume_db(bgm_bus)
+	# 压下约 0.12 秒，台词结束后约 0.35 秒恢复。
+	var speed := 75.0 if target < cur else 26.0
+	AudioServer.set_bus_volume_db(bgm_bus, move_toward(cur, target, speed * delta))
+
+
+func set_audio_enabled(on: bool) -> void:
+	# 声音开关要一并管住 3D 语音/普攻：它们直接播在 SFX 总线上，不走 Sfx.play。
+	var bus := AudioServer.get_bus_index("SFX")
+	if bus != -1:
+		AudioServer.set_bus_mute(bus, not on)
+
+
+func _exit_tree() -> void:
+	# 对局中途退出时把 BGM 总线还原，避免下一局音乐一直是压低的。
+	if bgm_bus != -1:
+		AudioServer.set_bus_volume_db(bgm_bus, 0.0)
 
 
 func _weapon_strike(u) -> void:

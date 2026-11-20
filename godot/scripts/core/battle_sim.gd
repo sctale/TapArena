@@ -1950,6 +1950,8 @@ func ai_target(h):
 				score = base_w - d * 0.08
 				if sudden_death:
 					score += 500.0
+			BOSS:
+				score = float(ai_cfg.get("boss_weight", 300.0)) - d * float(ai_cfg.get("boss_dist", 0.3))
 		if o == h.ai_target:
 			score += sticky
 		if score > best_score:
@@ -2582,6 +2584,10 @@ func pick_attack_target(h):
 				score = _tcfg("tower_weight", 400.0) - d * _tcfg("tower_dist", 0.2)
 			BASE:
 				score = _tcfg("base_weight", 200.0) - d * _tcfg("base_dist", 0.1)
+			BOSS:
+				# 巨兽属于领先方，被另一方视作敌方单位；不补这一支，普攻永远选不中它。
+				score = _tcfg("boss_weight", 2600.0) - d * _tcfg("boss_dist", 0.35) \
+					+ missing * _tcfg("boss_focus_hp", 300.0)
 		if u == h.atk_target:
 			score += _tcfg("sticky", 280.0)
 		if u == h.ai_target:
