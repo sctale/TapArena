@@ -7,6 +7,15 @@ extends Control
 signal start_requested(hero_id: String, difficulty: int, mode_5v5: bool)
 signal ui_click
 
+
+class GridCanvas extends Control:
+	# 只负责画网格内容；由父 Control 的 clip_contents 裁掉视口外的部分。
+	var home = null
+
+	func _draw() -> void:
+		if home != null:
+			home._draw_grid(self)
+
 const HeroPortraitsScript = preload("res://scripts/art/hero_portraits.gd")
 const GRID_COLS := 5
 const GRID_ROWS_VISIBLE := 2
@@ -40,6 +49,13 @@ var drag_active := false
 var drag_start := Vector2.ZERO
 var drag_start_scroll := 0.0
 var drag_moved := false
+var grid_clip: Control = null
+var grid_canvas: Control = null
+var scroll_track: ColorRect = null
+var scroll_thumb: ColorRect = null
+var scroll_velocity := 0.0
+var momentum_active := false
+var drag_last_ms := 0
 
 var lbl_title: Label
 var lbl_sub: Label
@@ -83,6 +99,7 @@ func _ready() -> void:
 	icons = load("res://scripts/art/pixel_icons.gd").new()
 	portraits = HeroPortraitsScript.new()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_build_grid_layer()
 	_load_heroes()
 	_make_labels()
 	detail_open = "--detail" in OS.get_cmdline_user_args()
@@ -92,7 +109,14 @@ func _ready() -> void:
 	_refresh_labels()
 	if "--grid-bottom" in OS.get_cmdline_user_args():
 		_set_grid_bottom.call_deferred()
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--grid-scroll="):
+			_apply_scroll_debug.call_deferred(float(str(a).substr(14)))
 	set_process(true)
+
+
+func _apply_scroll_debug(v: float) -> void:
+	set_grid_scroll(v)
 
 
 func _set_grid_bottom() -> void:
@@ -142,6 +166,8 @@ func _apply_mode() -> void:
 		heroes.append(d)
 	sel_index = clampi(sel_index, 0, maxi(0, heroes.size() - 1))
 	grid_scroll = 0.0
+	scroll_velocity = 0.0
+	momentum_active = false
 	detail_open = false
 
 
@@ -211,10 +237,136 @@ func max_grid_scroll() -> float:
 	return maxf(0.0, _grid_content_h() - _grid_rect().size.y)
 
 
+func _build_grid_layer() -> void:
+	# 独立的裁剪层：卡片在子 CanvasItem 里画，视口外的部分由 clip_contents 裁掉。
+	grid_clip = Control.new()
+	grid_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid_clip.clip_contents = true
+	add_child(grid_clip)
+	grid_canvas = GridCanvas.new()
+	grid_canvas.home = self
+	grid_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid_clip.add_child(grid_canvas)
+	scroll_track = ColorRect.new()
+	scroll_track.color = Color(0, 0, 0, 0.22)
+	scroll_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(scroll_track)
+	scroll_thumb = ColorRect.new()
+	scroll_thumb.color = Color(1, 1, 1, 0.5)
+	scroll_thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(scroll_thumb)
+
+
+func _layout_grid_layer() -> void:
+	if grid_clip == null:
+		return
+	var g := _grid_rect()
+	grid_clip.position = g.position
+	grid_clip.size = g.size
+	grid_clip.visible = not detail_open
+	grid_canvas.size = Vector2(g.size.x, maxf(_grid_content_h(), g.size.y))
+	grid_canvas.position = Vector2(0, -grid_scroll)
+	grid_canvas.queue_redraw()
+	_update_scrollbar()
+
+
+func _update_scrollbar() -> void:
+	if scroll_track == null:
+		return
+	var g := _grid_rect()
+	var ms := max_grid_scroll()
+	var show := ms > 0.5 and not detail_open
+	scroll_track.visible = show
+	scroll_thumb.visible = show
+	if not show:
+		return
+	scroll_track.position = Vector2(g.end.x - 5, g.position.y)
+	scroll_track.size = Vector2(4, g.size.y)
+	var th := maxf(28.0, g.size.y * g.size.y / maxf(1.0, _grid_content_h()))
+	var ty := g.position.y + (g.size.y - th) * clampf(grid_scroll / ms, 0.0, 1.0)
+	scroll_thumb.position = Vector2(g.end.x - 5, ty)
+	scroll_thumb.size = Vector2(4, th)
+
+
 func set_grid_scroll(v: float) -> void:
+	momentum_active = false
+	scroll_velocity = 0.0
 	grid_scroll = clampf(v, 0.0, max_grid_scroll())
-	_refresh_labels()
+	if grid_canvas != null:
+		grid_canvas.position.y = -grid_scroll
+	_update_scrollbar()
 	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	# 松手后的惯性滚动：连续减速，不再整排吸附。
+	if not momentum_active or detail_open or grid_canvas == null:
+		return
+	var ms := max_grid_scroll()
+	if ms <= 0.0:
+		momentum_active = false
+		return
+	var next := grid_scroll + scroll_velocity * delta
+	if next <= 0.0 or next >= ms:
+		grid_scroll = clampf(next, 0.0, ms)
+		scroll_velocity = 0.0
+		momentum_active = false
+	else:
+		grid_scroll = next
+		scroll_velocity *= exp(-6.0 * delta)
+		if absf(scroll_velocity) < 10.0:
+			scroll_velocity = 0.0
+			momentum_active = false
+	grid_canvas.position.y = -grid_scroll
+	_update_scrollbar()
+
+
+func _panel_on(ci: CanvasItem, r: Rect2, fill: Color) -> void:
+	ci.draw_rect(r, fill)
+	_outline_on(ci, r, PANEL_LIGHT, 2.0)
+	ci.draw_rect(Rect2(r.position.x + 2, r.end.y - 4, r.size.x - 4, 2), PANEL_DARK)
+	ci.draw_rect(Rect2(r.end.x - 4, r.position.y + 2, 2, r.size.y - 4), PANEL_DARK)
+
+
+func _outline_on(ci: CanvasItem, r: Rect2, c: Color, t: float) -> void:
+	ci.draw_rect(Rect2(r.position.x, r.position.y, r.size.x, t), c)
+	ci.draw_rect(Rect2(r.position.x, r.end.y - t, r.size.x, t), c)
+	ci.draw_rect(Rect2(r.position.x, r.position.y, t, r.size.y), c)
+	ci.draw_rect(Rect2(r.end.x - t, r.position.y, t, r.size.y), c)
+
+
+func _draw_grid(ci: Control) -> void:
+	# 画在可裁剪的画布上：位置本身随 grid_scroll 移动，滚动时不需要重画 20 张卡。
+	var cs := _grid_card_size()
+	var gap := _grid_gap()
+	var fs := int(_safe().size.y * 0.028)
+	for i in range(heroes.size()):
+		var col := i % GRID_COLS
+		var row := i / GRID_COLS
+		var card := Rect2(Vector2(float(col) * (cs.x + gap), float(row) * (cs.y + gap)), cs)
+		var selected := i == sel_index
+		_panel_on(ci, card, Color("2f4038") if selected else PANEL_DEEP)
+		if selected:
+			_outline_on(ci, card, GOLD, 4.0)
+		var d: Dictionary = heroes[i]
+		var pad := card.size.y * 0.055
+		var av := minf(card.size.x - pad * 2.0, card.size.y * 0.66)
+		var ar := Rect2(card.get_center().x - av * 0.5, card.position.y + pad, av, av)
+		ci.draw_rect(Rect2(ar.position - Vector2(4, 4), ar.size + Vector2(8, 8)), PANEL_DARK)
+		var portrait: Texture2D = portraits.portrait(str(d.get("id", "tiger")),
+			d.get("fur_c", Color.WHITE), d.get("cream_c", Color.WHITE),
+			d.get("dark_c", Color.BLACK), d.get("accent_c", Color.WHITE))
+		ci.draw_texture_rect(portrait, ar, false)
+		_outline_on(ci, Rect2(ar.position - Vector2(2, 2), ar.size + Vector2(4, 4)),
+			GOLD if selected else Color(0.86, 0.93, 0.84, 0.35), 2.0)
+		ci.draw_rect(Rect2(card.position.x + 8, card.end.y - 8, card.size.x - 16, 3),
+			d.get("accent_c", GOLD))
+		var nr := Rect2(card.position.x, card.position.y + av + pad * 0.7,
+			card.size.x, card.size.y * 0.19)
+		var label := "%s · %s" % [str(d.get("name", "?")), str(d.get("role", ""))]
+		var baseline := nr.position.y + nr.size.y * 0.5 + float(fs) * 0.36
+		ci.draw_string(font, Vector2(nr.position.x, baseline), label,
+			HORIZONTAL_ALIGNMENT_CENTER, nr.size.x, fs, GOLD if selected else CREAM)
 
 
 func _card_fully_visible(card: Rect2) -> bool:
@@ -365,12 +517,6 @@ func _make_labels() -> void:
 	lbl_mode_tag = _mk_label(int(h * 0.020), Color(1, 1, 1, 0.62), HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_diff_tag = _mk_label(int(h * 0.020), Color(1, 1, 1, 0.62), HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_foot = _mk_label(int(h * 0.020), Color(1, 1, 1, 0.72), HORIZONTAL_ALIGNMENT_RIGHT)
-	for i in range(all_heroes.size()):
-		hero_name_labels.append(_mk_label(int(h * 0.028), CREAM, HORIZONTAL_ALIGNMENT_CENTER))
-		var blurb := _mk_label(int(h * 0.018), Color(0.92, 0.96, 0.90, 0.82), HORIZONTAL_ALIGNMENT_LEFT)
-		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		hero_blurb_labels.append(blurb)
-
 	# 详情弹窗文字：人物标题 / 定位 / 介绍 / 三技能。
 	lbl_detail_name = _mk_label(int(h * 0.038), GOLD, HORIZONTAL_ALIGNMENT_LEFT)
 	lbl_detail_sub = _mk_label(int(h * 0.022), CREAM, HORIZONTAL_ALIGNMENT_LEFT)
@@ -401,21 +547,6 @@ func _refresh_labels() -> void:
 	lbl_title.text = "萌兽峡谷"
 	_place(lbl_sub, _sub_rect())
 	lbl_sub.text = "选一只小动物 · 点开卡片看技能 · 推掉对面的蘑菇塔"
-
-	for i in range(heroes.size()):
-		var d: Dictionary = heroes[i]
-		var card := card_rect(i)
-		var pad := card.size.y * 0.055
-		var av := minf(card.size.x - pad * 2.0, card.size.y * 0.66)
-		_place(hero_name_labels[i], Rect2(card.position.x, card.position.y + av + pad * 0.7,
-			card.size.x, card.size.y * 0.19))
-		hero_name_labels[i].text = "%s · %s" % [str(d.get("name", "?")), str(d.get("role", ""))]
-		hero_name_labels[i].add_theme_color_override("font_color",
-			GOLD if i == sel_index else CREAM)
-		hero_name_labels[i].visible = (not detail_open) and _card_fully_visible(card)
-		hero_blurb_labels[i].visible = false
-	for i in range(heroes.size(), hero_name_labels.size()):
-		hero_name_labels[i].visible = false
 
 	_place(lbl_mode3, mode3_rect())
 	lbl_mode3.text = "3v3"
@@ -495,6 +626,7 @@ func _refresh_labels() -> void:
 	for l in [lbl_detail_name, lbl_detail_sub, lbl_detail_blurb, lbl_detail_tip,
 			lbl_detail_mode, lbl_detail_close, lbl_detail_start]:
 		l.visible = detail_open
+	_layout_grid_layer()
 
 
 # ---- 绘制 ----
@@ -524,45 +656,6 @@ func _draw() -> void:
 	var safe := _safe()
 	_panel(_brand_rect(), PANEL_FILL)
 	_panel(_version_badge_rect(), PANEL_DEEP)
-
-	var grid_r := _grid_rect()
-	for i in range(heroes.size()):
-		var card := card_rect(i)
-		var vis := card.intersection(grid_r)
-		if vis.size.x <= 0.0 or vis.size.y <= 0.0:
-			continue
-		var selected := i == sel_index
-		if not _card_fully_visible(card):
-			# 滚到视口边缘的半张卡只画底板，头像/名字等滚全了再出现。
-			draw_rect(vis, Color("2f4038") if selected else PANEL_DEEP)
-			continue
-		_panel(card, Color("2f4038") if selected else PANEL_DEEP)
-		if selected:
-			_outline(card, GOLD, 4.0)
-		var d: Dictionary = heroes[i]
-		var pad := card.size.y * 0.055
-		var av := minf(card.size.x - pad * 2.0, card.size.y * 0.66)
-		var ar := Rect2(card.get_center().x - av * 0.5, card.position.y + pad, av, av)
-		draw_rect(Rect2(ar.position - Vector2(4, 4), ar.size + Vector2(8, 8)), PANEL_DARK)
-		var portrait: Texture2D = portraits.portrait(str(d.get("id", "tiger")),
-			d.get("fur_c", Color.WHITE), d.get("cream_c", Color.WHITE),
-			d.get("dark_c", Color.BLACK), d.get("accent_c", Color.WHITE))
-		draw_texture_rect(portrait, ar, false)
-		_outline(Rect2(ar.position - Vector2(2, 2), ar.size + Vector2(4, 4)),
-			GOLD if selected else Color(0.86, 0.93, 0.84, 0.35), 2.0)
-		# 卡底职业色条
-		draw_rect(Rect2(card.position.x + 8, card.end.y - 8, card.size.x - 16, 3),
-			d.get("accent_c", GOLD))
-
-	# 滚动条：内容超过两排时显示，提示下面还有人物。
-	var max_s := max_grid_scroll()
-	if max_s > 0.5:
-		var track := Rect2(grid_r.end.x - 5.0, grid_r.position.y, 4.0, grid_r.size.y)
-		draw_rect(track, Color(0, 0, 0, 0.22))
-		var frac := grid_r.size.y / _grid_content_h()
-		var th := maxf(28.0, grid_r.size.y * frac)
-		var ty := grid_r.position.y + (grid_r.size.y - th) * (grid_scroll / max_s)
-		draw_rect(Rect2(track.position.x, ty, 4.0, th), Color(1, 1, 1, 0.5))
 
 	_panel(_bar_rect(), PANEL_DEEP)
 
@@ -689,10 +782,8 @@ func _input(event: InputEvent) -> void:
 				_release(event.position)
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			set_grid_scroll(grid_scroll - _grid_card_size().y * 0.45)
-			_snap_grid_scroll()
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			set_grid_scroll(grid_scroll + _grid_card_size().y * 0.45)
-			_snap_grid_scroll()
 	elif event is InputEventMouseMotion and drag_active:
 		_drag_to(event.position)
 
@@ -702,9 +793,12 @@ func _press(pos: Vector2) -> void:
 		_tap(pos)
 		return
 	# 只有从网格里按下才可能是滚动；按钮仍按下即生效，保持原来的手感。
+	momentum_active = false
+	scroll_velocity = 0.0
 	drag_active = _grid_rect().has_point(pos)
 	drag_start = pos
 	drag_start_scroll = grid_scroll
+	drag_last_ms = Time.get_ticks_msec()
 	drag_moved = false
 	if not drag_active:
 		_tap(pos)
@@ -714,10 +808,21 @@ func _drag_to(pos: Vector2) -> void:
 	if not drag_active:
 		return
 	var dy := pos.y - drag_start.y
-	if absf(dy) > 10.0:
+	if absf(dy) > 6.0:
 		drag_moved = true
-	if drag_moved:
-		set_grid_scroll(drag_start_scroll - dy)
+	if not drag_moved:
+		return
+	var prev := grid_scroll
+	grid_scroll = clampf(drag_start_scroll - dy, 0.0, max_grid_scroll())
+	var now := Time.get_ticks_msec()
+	var dt := maxf(0.001, float(now - drag_last_ms) / 1000.0)
+	if now > drag_last_ms:
+		var inst := (grid_scroll - prev) / dt
+		scroll_velocity = clampf(lerpf(scroll_velocity, inst, 0.5), -4000.0, 4000.0)
+	drag_last_ms = now
+	if grid_canvas != null:
+		grid_canvas.position.y = -grid_scroll
+	_update_scrollbar()
 
 
 func _release(pos: Vector2) -> void:
@@ -725,17 +830,11 @@ func _release(pos: Vector2) -> void:
 		return
 	drag_active = false
 	if drag_moved:
-		_snap_grid_scroll()
+		momentum_active = absf(scroll_velocity) > 120.0
+		if not momentum_active:
+			scroll_velocity = 0.0
 	else:
 		_tap(pos)
-
-
-func _snap_grid_scroll() -> void:
-	# 松手后按整排吸附，避免停在两排之间露出半张空卡。
-	var step := _grid_card_size().y + _grid_gap()
-	if step <= 1.0:
-		return
-	set_grid_scroll(roundf(grid_scroll / step) * step)
 
 
 func _tap(pos: Vector2) -> void:

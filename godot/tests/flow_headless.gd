@@ -33,7 +33,14 @@ func _process(_delta: float) -> bool:
 			main.home.set_grid_scroll(0.0)
 			# 网格内上滑应产生滚动，且松手不误触卡片。
 			var gc: Vector2 = grid_vp.get_center()
+			var step: float = main.home._grid_card_size().y + main.home._grid_gap()
 			main.home._press(gc)
+			main.home._drag_to(gc + Vector2(0, -50))
+			var partial: float = main.home.grid_scroll
+			if partial <= 1.0:
+				failures.append("小幅拖动没有滚动")
+			if absf(partial - roundf(partial / step) * step) < 2.0:
+				failures.append("滚动仍按整排吸附")
 			main.home._drag_to(gc + Vector2(0, -400))
 			main.home._release(gc + Vector2(0, -400))
 			if main.home.grid_scroll <= 1.0:
@@ -282,6 +289,8 @@ func _check_roster_art() -> void:
 				failures.append("%s/%s 调色板 %d 超过 64" % [id, part, palette.size()])
 			if int(mesh.get_meta("palette_overflow", 0)) > 0:
 				failures.append("%s/%s 调色板溢出" % [id, part])
+		if not main.view.HERO_DESIGN_H.has(str(id)):
+			failures.append(str(id) + " 缺少设计身高")
 		if portraits.portrait(str(id), fur, cream, dark, accent) == null:
 			failures.append(str(id) + " 头像生成失败")
 		if icons.ult_icon(str(id)) == null:
