@@ -1670,6 +1670,8 @@ func _roster_checks() -> Array:
 		for i in range(3):
 			h.cds[i] = 0.0
 			sim.try_cast(h, i)
+			if h.cast_index != i or str(h.cast_kind) != str(h.skills[i].get("kind", "")):
+				issues.append("%s 技能%d 施法索引/类型没有写入" % [id, i])
 			for k in range(10):
 				sim.step(1.0 / 60.0)
 		if is_nan(h.hp) or is_nan(h.pos.x) or is_nan(h.pos.y):

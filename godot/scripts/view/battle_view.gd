@@ -5,6 +5,8 @@ extends Node3D
 # 4.14 起视觉对齐宣传片：太阳光 + 实时阴影 + FILMIC 影调 + 环境点缀；
 # 模型仍走像素图集 + 调色板（不写 ALPHA），面明暗只做轻量烘焙避免双重压暗。
 
+const CAST_ACTIONS := ["spin", "twirl", "slam", "stomp", "charge", "cast",
+	"slash", "roar", "pray", "crouch", "dive", "none"]
 const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
 	"panda": 88.0, "owl": 88.0, "axolotl": 88.0, "deer": 88.0,
@@ -538,6 +540,49 @@ func _hero_scale(u) -> float:
 	return float(u.height) / design
 
 
+func cast_action_for(hero_id: String, index: int, kind: String) -> String:
+	# 每条技能都对应一个全身释放动作：旋转/跳砸/前冲/施法/吼叫/祈祷等。
+	if index == 2:
+		match hero_id:
+			"tiger", "cat", "penguin", "bat", "hedgehog":
+				return "spin"
+			"fox", "crane":
+				return "twirl"
+			"rabbit", "axolotl", "sheep":
+				return "pray"
+			"bear", "panda", "monkey", "elephant", "turtle":
+				return "slam"
+			"frog":
+				return "stomp"
+			"owl", "wolf":
+				return "dive"
+			"deer":
+				return "cast"
+			"redpanda":
+				return "charge"
+	match kind:
+		"aoe":
+			return "spin"
+		"cone", "boomerang":
+			return "slash"
+		"dash", "blink", "backstep":
+			return "charge"
+		"leap":
+			return "none"
+		"heal", "shield", "heal_zone":
+			return "pray"
+		"fear", "taunt":
+			return "roar"
+		"spin":
+			return "spin"
+		"vanish":
+			return "crouch"
+		"pull":
+			return "cast"
+		_:
+			return "cast"
+
+
 func _add_hero(u) -> void:
 	var root := Node3D.new()
 	root.name = "Hero_%d" % u.uid
@@ -859,6 +904,7 @@ func _sync_hero(u, delta: float) -> void:
 	var rp: Vector2 = sim.render_pos(u)
 	root.position = Vector3(rp.x, 0, rp.y)
 	_face_yaw(item, u, delta)
+	var base_yaw: float = root.rotation.y
 	# 攻击起始帧：按英雄的主武器放一次挥砍/弓弦/法杖闪光。
 	var atk_now: bool = u.atk_anim > 0.0
 	if atk_now and not bool(item.get("atk_active", false)):
@@ -866,8 +912,10 @@ func _sync_hero(u, delta: float) -> void:
 	item["atk_active"] = atk_now
 	# 大招台词：cast_total > 0.4 表示第 3 条大招（小技能是 0.34 秒）。
 	var cast_now: bool = u.cast_anim > 0.0
-	if cast_now and not bool(item.get("cast_active", false)) and u.cast_total > 0.4:
-		_queue_ult(u)
+	if cast_now and not bool(item.get("cast_active", false)):
+		item["cast_action"] = cast_action_for(str(u.hero_id), int(u.cast_index), str(u.cast_kind))
+		if u.cast_total > 0.4:
+			_queue_ult(u)
 	item["cast_active"] = cast_now
 	var step := 1.0 / 30.0
 	var wt: float = u.walk_t
@@ -982,6 +1030,113 @@ func _sync_hero(u, delta: float) -> void:
 				arm_r.rotation.z = -1.15 * ek
 				arm_r.rotation.x = -1.7 * ek
 				head.rotation.x = -0.10 * ek
+
+	# 技能释放动作：整体旋转 / 跳砸 / 前冲 / 施法 / 吼叫 / 祈祷等，
+	# 叠在标准施法手臂姿势上方，让每条技能都有像「筋斗跃」那样的全身动作。
+	var act_yaw := 0.0
+	var act_pitch := 0.0
+	var act_roll := 0.0
+	var act_lift := 0.0
+	var act_sxz := 1.0
+	var act_sy := 1.0
+	if u.cast_anim > 0.0:
+		var ck: float = 1.0 - u.cast_anim / maxf(0.01, u.cast_total)
+		var act: String = str(item.get("cast_action", "cast"))
+		var env: float = sin(ck * PI)
+		var has_move: bool = u.move_skill_total > 0.0
+		match act:
+			"spin":
+				var turns: float = 2.2 if u.cast_total > 0.4 else 1.2
+				act_yaw = TAU * turns * ck
+				act_lift = env * 8.0
+				arm_l.rotation.x = 0.0
+				arm_r.rotation.x = 0.0
+				arm_l.rotation.z = env * 1.35
+				arm_r.rotation.z = -env * 1.35
+				head.rotation.x = env * 0.05
+				tail.rotation.y += env * 0.8
+			"twirl":
+				act_yaw = TAU * 1.6 * ck
+				act_lift = env * 14.0
+				arm_l.rotation.x = -0.6 * env
+				arm_r.rotation.x = -0.6 * env
+				arm_l.rotation.z = env * 1.2
+				arm_r.rotation.z = -env * 1.2
+				head.rotation.x = env * 0.10
+			"slam":
+				var s_up: float = clampf(ck / 0.45, 0.0, 1.0)
+				var s_down: float = clampf((ck - 0.45) / 0.2, 0.0, 1.0)
+				var s_raise: float = sin(s_up * PI * 0.5) * (1.0 - s_down)
+				if not has_move:
+					act_lift = s_raise * 34.0
+				act_sy = 1.0 - sin(s_down * PI) * 0.16
+				arm_l.rotation.x = -2.5 * s_raise + 0.9 * sin(s_down * PI)
+				arm_r.rotation.x = arm_l.rotation.x
+				arm_l.rotation.z = 0.25
+				arm_r.rotation.z = -0.25
+				head.rotation.x = -0.12 * sin(s_down * PI)
+			"stomp":
+				var st_up: float = clampf(ck / 0.4, 0.0, 1.0)
+				var st_down: float = clampf((ck - 0.4) / 0.18, 0.0, 1.0)
+				var st_raise: float = sin(st_up * PI * 0.5) * (1.0 - st_down)
+				if not has_move:
+					act_lift = st_raise * 20.0
+				act_sy = 1.0 - sin(st_down * PI) * 0.12
+				arm_l.rotation.x = -2.2 * st_raise + 0.8 * sin(st_down * PI)
+				arm_r.rotation.x = arm_l.rotation.x
+				head.rotation.x = -0.10 * sin(st_down * PI)
+			"charge":
+				act_pitch = 0.24 * env
+				act_lift = 5.0 * env
+				arm_l.rotation.x = 0.8 * env
+				arm_r.rotation.x = 0.8 * env
+				head.rotation.x = -0.15 * env
+			"cast":
+				act_lift = 10.0 * env
+				arm_l.rotation.x = -1.4 * env
+				arm_r.rotation.x = -1.4 * env
+				arm_l.rotation.z = 0.35
+				arm_r.rotation.z = -0.35
+				head.rotation.x = 0.12 * env
+			"slash":
+				act_yaw = env * 0.5
+				arm_r.rotation.x = -1.9 * env
+				arm_r.rotation.z = -0.45 * env
+				arm_l.rotation.x = 0.35 * env
+				head.rotation.y += -0.25 * env
+			"roar":
+				act_pitch = -0.18 * env
+				arm_l.rotation.x = 0.4 * env
+				arm_r.rotation.x = 0.4 * env
+				arm_l.rotation.z = env * 1.0
+				arm_r.rotation.z = -env * 1.0
+				head.rotation.x += -0.25 * env
+			"pray":
+				act_lift = 10.0 * env
+				arm_l.rotation.x = -2.5 * env
+				arm_r.rotation.x = -2.5 * env
+				arm_l.rotation.z = 0.2
+				arm_r.rotation.z = -0.2
+				head.rotation.x = 0.18 * env
+			"crouch":
+				act_sy = 1.0 - 0.12 * env
+				arm_l.rotation.x = 0.5 * env
+				arm_r.rotation.x = 0.5 * env
+				head.rotation.x = -0.2 * env
+			"dive":
+				if not has_move:
+					act_lift = env * 26.0
+				act_pitch = 0.35 * env
+				arm_l.rotation.z = env * 1.2
+				arm_r.rotation.z = -env * 1.2
+				arm_l.rotation.x = 0.5
+				arm_r.rotation.x = 0.5
+				head.rotation.x = -0.2 * env
+			_:
+				pass
+	root.position.y += act_lift
+	root.rotation = Vector3(act_pitch, base_yaw + act_yaw, act_roll)
+	root.scale = Vector3(s * sxz * act_sxz, s * sy * act_sy, s * sxz * act_sxz)
 
 
 func _sync_minion(u, delta: float) -> void:
@@ -1850,14 +2005,7 @@ func _spawn_claw_ult(pos: Vector3, color: Color, radius: float) -> void:
 	base_ring.rings = 32
 	base_ring.ring_segments = 4
 	_add_fx_mesh(base_ring, _fx_mat(color, 0.65), Vector3(pos.x, 8.0, pos.z), 0.85, 0.5, 1.3)
-	var wind := _fx_mat(Color(color.r, color.g * 0.92, color.b * 0.55), 0.14)
-	for i in range(3):
-		var col := CylinderMesh.new()
-		col.top_radius = radius * (0.30 - float(i) * 0.06)
-		col.bottom_radius = radius * (0.46 - float(i) * 0.08)
-		col.height = 70.0
-		col.radial_segments = 20
-		_add_fx_mesh(col, wind, Vector3(pos.x, 34.0 + float(i) * 56.0, pos.z), 0.95, 0.55, 1.0)
+	# 不再加高的风柱：整根黄色圆柱会把英雄的旋身动作盖住，改用贴地环 + 旋转爪痕表达旋风。
 	var mat := _fx_mat(color, 0.95)
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(64, 7, 10)

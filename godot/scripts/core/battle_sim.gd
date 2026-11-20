@@ -98,6 +98,8 @@ class Unit:
 	var atk_anim: float = 0.0
 	var cast_anim: float = 0.0
 	var cast_total: float = 0.5
+	var cast_index: int = -1
+	var cast_kind: String = ""
 	var hurt_anim: float = 0.0
 	var die_t: float = 0.0
 	var respawn_t: float = 0.0
@@ -2937,6 +2939,8 @@ func try_cast(h, index: int) -> void:
 	# 小技能收招更快：技能 1/2 的施法姿势 0.34 秒，大招保留 0.5 秒。
 	h.cast_total = 0.34 if index < 2 else 0.5
 	h.cast_anim = h.cast_total
+	h.cast_index = index
+	h.cast_kind = str(s.get("kind", "projectile"))
 	sfx.emit(("ult_" if index == 2 else "cast_") + h.hero_id, h.pos)
 	if h.is_player and index == 2:
 		fx.emit("punch", Vector3(h.pos.x, 40.0, h.pos.y), Color.WHITE, 0.0)

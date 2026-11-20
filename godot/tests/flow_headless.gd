@@ -94,6 +94,7 @@ func _process(_delta: float) -> bool:
 				failures.append("缺少普攻音效 shoot_" + id)
 		_check_palette("3v3")
 		_check_roster_art()
+		_check_cast_actions()
 		_check_base_clear("3v3")
 		_check_audio_assets()
 	elif frame == 66:
@@ -298,6 +299,28 @@ func _check_roster_art() -> void:
 		checked += 1
 	if checked == 20:
 		print("ROSTER_OK art=20 audio=20")
+
+
+func _check_cast_actions() -> void:
+	# 20 人 × 3 技能都要映射到一个全身释放动作；大招不允许 none。
+	if main.view == null or main.sim == null:
+		failures.append("施法动作检查时没有战斗视图")
+		return
+	var seen: Dictionary = {}
+	for id in main.sim.defs_by_id.keys():
+		var d: Dictionary = main.sim.defs_by_id[id]
+		var skills: Array = d.get("skills", [])
+		for i in range(skills.size()):
+			var kind := str(skills[i].get("kind", ""))
+			var act := str(main.view.cast_action_for(str(id), i, kind))
+			if not main.view.CAST_ACTIONS.has(act):
+				failures.append("%s 技能%d 动作无效：%s" % [id, i, act])
+			if i == 2 and act == "none":
+				failures.append(str(id) + " 大招没有释放动作")
+			seen[act] = true
+	if not seen.has("spin"):
+		failures.append("没有旋转类施法动作")
+	print("CAST_OK actions=%d" % seen.size())
 
 
 func _check_palette(tag: String) -> void:
