@@ -2994,8 +2994,15 @@ func cast(h, s: Dictionary, index: int) -> void:
 	var radius := float(s.get("radius", 120.0))
 	var style := str(s.get("fx", "burst"))
 	var shot_style := str(s.get("shot_style", style))
-	if kind != "leap" and kind != "pull" and kind != "multi" and kind != "beam" and kind != "chain":
+	if index == 2 and style == "arrow_rain_ult":
+		# 角角「林间箭雨」：箭雨落在目标区域，而不是只在脚下炸一圈。
+		var rain_at: Vector2 = h.pos + aim_dir * 240.0
+		if aim != null:
+			rain_at = aim.pos
+		fx.emit("arrow_rain", Vector3(rain_at.x, 0.0, rain_at.y), color, maxf(radius, 170.0))
+	elif index == 2 or (kind != "leap" and kind != "pull" and kind != "multi" 			and kind != "beam" and kind != "chain"):
 		# 每个英雄的施法都有专属形状：爪痕、星星、叶子、水泡、箭雨、竹子、月光…
+		# 大招（index 2）即使走 multi/leap 也要播专属起手特效，否则星落/满月/瀑布会被跳过。
 		fx.emit("cast_" + style, Vector3(h.pos.x, 22.0, h.pos.y), color, maxf(radius, 90.0))
 
 	match kind:

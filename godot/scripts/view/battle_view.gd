@@ -1260,6 +1260,10 @@ func _shot_mesh(style: String) -> Mesh:
 			s.radial_segments = 10
 			s.rings = 5
 			mesh = s
+		"ice":
+			var b := BoxMesh.new()
+			b.size = Vector3(9, 9, 20)
+			mesh = b
 		"moon":
 			var t := TorusMesh.new()
 			t.inner_radius = 4.0
@@ -1337,6 +1341,8 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 		"potion_pick":
 			_spawn_style("leafheal", pos, color, 90.0)
 			_spawn_burst(pos, color, 0.30)
+		"arrow_rain":
+			_spawn_arrow_rain(pos, color, radius)
 
 
 func _on_beam_fx(from: Vector3, to: Vector3, color: Color, width: float) -> void:
@@ -1783,6 +1789,182 @@ func _entrance_fx(u) -> void:
 			_spawn_feathers(at, Color("c8e8ff"), 100.0)
 
 
+func _spawn_arrow_rain(pos: Vector3, color: Color, radius: float) -> void:
+	# 林间箭雨：带尾羽和尖头的箭斜着从空中落下，落点有尘环和插地箭。
+	var shaft := _fx_mesh("fx_arrow_shaft", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(2.4, 32, 2.4)
+		return b)
+	var head := _fx_mesh("fx_arrow_head", func():
+		var cone := CylinderMesh.new()
+		cone.top_radius = 4.6
+		cone.bottom_radius = 0.0
+		cone.height = 9.0
+		cone.radial_segments = 4
+		return cone)
+	var tail := _fx_mesh("fx_arrow_tail", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(7.0, 3.0, 3.0)
+		return b)
+	var wood := _fx_mat(Color("8a5a3b"), 0.95)
+	var tip := _fx_mat(Color("fff2c8"), 0.95)
+	var fletch := _fx_mat(Color("e8f6c8"), 0.95)
+	for i in range(18):
+		var ang := randf() * TAU
+		var dist := radius * sqrt(randf()) * 0.72
+		var at := pos + Vector3(cos(ang) * dist, 0.0, sin(ang) * dist)
+		var h0 := randf_range(50.0, 210.0)
+		var yaw := randf_range(0.0, TAU)
+		var tilt := Vector3(deg_to_rad(randf_range(-22.0, 22.0)), yaw,
+			deg_to_rad(randf_range(-22.0, 22.0)))
+		var vel := Vector3(randf_range(-30.0, 30.0), -430.0, randf_range(-30.0, 30.0))
+		_add_fx_mesh(shaft, wood, Vector3(at.x, h0, at.z), 0.6, 0.9, 0.9, vel,
+			Vector3.ZERO, tilt)
+		_add_fx_mesh(head, tip, Vector3(at.x, h0 - 19.0, at.z), 0.6, 0.9, 0.9, vel,
+			Vector3.ZERO, tilt)
+		_add_fx_mesh(tail, fletch, Vector3(at.x, h0 + 16.0, at.z), 0.6, 0.9, 0.9, vel,
+			Vector3.ZERO, tilt)
+	for i in range(7):
+		var ang := randf() * TAU
+		var dist := radius * sqrt(randf()) * 0.70
+		var at := pos + Vector3(cos(ang) * dist, 0.0, sin(ang) * dist)
+		_spawn_ring(Vector3(at.x, 6.0, at.z), color, 18.0, 0.30)
+		var lean := Vector3(deg_to_rad(randf_range(38.0, 58.0)), randf() * TAU,
+			deg_to_rad(randf_range(-12.0, 12.0)))
+		_add_fx_mesh(shaft, wood, Vector3(at.x, 8.0, at.z), 0.55, 0.8, 0.8,
+			Vector3.ZERO, Vector3.ZERO, lean)
+		_add_fx_mesh(head, tip, Vector3(at.x, 8.0, at.z), 0.55, 0.8, 0.8,
+			Vector3.ZERO, Vector3.ZERO, lean)
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(radius, 170.0), 0.65)
+
+
+func _spawn_staff_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 定海神针：长棍从空中砸下 + 双层冲击环 + 尘土。
+	var staff := _fx_mesh("fx_staff_ult", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(7, 150, 7)
+		return b)
+	_add_fx_mesh(staff, _fx_mat(Color("f2c14e"), 0.95),
+		Vector3(pos.x, 150.0, pos.z), 0.45, 0.7, 1.0,
+		Vector3(0.0, -420.0, 0.0), Vector3.ZERO,
+		Vector3(deg_to_rad(18.0), 0.0, deg_to_rad(-22.0)))
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(radius, 180.0), 0.55)
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color.lightened(0.2), maxf(radius, 120.0), 0.40)
+	_spawn_debris(Vector3(pos.x, 4.0, pos.z), Color("d8c09a"), 9)
+	_spawn_spark(Vector3(pos.x, 20.0, pos.z), Color("ffe8a8"), 12.0)
+
+
+func _spawn_stomp_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 大地践踏：大脚印 + 三枚脚趾 + 两层震波 + 碎石。
+	var pad := _fx_mesh("fx_stomp_pad", func():
+		var c := CylinderMesh.new()
+		c.top_radius = 44.0
+		c.bottom_radius = 44.0
+		c.height = 4.0
+		c.radial_segments = 18
+		return c)
+	var toe := _fx_mesh("fx_stomp_toe", func():
+		var c := CylinderMesh.new()
+		c.top_radius = 11.0
+		c.bottom_radius = 11.0
+		c.height = 4.0
+		c.radial_segments = 10
+		return c)
+	_add_fx_mesh(pad, _fx_mat(color, 0.35), Vector3(pos.x, 4.0, pos.z), 0.55, 0.7, 1.1)
+	for i in range(3):
+		_add_fx_mesh(toe, _fx_mat(color, 0.35),
+			Vector3(pos.x - 24.0 + 24.0 * float(i), 4.0, pos.z + 40.0), 0.55, 0.7, 1.0)
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(radius, 190.0), 0.60)
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color.lightened(0.15), maxf(radius, 120.0), 0.45)
+	_spawn_debris(Vector3(pos.x, 4.0, pos.z), Color("a8b8c8"), 12)
+
+
+func _spawn_frost_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 暴风雪：冰晶从空中旋转落下 + 地面雪花 + 双层冰环。
+	var shard := _fx_mesh("fx_frost_shard", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(5, 24, 5)
+		return b)
+	var ice := _fx_mat(Color("dff6ff"), 0.95)
+	for i in range(16):
+		var ang := randf() * TAU
+		var dist := radius * sqrt(randf()) * 0.70
+		var at := pos + Vector3(cos(ang) * dist, randf_range(50.0, 190.0), sin(ang) * dist)
+		_add_fx_mesh(shard, ice, at, 0.65, 0.8, 0.8, Vector3(0.0, -380.0, 0.0),
+			Vector3(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0), randf_range(-6.0, 6.0)),
+			Vector3(randf() * TAU, randf() * TAU, 0.0))
+	var bar := _fx_mesh("fx_frost_bar", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(90, 4, 4)
+		return b)
+	for k in range(3):
+		_add_fx_mesh(bar, ice, pos + Vector3(0, 30, 0), 0.50, 0.6, 1.1,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, PI * float(k) / 3.0, 0.0))
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(radius, 190.0), 0.60)
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), Color("eaffff"), maxf(radius, 120.0), 0.45)
+
+
+func _spawn_pasture_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 暖云牧场：云团升起 + 粉色心形 + 草绿治疗环。
+	var puff := _fx_mesh("fx_cloud_puff", func():
+		var s := SphereMesh.new()
+		s.radius = 22.0
+		s.height = 22.0
+		s.radial_segments = 10
+		s.rings = 6
+		return s)
+	var cloud := _fx_mat(Color("fff4dc"), 0.55)
+	for i in range(6):
+		var ang := TAU * float(i) / 6.0
+		var at := pos + Vector3(cos(ang) * radius * 0.45, 26.0, sin(ang) * radius * 0.45)
+		_add_fx_mesh(puff, cloud, at, 1.0, 0.6, 1.6, Vector3(0.0, 30.0, 0.0))
+	_spawn_heart(pos + Vector3(0, 10, 0), color)
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(radius, 180.0), 0.65)
+
+
+func _spawn_staff_sweep(pos: Vector3, color: Color, radius: float) -> void:
+	# 长棍横扫：四道金色棍影 + 一道横向亮痕。
+	_spawn_slashes(pos, Color("f2c14e"), 4, maxf(radius, 120.0))
+	var bar := _fx_mesh("fx_staff_bar", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(110, 6, 8)
+		return b)
+	_add_fx_mesh(bar, _fx_mat(Color("ffe08a"), 0.85), pos + Vector3(0, 36, 0), 0.25, 0.5, 1.3,
+		Vector3.ZERO, Vector3.ZERO, Vector3(0.2, deg_to_rad(30.0), 0.6))
+	_spawn_spark(pos + Vector3(0, 40, 0), color, 10.0)
+
+
+func _spawn_frost_cast(pos: Vector3, color: Color, radius: float) -> void:
+	# 冰锥/冰面起手：几枚冰晶向外散开 + 小冰环。
+	var shard := _fx_mesh("fx_frost_shard", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(5, 24, 5)
+		return b)
+	var ice := _fx_mat(Color("dff6ff"), 0.95)
+	for i in range(6):
+		var ang := TAU * float(i) / 6.0
+		var dir := Vector3(cos(ang), 0.0, sin(ang))
+		_add_fx_mesh(shard, ice, pos + dir * 26.0 + Vector3(0, 34, 0), 0.40, 0.7, 0.9,
+			dir * 120.0 + Vector3(0, 30, 0), Vector3.ZERO, Vector3(0.2, ang, 0.0))
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, 42.0, 0.30)
+
+
+func _spawn_arrow_cast(pos: Vector3, color: Color, radius: float) -> void:
+	# 弓箭起手：几支箭向前扇形飞出 + 弓弦光。
+	var shaft := _fx_mesh("fx_arrow_shaft", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(2.6, 30, 2.6)
+		return b)
+	var wood := _fx_mat(Color("d8b878"), 0.95)
+	for i in range(4):
+		var ang := -0.45 + 0.30 * float(i)
+		var dir := Vector3(sin(ang), 0.0, cos(ang))
+		var at := pos + dir * 28.0 + Vector3(0, 34, 0)
+		_add_fx_mesh(shaft, wood, at, 0.32, 0.6, 1.0, dir * 260.0,
+			Vector3.ZERO, Vector3(0.0, atan2(dir.x, dir.z), 0.0))
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(60.0, radius * 0.4), 0.30)
+
+
 func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> void:
 	# 每个英雄的施法形状不同：爪痕 / 星星 / 叶子 / 竹子 / 水泡 / 月光 / 羽刃…
 	match style:
@@ -1838,6 +2020,22 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_ring(pos, color, maxf(radius, 150.0), 0.55)
 			_spawn_ring(pos, color, maxf(radius, 90.0), 0.35)
 			_spawn_burst(pos, color, 0.30)
+		"arrow_rain_ult":
+			_spawn_arrow_rain(pos, color, radius)
+		"staff_ult":
+			_spawn_staff_ult(pos, color, radius)
+		"stomp_ult":
+			_spawn_stomp_ult(pos, color, radius)
+		"frost_ult":
+			_spawn_frost_ult(pos, color, radius)
+		"pasture_ult":
+			_spawn_pasture_ult(pos, color, radius)
+		"staff":
+			_spawn_staff_sweep(pos, color, radius)
+		"frost":
+			_spawn_frost_cast(pos, color, radius)
+		"arrow":
+			_spawn_arrow_cast(pos, color, radius)
 		"beam", "chain":
 			_spawn_burst(pos, color, 0.30)
 		_:
