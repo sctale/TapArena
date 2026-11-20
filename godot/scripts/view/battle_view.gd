@@ -41,6 +41,13 @@ var shadow_quality := "high"
 # 待机武器微光：每 0.55 秒轮转一位英雄，交错闪烁。
 var glint_t := 0.0
 var glint_idx := 0
+# 音频资产（4.21）：15 条大招台词 + 15 条普攻音效，3D 声源。
+var audio_atk: Dictionary = {}
+var audio_ult: Dictionary = {}
+var audio_pool: Array = []
+var audio_next := 0
+var audio_queue: Array = []
+var ult_last_ms: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var sync_us_total := 0
 var sync_frames := 0
@@ -57,6 +64,7 @@ func attach(s) -> void:
 	atlas = load("res://scripts/art/pixel_atlas.gd").new()
 	icons = load("res://scripts/art/pixel_icons.gd").new()
 	rng.seed = 7127
+	_build_audio()
 	_build_world()
 	sim.fx.connect(_on_fx)
 	if sim.has_signal("beam_fx"):
@@ -683,6 +691,7 @@ func _process(delta: float) -> void:
 	_step_debris(delta)
 	_step_sprouts(delta)
 	_step_clouds(delta)
+	_flush_audio()
 	glint_t += delta
 	if glint_t >= 0.55:
 		glint_t = 0.0
@@ -838,6 +847,11 @@ func _sync_hero(u, delta: float) -> void:
 	if atk_now and not bool(item.get("atk_active", false)):
 		_weapon_strike(u)
 	item["atk_active"] = atk_now
+	# 大招台词：cast_total > 0.4 表示第 3 条大招（小技能是 0.34 秒）。
+	var cast_now: bool = u.cast_anim > 0.0
+	if cast_now and not bool(item.get("cast_active", false)) and u.cast_total > 0.4:
+		_queue_ult(u)
+	item["cast_active"] = cast_now
 	var step := 1.0 / 30.0
 	var wt: float = u.walk_t
 	if u.moving:
@@ -1272,8 +1286,84 @@ func _add_fx_mesh(mesh: Mesh, mat: Material, at: Vector3, life: float, start: fl
 	fx_items.append(item)
 
 
+func _build_audio() -> void:
+	# 资产：assets/audio/atk/atk_<id>.wav、assets/audio/ult/ult_<id>.wav（48k 单声道）。
+	# 3D 声源：听者=当前相机，unit_size 按本作镜头距离（约 500）定标，远处自然衰减并静音。
+	var bus := "SFX" if AudioServer.get_bus_index("SFX") != -1 else "Master"
+	for id in sim.defs_by_id.keys():
+		var atk_path := "res://assets/audio/atk/atk_%s.wav" % str(id)
+		if ResourceLoader.exists(atk_path):
+			audio_atk[str(id)] = load(atk_path)
+		var ult_path := "res://assets/audio/ult/ult_%s.wav" % str(id)
+		if ResourceLoader.exists(ult_path):
+			audio_ult[str(id)] = load(ult_path)
+	for i in range(10):
+		var p := AudioStreamPlayer3D.new()
+		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+		p.unit_size = 600.0
+		p.max_distance = 1500.0
+		p.max_db = 0.0
+		p.bus = bus
+		add_child(p)
+		audio_pool.append(p)
+
+
+func _queue_atk(u) -> void:
+	var stream = audio_atk.get(u.hero_id)
+	if stream == null:
+		return
+	var rp: Vector2 = sim.render_pos(u)
+	audio_queue.append({"stream": stream, "pos": Vector3(rp.x, 24.0, rp.y),
+		"pitch": rng.randf_range(0.94, 1.06), "volume": -9.0})
+
+
+func _queue_ult(u) -> void:
+	var id := str(u.hero_id)
+	var stream = audio_ult.get(id)
+	if stream == null:
+		return
+	var now := Time.get_ticks_msec()
+	# 同一英雄 8 秒内不重播台词。
+	if now - int(ult_last_ms.get(id, -99999)) < 8000:
+		return
+	ult_last_ms[id] = now
+	var rp: Vector2 = sim.render_pos(u)
+	audio_queue.append({"stream": stream, "pos": Vector3(rp.x, 34.0, rp.y),
+		"pitch": 1.0, "volume": -5.0})
+
+
+func _flush_audio() -> void:
+	# 同帧最多 6 个音效源；超出按与听者（玩家）距离丢弃最远的。
+	if audio_queue.is_empty():
+		return
+	var listen := Vector2.ZERO
+	if sim.player != null:
+		listen = sim.render_pos(sim.player)
+	var reqs: Array = []
+	for req in audio_queue:
+		var p: Vector3 = req["pos"]
+		var d: float = Vector2(p.x, p.z).distance_to(listen)
+		if d <= 1500.0:
+			req["d"] = d
+			reqs.append(req)
+	audio_queue.clear()
+	if reqs.is_empty():
+		return
+	reqs.sort_custom(func(a, b): return float(a["d"]) < float(b["d"]))
+	for i in range(mini(6, reqs.size())):
+		var req: Dictionary = reqs[i]
+		var player: AudioStreamPlayer3D = audio_pool[audio_next]
+		audio_next = (audio_next + 1) % audio_pool.size()
+		player.stream = req["stream"]
+		player.position = req["pos"]
+		player.pitch_scale = float(req["pitch"])
+		player.volume_db = float(req["volume"])
+		player.play()
+
+
 func _weapon_strike(u) -> void:
 	# 每次攻击只触发一次，纯表现；不消耗逻辑随机数。
+	_queue_atk(u)
 	var rp: Vector2 = sim.render_pos(u)
 	var at := Vector3(rp.x, 0.0, rp.y)
 	match u.hero_id:

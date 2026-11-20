@@ -27,6 +27,8 @@ reference/
 
 # 临时录屏/截图与系统垃圾
 *.wav
+# 游戏音频资产（自制/合成）：随仓库入库
+!godot/assets/audio/**/*.wav
 *.mp4
 *.avi
 *.tmp

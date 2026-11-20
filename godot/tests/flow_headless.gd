@@ -68,6 +68,7 @@ func _process(_delta: float) -> bool:
 			if not main.sfx._streams.has("shoot_" + id):
 				failures.append("缺少普攻音效 shoot_" + id)
 		_check_palette("3v3")
+		_check_audio_assets()
 	elif frame == 66:
 		if main.sim != null and main.sim.clock <= 0.0:
 			failures.append("战斗没有推进时钟")
@@ -118,6 +119,27 @@ func _process(_delta: float) -> bool:
 				print("FLOW_FAIL " + f)
 		quit(0 if failures.is_empty() else 1)
 	return false
+
+
+func _check_audio_assets() -> void:
+	# 4.21：30 个音频资产 + SFX/BGM 总线 + 视图音频池。
+	var ids := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl",
+		"deer", "turtle", "hedgehog", "redpanda", "wolf", "crane"]
+	for id in ids:
+		for kind in ["atk", "ult"]:
+			var path := "res://assets/audio/%s/%s_%s.wav" % [kind, kind, id]
+			if not ResourceLoader.exists(path):
+				failures.append("缺少音频资产 " + path)
+	if AudioServer.get_bus_index("SFX") == -1 or AudioServer.get_bus_index("BGM") == -1:
+		failures.append("缺少 SFX/BGM 音频总线")
+	if main.view == null:
+		failures.append("音频检查时没有视图")
+		return
+	if main.view.audio_atk.size() != 15 or main.view.audio_ult.size() != 15:
+		failures.append("视图音频池未加载完整：atk=%d ult=%d" % [
+			main.view.audio_atk.size(), main.view.audio_ult.size()])
+	if main.view.audio_pool.is_empty():
+		failures.append("视图没有 3D 音频播放器")
 
 
 func _check_palette(tag: String) -> void:

@@ -1,0 +1,126 @@
+{
+  "sample_rate": 48000,
+  "lines": [
+    {
+      "hero": "tiger",
+      "name": "阿狮",
+      "ult": "旋风爪",
+      "voice": "male-qn-jingying",
+      "line": "旋风爪！都让开！",
+      "dur": 1.68
+    },
+    {
+      "hero": "fox",
+      "name": "灵灵",
+      "ult": "星河坠落",
+      "voice": "Chinese (Mandarin)_Crisp_Girl",
+      "line": "星河，落下来吧！",
+      "dur": 2.21
+    },
+    {
+      "hero": "rabbit",
+      "name": "朵朵",
+      "ult": "满月祝福",
+      "voice": "Chinese (Mandarin)_Cute_Spirit",
+      "line": "满月，照亮大家！",
+      "dur": 2.37
+    },
+    {
+      "hero": "bear",
+      "name": "阿岳",
+      "ult": "山崩地裂",
+      "voice": "male-qn-badao",
+      "line": "山崩地裂！",
+      "dur": 1.59
+    },
+    {
+      "hero": "frog",
+      "name": "泡泡",
+      "ult": "瀑布冲击",
+      "voice": "male-qn-qingse",
+      "line": "瀑布，冲垮他们！",
+      "dur": 1.88
+    },
+    {
+      "hero": "cat",
+      "name": "尖尖",
+      "ult": "万爪齐发",
+      "voice": "Chinese (Mandarin)_Warm_Girl",
+      "line": "万爪齐发，看招！",
+      "dur": 1.78
+    },
+    {
+      "hero": "panda",
+      "name": "团团",
+      "ult": "竹林震地",
+      "voice": "Chinese (Mandarin)_Straightforward_Boy",
+      "line": "竹林震地！",
+      "dur": 1.1
+    },
+    {
+      "hero": "owl",
+      "name": "咕咕",
+      "ult": "夜枭俯冲",
+      "voice": "Chinese (Mandarin)_Wise_Women",
+      "line": "夜枭，俯冲！",
+      "dur": 1.79
+    },
+    {
+      "hero": "axolotl",
+      "name": "绒绒",
+      "ult": "再生水域",
+      "voice": "Chinese (Mandarin)_Soft_Girl",
+      "line": "再生水域，别怕！",
+      "dur": 2.25
+    },
+    {
+      "hero": "deer",
+      "name": "角角",
+      "ult": "林间箭雨",
+      "voice": "Chinese (Mandarin)_Sweet_Lady",
+      "line": "林间箭雨，落！",
+      "dur": 1.95
+    },
+    {
+      "hero": "turtle",
+      "name": "甲甲",
+      "ult": "龟甲震地",
+      "voice": "Chinese (Mandarin)_Gentleman",
+      "line": "龟甲震地，站稳！",
+      "dur": 1.95
+    },
+    {
+      "hero": "hedgehog",
+      "name": "刺刺",
+      "ult": "滚动刺球",
+      "voice": "Chinese (Mandarin)_Pure-hearted_Boy",
+      "line": "滚动刺球，滚起来！",
+      "dur": 1.94
+    },
+    {
+      "hero": "redpanda",
+      "name": "火火",
+      "ult": "烈焰冲锋",
+      "voice": "Chinese (Mandarin)_Unrestrained_Young_Man",
+      "line": "烈焰冲锋，烧起来！",
+      "dur": 2.01
+    },
+    {
+      "hero": "wolf",
+      "name": "灰灰",
+      "ult": "猎影突袭",
+      "voice": "male-qn-badao",
+      "line": "猎影突袭！",
+      "dur": 1.56
+    },
+    {
+      "hero": "crane",
+      "name": "小白",
+      "ult": "风之领域",
+      "voice": "Chinese (Mandarin)_Lyrical_Voice",
+      "line": "风之领域，起风了。",
+      "dur": 2.87
+    }
+  ],
+  "failed": []
+}

@@ -32,13 +32,17 @@ var _bgm: AudioStreamPlayer
 
 
 func _ready() -> void:
+	_ensure_bus("SFX")
+	_ensure_bus("BGM")
 	for i in range(10):
 		var p := AudioStreamPlayer.new()
 		p.volume_db = -9.0
+		p.bus = "SFX"
 		add_child(p)
 		_players.append(p)
 	_bgm = AudioStreamPlayer.new()
 	_bgm.volume_db = -8.0
+	_bgm.bus = "BGM"
 	add_child(_bgm)
 	_build()
 	_bgm.stream = _make_bgm()
@@ -77,6 +81,16 @@ func attenuation_db(key: String, at: Vector2, listener: Vector2) -> float:
 		return -99.0
 	var t := clampf((d - near) / (far - near), 0.0, 1.0)
 	return -20.0 * pow(t, 1.35)
+
+
+func _ensure_bus(bus_name: String) -> void:
+	# 预留 SFX / BGM 两条总线，方便后续加音量设置项。
+	if AudioServer.get_bus_index(bus_name) != -1:
+		return
+	AudioServer.add_bus()
+	var idx := AudioServer.bus_count - 1
+	AudioServer.set_bus_name(idx, bus_name)
+	AudioServer.set_bus_send(idx, "Master")
 
 
 func set_enabled(on: bool) -> void:

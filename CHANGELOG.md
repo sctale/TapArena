@@ -10,6 +10,31 @@
 
 - 移除已冻结的 Unity 3.2.0 存档（`unity/`）、`打开Unity工程.cmd`、Unity 构建与 Polyfork/Blender 美术脚本、v3.2 预览图及对应 `.gitignore` 规则；仓库只保留 Godot 主线与 Web 存档。
 
+## [4.21.0] - 2026-11-20
+
+**大招台词与普攻音效接入：15 句人声台词 + 15 条合成普攻，3D 距离衰减。**
+
+### 新增
+
+- 15 位英雄的大招台词（`assets/audio/ult/ult_<id>.wav`，48k 单声道）：第 3 条技能释放瞬间在英雄位置播放，
+      同一英雄 8 秒内不重播。
+- 15 条普攻音效（`assets/audio/atk/atk_<id>.wav`）：攻击起始帧播放，音高 0.94–1.06 随机，避免连击像机关枪。
+
+### 优化
+
+- 3D 声源：`AudioStreamPlayer3D` 按相机听者做距离衰减（`unit_size 600` 按镜头距离定标、`max_distance 1500`），
+      超过 1500 直接不播；同帧最多 6 个音效源，超出按与玩家距离丢弃最远的。
+- 新增 `SFX` / `BGM` 两条音频总线：旧运行时合成音效全部走 `SFX`，BGM 走 `BGM`，方便后续加音量设置项。
+- 音频资产与生成脚本（`tools/audio/`、`ult/manifest.json`）随仓库入库，改台词/音色只动表。
+
+### 验证
+
+- `sim_headless` / `flow_headless` 全绿；flow 新增 30 个音频资产、SFX/BGM 总线、视图音频池（15/15、10 个 3D 播放器）断言。
+- 触发探针：`--ult` 实拍 `ult_tiger d=0`；`--auto-run` 实拍玩家 `atk_tiger d=0` 与 90–565 距离的 AI 普攻，
+      同帧 6 源上限生效。
+- Android 16 模拟器（`-gpu host`）5v5 实测平均 **27.4fps**（25.1–30.2），0 条脚本/音频错误；APK 内 30 个 `.sample` 齐全。
+- APK：28,055,227 字节，versionCode 63 / versionName 4.21.0 / arm64-v8a / `CN=TapArena`，SHA-256 `A1C675AFC83246C39BF05F61CE73C677BA1E23B9DDC8FB90FE95FDFA736EF8F0`。
+
 ## [4.20.0] - 2026-11-19
 
 **5v5 地图放大 1.5 倍（3600×3600），分路间距拉开，环境点缀按面积补齐。**
