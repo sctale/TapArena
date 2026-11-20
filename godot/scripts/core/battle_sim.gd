@@ -121,6 +121,9 @@ class Unit:
 	var is_jungler: bool = false
 	var jungle_gank_t: float = 0.0
 	var jungle_gank_lane: int = 1
+	# 本家野区全空时的等待计时与巡逻点：等太久就在自家野区里走动，不站成木桩。
+	var jungle_wait_t: float = 0.0
+	var jungle_patrol := Vector2.ZERO
 
 	# BOSS 技能状态：前摇、冲撞、施法目标。普通英雄不用这些字段。
 	var boss_skill: String = ""
@@ -2014,11 +2017,25 @@ func _step_jungler_ai(h, dt) -> bool:
 			best = d
 			camp = u
 	if camp == null:
+		# 自家野区全空：先在最近营地等 4 秒，再沿自家营地巡逻，避免站在角落不动。
+		if h.jungle_patrol != Vector2.ZERO:
+			if h.pos.distance_to(h.jungle_patrol) > 50.0:
+				move_ai(h, h.jungle_patrol - h.pos, dt, 0.80)
+			else:
+				h.jungle_patrol = Vector2.ZERO
+				h.moving = false
+			return true
 		if fallback_home != Vector2.ZERO and h.pos.distance_to(fallback_home) > 50.0:
 			move_ai(h, fallback_home - h.pos, dt, 0.9)
 		else:
 			h.moving = false
+			h.jungle_wait_t += dt
+			if h.jungle_wait_t >= 4.0:
+				h.jungle_wait_t = 0.0
+				h.jungle_patrol = _far_own_camp(h)
 		return true
+	h.jungle_wait_t = 0.0
+	h.jungle_patrol = Vector2.ZERO
 	var reach: float = h.attack_range + camp.radius * 0.5
 	if h.pos.distance_to(camp.pos) <= reach:
 		h.moving = false
@@ -2026,6 +2043,24 @@ func _step_jungler_ai(h, dt) -> bool:
 	else:
 		move_ai(h, camp.pos - h.pos, dt, 0.95)
 	return true
+
+
+func _far_own_camp(h) -> Vector2:
+	# 自家野区里离当前点最远的营地刷新点，用作巡逻目标（只在自家半场）。
+	var best := Vector2.ZERO
+	var bd := -1.0
+	for u in units:
+		if u.kind != JUNGLE:
+			continue
+		var own_d: float = u.pos.distance_to(base_pos(h.team))
+		var foe_d: float = u.pos.distance_to(base_pos(1 - h.team))
+		if own_d > foe_d + 100.0:
+			continue
+		var d: float = h.pos.distance_to(u.respawn_home)
+		if d > bd:
+			bd = d
+			best = u.respawn_home
+	return best
 
 
 func count_enemies_at(pos: Vector2, team: int, radius: float) -> int:
@@ -2097,9 +2132,30 @@ func has_healer_near(h, radius: float) -> bool:
 
 
 func step_minion(m, dt: float) -> void:
-	# 贴身接战：走到双方身体几乎接触才停（不再在 158 像素外隔着空气站桩）。
-	var foe = nearest_enemy(m, m.radius + 130.0)
-	if foe != null and m.pos.distance_to(foe.pos) <= m.radius + foe.radius + 20.0:
+	# 先接战敌方英雄/小兵：在 150 内先朝对方靠近，贴近后再出手。
+	# 旧逻辑只按身体间隙判定；两波兵横向错开 60–140px 时会擦肩而过。
+	var unit_foe = nearest_enemy_unit(m, m.radius + 150.0)
+	if unit_foe != null:
+		var ud: float = m.pos.distance_to(unit_foe.pos)
+		var reach: float = m.radius + unit_foe.radius + 26.0
+		if ud > reach:
+			m.moving = true
+			m.face_dir = (unit_foe.pos - m.pos).normalized()
+			m.facing = 1.0 if unit_foe.pos.x >= m.pos.x else -1.0
+			var chase_k := 0.55 if m.slow_t > 0.0 else 1.0
+			move_to(m, m.pos + m.face_dir * (m.move_speed * chase_k * dt))
+			m.walk_t += dt
+			return
+		m.moving = false
+		m.facing = 1.0 if unit_foe.pos.x >= m.pos.x else -1.0
+		m.face_dir = (unit_foe.pos - m.pos).normalized()
+		if m.atk_timer <= 0.0:
+			m.atk_timer = m.atk_interval
+			m.atk_anim = 0.22
+			hit_with_fx(unit_foe, m.dmg, m, 0.0)
+		return
+	var foe = nearest_enemy(m, m.attack_range + 40.0)
+	if foe != null and m.pos.distance_to(foe.pos) <= m.radius + foe.radius + 26.0:
 		m.moving = false
 		m.facing = 1.0 if foe.pos.x >= m.pos.x else -1.0
 		m.face_dir = (foe.pos - m.pos).normalized()
@@ -2937,7 +2993,7 @@ func try_cast(h, index: int) -> void:
 		return
 	h.cds[index] = float(s.get("cd", 6.0))
 	# 小技能收招更快：技能 1/2 的施法姿势 0.34 秒，大招保留 0.5 秒。
-	h.cast_total = 0.34 if index < 2 else 0.5
+	h.cast_total = 0.34 if index < 2 else 0.9
 	h.cast_anim = h.cast_total
 	h.cast_index = index
 	h.cast_kind = str(s.get("kind", "projectile"))

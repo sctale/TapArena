@@ -210,6 +210,14 @@ func _init() -> void:
 		for issue in roster_issues:
 			print("HEROES_FAIL " + issue)
 
+	var minion_issues := _minion_checks()
+	if minion_issues.is_empty():
+		print("MINION_OK lateral_engage")
+	else:
+		failures += 1
+		for issue in minion_issues:
+			print("MINION_FAIL " + issue)
+
 	var new_issues := _new_hero_matches()
 	if new_issues.is_empty():
 		print("NEW_OK monkey/elephant/penguin/sheep/bat 3v3")
@@ -1672,6 +1680,9 @@ func _roster_checks() -> Array:
 			sim.try_cast(h, i)
 			if h.cast_index != i or str(h.cast_kind) != str(h.skills[i].get("kind", "")):
 				issues.append("%s 技能%d 施法索引/类型没有写入" % [id, i])
+			var want_cast: float = 0.34 if i < 2 else 0.9
+			if absf(h.cast_total - want_cast) > 0.01:
+				issues.append("%s 技能%d 施法时长 %.2f，期望 %.2f" % [id, i, h.cast_total, want_cast])
 			for k in range(10):
 				sim.step(1.0 / 60.0)
 		if is_nan(h.hp) or is_nan(h.pos.x) or is_nan(h.pos.y):
@@ -1696,4 +1707,36 @@ func _new_hero_matches() -> Array:
 			issues.append(id + " 胜者无效")
 		if sim.player == null or sim.player.level2_time <= 0.0:
 			issues.append(id + " 没有解锁大招")
+	return issues
+
+
+func _minion_checks() -> Array:
+	# 4.26.1：两波小兵横向错开 90px 时也要互相靠近并开打，不能擦肩而过。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 882)
+	sim.spawn_wave_lane(BattleSimScript.BLUE, 1)
+	sim.spawn_wave_lane(BattleSimScript.RED, 1)
+	var blue = null
+	var red = null
+	for m in sim.minions:
+		if m.team == BattleSimScript.BLUE and blue == null:
+			blue = m
+		elif m.team == BattleSimScript.RED and red == null:
+			red = m
+	if blue == null or red == null:
+		issues.append("没有生成测试小兵")
+		return issues
+	blue.pos = Vector2(1500, 760)
+	blue.prev_pos = blue.pos
+	blue.atk_timer = 0.0
+	red.pos = Vector2(1500, 850)
+	red.prev_pos = red.pos
+	red.atk_timer = 0.0
+	var hp0: float = blue.hp
+	var hp1: float = red.hp
+	for i in range(240):
+		sim.step(DT)
+	if blue.hp >= hp0 and red.hp >= hp1:
+		issues.append("错位小兵互相不攻击")
 	return issues
