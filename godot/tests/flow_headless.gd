@@ -19,8 +19,26 @@ func _process(_delta: float) -> bool:
 		if main.home == null:
 			failures.append("启动后没有首页")
 		else:
-			if main.home.heroes.size() != 10:
-				failures.append("首页英雄数量不是 10")
+			if main.home.heroes.size() != 20:
+				failures.append("首页英雄数量不是 20，实际 %d" % main.home.heroes.size())
+			# 两排视口：默认第 20 张在视口外，滚到底后完整可见，底部栏不动。
+			if main.home.max_grid_scroll() <= 0.0:
+				failures.append("20 人首页没有可滚动内容")
+			var grid_vp: Rect2 = main.home._grid_rect()
+			if grid_vp.encloses(main.home.card_rect(19)):
+				failures.append("第 20 张卡默认就在两排视口内")
+			main.home.set_grid_scroll(main.home.max_grid_scroll())
+			if not grid_vp.encloses(main.home.card_rect(19)):
+				failures.append("滚到底后第 20 张卡不可见")
+			main.home.set_grid_scroll(0.0)
+			# 网格内上滑应产生滚动，且松手不误触卡片。
+			var gc: Vector2 = grid_vp.get_center()
+			main.home._press(gc)
+			main.home._drag_to(gc + Vector2(0, -400))
+			main.home._release(gc + Vector2(0, -400))
+			if main.home.grid_scroll <= 1.0:
+				failures.append("网格上滑没有滚动")
+			main.home.set_grid_scroll(0.0)
 			main.home._tap(main.home.card_rect(1).get_center())
 			if not main.home.detail_open:
 				failures.append("选中卡片后没有弹出人物介绍")
@@ -60,14 +78,15 @@ func _process(_delta: float) -> bool:
 		elif main.current_hero != "fox" or main.current_difficulty != 1:
 			failures.append("选人/难度没有传进战斗：%s/%d" % [main.current_hero, main.current_difficulty])
 		# 每个英雄都应该有独立的施法/命中/大招音色。
-		for id in ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl"]:
+		for id in main.sim.defs_by_id.keys():
 			for prefix in ["cast_", "hit_", "ult_"]:
 				if not main.sfx._streams.has(prefix + id):
 					failures.append("缺少音效 " + prefix + id)
-		for id in ["fox", "rabbit", "frog", "cat", "owl"]:
-			if not main.sfx._streams.has("shoot_" + id):
+			var audio: Dictionary = main.sfx.HERO_AUDIO.get(id, {})
+			if float(audio.get("shoot", 0.0)) > 0.0 and not main.sfx._streams.has("shoot_" + id):
 				failures.append("缺少普攻音效 shoot_" + id)
 		_check_palette("3v3")
+		_check_roster_art()
 		_check_base_clear("3v3")
 		_check_audio_assets()
 	elif frame == 66:
@@ -107,8 +126,10 @@ func _process(_delta: float) -> bool:
 		else:
 			if not main.home.mode_5v5:
 				failures.append("5v5 模式没有切换")
-			if main.home.heroes.size() != 15:
-				failures.append("5v5 首页英雄数量不是 15，实际 %d" % main.home.heroes.size())
+			if main.home.heroes.size() != 20:
+				failures.append("5v5 首页英雄数量不是 20，实际 %d" % main.home.heroes.size())
+			if main.home.max_grid_scroll() <= 0.0:
+				failures.append("5v5 首页没有可滚动内容")
 			main.home._tap(main.home.start_rect().get_center())
 	elif frame == 78:
 		if main.sim == null or not main.match_active:
@@ -130,8 +151,7 @@ func _process(_delta: float) -> bool:
 
 func _check_audio_assets() -> void:
 	# 4.21：30 个音频资产 + SFX/BGM 总线 + 视图音频池。
-	var ids := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl",
-		"deer", "turtle", "hedgehog", "redpanda", "wolf", "crane"]
+	var ids: Array = main.sim.defs_by_id.keys() if main.sim != null else []
 	for id in ids:
 		for kind in ["atk", "ult"]:
 			var path := "res://assets/audio/%s/%s_%s.wav" % [kind, kind, id]
@@ -142,7 +162,7 @@ func _check_audio_assets() -> void:
 	if main.view == null:
 		failures.append("音频检查时没有视图")
 		return
-	if main.view.audio_atk.size() != 15 or main.view.audio_ult.size() != 15:
+	if main.view.audio_atk.size() != 20 or main.view.audio_ult.size() != 20:
 		failures.append("视图音频池未加载完整：atk=%d ult=%d" % [
 			main.view.audio_atk.size(), main.view.audio_ult.size()])
 	if main.view.audio_pool.is_empty():
@@ -157,8 +177,8 @@ func _check_audio_assets() -> void:
 				failures.append("ult/manifest.json 解析失败")
 			else:
 				var lines: Array = mdata["lines"]
-				if lines.size() != 15:
-					failures.append("台词 manifest 不是 15 条：%d" % lines.size())
+				if lines.size() != 20:
+					failures.append("台词 manifest 不是 20 条：%d" % lines.size())
 				var genders := {"boy": 0, "girl": 0}
 				var voices: Dictionary = {}
 				for e in lines:
@@ -173,8 +193,8 @@ func _check_audio_assets() -> void:
 					if voices.has(v):
 						failures.append("台词音色重复：" + v)
 					voices[v] = true
-				if genders["boy"] != 8 or genders["girl"] != 7:
-					failures.append("台词男女数量不是 8/7：%d/%d" % [genders["boy"], genders["girl"]])
+				if genders["boy"] != 10 or genders["girl"] != 10:
+					failures.append("台词男女数量不是 10/10：%d/%d" % [genders["boy"], genders["girl"]])
 	if main.view.voice_pool.size() != 4:
 		failures.append("台词播放器池不是 4 个：%d" % main.view.voice_pool.size())
 	else:
@@ -224,6 +244,51 @@ func _check_base_clear(tag: String) -> void:
 				if Vector2(p.x, p.z).distance_to(b.pos) < margin + b.radius - 0.5:
 					failures.append("%s %s 压到基地：%s" % [tag, str(key), str(p)])
 					return
+
+
+func _check_roster_art() -> void:
+	# 20 位英雄的模型部件 / 头像 / 大招图标都能生成，调色板 ≤64。
+	if main.sim == null or main.view == null:
+		failures.append("阵容检查时没有战斗视图")
+		return
+	var BlockModels = load("res://scripts/art/block_models.gd")
+	var Portraits = load("res://scripts/art/hero_portraits.gd")
+	var Icons = load("res://scripts/art/pixel_icons.gd")
+	var atlas = main.view.atlas
+	var portraits = Portraits.new()
+	var icons = Icons.new()
+	var ids: Array = main.sim.defs_by_id.keys()
+	if ids.size() != 20:
+		failures.append("英雄定义不是 20 位：%d" % ids.size())
+	var checked := 0
+	for id in ids:
+		var d: Dictionary = main.sim.defs_by_id[id]
+		var fur: Color = Color.from_string(str(d.get("fur", "#ffffff")), Color.WHITE)
+		var cream: Color = Color.from_string(str(d.get("cream", "#ffffff")), Color.WHITE)
+		var dark: Color = Color.from_string(str(d.get("dark", "#000000")), Color.BLACK)
+		var accent: Color = Color.from_string(str(d.get("accent", "#ffffff")), Color.WHITE)
+		var pants := str(d.get("pants", "navy"))
+		var skills: Array = d.get("skills", [])
+		if skills.size() != 3:
+			failures.append(str(id) + " 技能不是 3 条")
+		for sk in skills:
+			if str(sk.get("name", "")) == "" or str(sk.get("kind", "")) == "":
+				failures.append(str(id) + " 技能缺名称/类型")
+		var parts = BlockModels.hero_parts(str(id), atlas, fur, cream, dark, accent, pants)
+		for part in parts["mesh"].keys():
+			var mesh = parts["mesh"][part]
+			var palette: PackedColorArray = mesh.get_meta("palette", PackedColorArray())
+			if palette.size() > 64:
+				failures.append("%s/%s 调色板 %d 超过 64" % [id, part, palette.size()])
+			if int(mesh.get_meta("palette_overflow", 0)) > 0:
+				failures.append("%s/%s 调色板溢出" % [id, part])
+		if portraits.portrait(str(id), fur, cream, dark, accent) == null:
+			failures.append(str(id) + " 头像生成失败")
+		if icons.ult_icon(str(id)) == null:
+			failures.append(str(id) + " 大招图标生成失败")
+		checked += 1
+	if checked == 20:
+		print("ROSTER_OK art=20 audio=20")
 
 
 func _check_palette(tag: String) -> void:

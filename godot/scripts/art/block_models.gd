@@ -338,6 +338,82 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 44, 10.2), Vector3(9, 10, 1), "flat", cream)
 			_b(boxes, Vector3(9, 34, -14), Vector3(9, 9, 15), "fur", fur)
 			_b(boxes, Vector3(9, 38, -27), Vector3(8, 8, 11), "fur", dark)
+		"monkey":
+			# 小猴：圆耳 + 浅色吻部 + 金头箍 + 红围巾 + 上卷长尾。
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9.5 * sx, 72, 0), Vector3(9, 9, 7), "fur", fur)
+				_b(boxes, Vector3(9.5 * sx, 74, 3.2), Vector3(5, 5, 2), "flat", cream)
+				_b(boxes, Vector3(6.2 * sx, 66, 12.7), Vector3(4, 4, 2), "flat", dark)
+			_b(boxes, Vector3(0, 58, 12.6), Vector3(22, 8, 2), "flat", cream)
+			_b(boxes, Vector3(0, 60, 13.2), Vector3(5, 3, 1), "flat", dark)
+			_b(boxes, Vector3(0, 34, 10.2), Vector3(10, 9, 1), "flat", cream)
+			_b(boxes, Vector3(0, 73, 0), Vector3(27, 3, 25), "gold", Color.WHITE)
+			_b(boxes, Vector3(0, 73, 12.8), Vector3(7, 4, 2), "gold", Color.WHITE)
+			_b(boxes, Vector3(0, 51, 0), Vector3(31, 5, 24), "flat", SCARF_RED)
+			_b(boxes, Vector3(0, 30, 10.2), Vector3(20, 14, 2), "flat", accent)
+			_b(boxes, Vector3(10, 28, -14), Vector3(7, 7, 16), "fur", fur)
+			_b(boxes, Vector3(10, 36, -24), Vector3(7, 10, 7), "fur", fur)
+			_b(boxes, Vector3(4, 44, -24), Vector3(12, 6, 7), "flat", cream)
+		"elephant":
+			# 小象：大耳 + 长鼻 + 象牙 + 蓝围巾 + 宽肚皮。
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(14 * sx, 66, 0), Vector3(14, 20, 6), "fur", fur)
+				_b(boxes, Vector3(16 * sx, 68, 3.2), Vector3(9, 14, 2), "flat", cream)
+				_b(boxes, Vector3(6 * sx, 66, 12.7), Vector3(4, 4, 2), "flat", dark)
+			_b(boxes, Vector3(0, 56, 15), Vector3(9, 10, 8), "fur", fur)
+			_b(boxes, Vector3(0, 48, 18), Vector3(7, 10, 7), "fur", fur)
+			_b(boxes, Vector3(0, 41, 20), Vector3(6, 8, 6), "fur", _darker(fur, 0.9))
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(6 * sx, 52, 17), Vector3(3, 8, 3), "flat", cream)
+			_b(boxes, Vector3(0, 30, 10.3), Vector3(24, 18, 1), "flat", cream)
+			_b(boxes, Vector3(0, 51, 0), Vector3(33, 5, 26), "flat", accent)
+			_b(boxes, Vector3(0, 30, -12), Vector3(5, 5, 8), "fur", _darker(fur, 0.9))
+		"penguin":
+			# 小企鹅：白脸 + 橙喙 + 白肚皮 + 冰蓝耳罩 + 橙脚。
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(6.5 * sx, 62, 12.8), Vector3(8, 10, 2), "flat", cream)
+				_b(boxes, Vector3(5.8 * sx, 66, 13.8), Vector3(3, 3, 1), "flat", dark)
+				_b(boxes, Vector3(13 * sx, 70, 0), Vector3(7, 7, 7), "flat", accent)
+				_b(boxes, Vector3(8.2 * sx, 0, 6), Vector3(10, 3, 12), "flat", Color("f2a03c"))
+			_b(boxes, Vector3(0, 58, 15), Vector3(6, 5, 6), "flat", Color("f2a03c"))
+			_b(boxes, Vector3(0, 28, 10.3), Vector3(20, 20, 1), "flat", cream)
+			_b(boxes, Vector3(0, 50, 0), Vector3(29, 5, 23), "flat", accent)
+			_b(boxes, Vector3(0, 74, 0), Vector3(27, 3, 25), "flat", accent)
+			_b(boxes, Vector3(0, 20, -11), Vector3(8, 5, 5), "flat", dark)
+		"sheep":
+			# 小羊：羊毛卷 + 小弯角 + 粉围巾 + 金铃铛。
+			for k in range(6):
+				var wa := TAU * float(k) / 6.0
+				_b(boxes, Vector3(cos(wa) * 11.0, 73, sin(wa) * 10.0), Vector3(8, 8, 8),
+					"cream", Color.WHITE)
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(9 * sx, 72, 0), Vector3(7, 6, 6), "flat", accent)
+				_b(boxes, Vector3(8 * sx, 77, 0), Vector3(4, 7, 4), "flat", Color("b28c5c"))
+				_b(boxes, Vector3(12.5 * sx, 80, 0), Vector3(5, 3, 5), "flat", Color("b28c5c"))
+				_b(boxes, Vector3(6 * sx, 65, 12.7), Vector3(4, 4, 2), "flat", dark)
+				_b(boxes, Vector3(13 * sx, 56, -2), Vector3(10, 14, 10), "cream", Color.WHITE)
+			_b(boxes, Vector3(0, 58, 12.6), Vector3(14, 7, 2), "flat", cream)
+			_b(boxes, Vector3(0, 60, 13.2), Vector3(4, 3, 1), "flat", Color("e888a8"))
+			_b(boxes, Vector3(0, 34, 0), Vector3(28, 20, 22), "cream", Color.WHITE)
+			_b(boxes, Vector3(0, 51, 0), Vector3(30, 5, 24), "flat", accent)
+			_b(boxes, Vector3(0, 44, 10.6), Vector3(6, 6, 3), "gold", Color.WHITE)
+		"bat":
+			# 小蝠：尖耳 + 紫毛 + 小獠牙 + 紫围巾 + 两侧蝠翼（跟手臂摆动）。
+			for sx in [-1, 1]:
+				_b(boxes, Vector3(8 * sx, 73, 0), Vector3(6, 14, 5), "fur", dark)
+				_b(boxes, Vector3(8 * sx, 75, 2.8), Vector3(3, 8, 2), "flat", cream)
+				_b(boxes, Vector3(6 * sx, 64, 12.7), Vector3(4, 4, 2), "flat", accent)
+				_b(boxes, Vector3(3 * sx, 58, 13.2), Vector3(2, 4, 1), "flat", Color.WHITE)
+				_b(boxes, Vector3(25 * sx, 30, -8), Vector3(3, 26, 24), "flat", _darker(fur, 0.82),
+					{}, "arm_l" if sx < 0 else "arm_r")
+				_b(boxes, Vector3(29 * sx, 26, -14), Vector3(3, 20, 16), "fur", fur,
+					{}, "arm_l" if sx < 0 else "arm_r")
+			_b(boxes, Vector3(0, 60, 12.6), Vector3(18, 8, 2), "flat", cream)
+			_b(boxes, Vector3(0, 61, 13.2), Vector3(4, 3, 1), "flat", dark)
+			_b(boxes, Vector3(0, 34, 10.3), Vector3(10, 12, 1), "flat", cream)
+			_b(boxes, Vector3(0, 51, 0), Vector3(31, 5, 24), "flat", _darker(fur, 0.75))
+			_b(boxes, Vector3(0, 44, 10.6), Vector3(5, 5, 3), "gold", Color.WHITE)
+			_b(boxes, Vector3(0, 22, -12), Vector3(6, 5, 7), "fur", dark)
 		"crane":
 			# 小鹤：白羽 + 红顶 + 长喙 + 黑翅尖 + 细腿 + 金腿环。
 			for sx in [-1, 1]:
@@ -591,6 +667,61 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 			_b(boxes, Vector3(0, 36, -13.2), Vector3(26, 16, 2), "fur", Color(0.72, 0.76, 0.82), {}, "body")
 			_b(boxes, Vector3(0, 24, -13.8), Vector3(32, 12, 2), "fur", Color(0.80, 0.84, 0.90), {}, "body")
 			_b(boxes, Vector3(0, 24, -14.2), Vector3(32, 3, 1.6), "flat", cream, {}, "body")
+		"monkey":
+			# 金箍长棍：木杆 + 两端金环，握在手掌。
+			_wrap(boxes, Vector3(20, 31, 4), dark, "arm_r")
+			var rot := Vector3(deg_to_rad(14.0), 0, deg_to_rad(-18.0))
+			var o := Vector3(20, 30, 4)
+			_w(boxes, Vector3(20, 32, 4), Vector3(3.2, 72, 3.2), "wood", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 68, 4), Vector3(5, 6, 5), "gold", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 2, 4), Vector3(5, 6, 5), "gold", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 36, 4), Vector3(4, 2, 4), "gold", Color.WHITE, "arm_r", rot, o)
+		"elephant":
+			# 重木槌：粗木柄 + 石箍，适合缓慢重击。
+			_wrap(boxes, Vector3(20, 31, 4), dark, "arm_r")
+			var rot := Vector3(deg_to_rad(-16.0), 0, deg_to_rad(-6.0))
+			var o := Vector3(20, 30, 4)
+			_w(boxes, Vector3(20, 22, 4), Vector3(5, 50, 5), "wood", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 66, 4), Vector3(20, 16, 20), "log_side", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 69, 4), Vector3(21, 3, 21), "stone", Color(0.62, 0.63, 0.64), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 79, 4), Vector3(21, 3, 21), "stone", Color(0.62, 0.63, 0.64), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 81, 4), Vector3(21, 2, 21), "log_side", Color(0.88, 0.83, 0.74), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 64, 4), Vector3(7, 2.5, 7), "flat", Color("d8c09a"), "arm_r", rot, o)
+		"penguin":
+			# 冰晶短杖：顶端雪花 + 发光核心。
+			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
+			var rot := Vector3(deg_to_rad(8.0), 0, deg_to_rad(-8.0))
+			var o := Vector3(20, 30, 5)
+			_w(boxes, Vector3(20, 27, 5), Vector3(3.2, 38, 3.2), "wood", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 65, 5), Vector3(12, 3, 3), "ice", Color(0.85, 0.97, 1.0), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 68, 5), Vector3(3, 9, 3), "ice", Color(0.85, 0.97, 1.0), "arm_r", rot, o)
+			_w(boxes, Vector3(17, 70, 5), Vector3(3, 3, 3), "ice", Color(0.75, 0.93, 1.0), "arm_r", rot, o)
+			_w(boxes, Vector3(23, 70, 5), Vector3(3, 3, 3), "ice", Color(0.75, 0.93, 1.0), "arm_r", rot, o)
+			_w(boxes, Vector3(20, 66.5, 5.2), Vector3(3, 3, 2), "glow", Color(0.95, 1.0, 1.0), "arm_r", rot, o)
+		"sheep":
+			# 云朵杖：木杆 + 云团 + 粉心；腰间小铃铛。
+			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
+			var rot := Vector3(deg_to_rad(6.0), 0, deg_to_rad(-8.0))
+			var o := Vector3(20, 30, 5)
+			_w(boxes, Vector3(20, 27, 5), Vector3(3.2, 38, 3.2), "wood", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(16, 64, 5), Vector3(10, 7, 7), "cream", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(24, 64, 5), Vector3(10, 7, 7), "cream", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 68, 5), Vector3(12, 7, 8), "cream", Color.WHITE, "arm_r", rot, o)
+			_w(boxes, Vector3(20, 70, 5.6), Vector3(4, 4, 2), "pink", Color.WHITE, "arm_r", rot, o)
+			_b(boxes, Vector3(-14, 20, 10), Vector3(7, 8, 6), "gold", Color.WHITE, {}, "body")
+			_b(boxes, Vector3(-14, 24, 16.2), Vector3(2, 2, 1), "flat", Color("e8d08a"), {}, "body")
+		"bat":
+			# 双持音波短刃：紫刃 + 亮边，左右各一把。
+			_wrap(boxes, Vector3(20, 31, 5), dark, "arm_r")
+			_wrap(boxes, Vector3(-20, 31, 5), dark, "arm_l")
+			for sx in [-1, 1]:
+				var part := "arm_l" if sx < 0 else "arm_r"
+				var rot := Vector3(deg_to_rad(12.0), 0, deg_to_rad(-14.0 * sx))
+				var o := Vector3(20.0 * sx, 30, 5)
+				_w(boxes, Vector3(20.0 * sx, 28, 5), Vector3(3, 8, 3), "wood", Color.WHITE, part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 36, 5), Vector3(3, 14, 2), "flat", Color("b08ae8"), part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 36, 6.1), Vector3(1.0, 12, 0.6), "flat", Color("f0e0ff"), part, rot, o)
+				_w(boxes, Vector3(20.0 * sx, 50, 5), Vector3(3, 4, 2), "glow", Color(0.9, 0.8, 1.0), part, rot, o)
 		"crane":
 			# 鹤羽杖：珠光核心；云带不变
 			_wrap(boxes, Vector3(20, 31, 6), dark, "arm_r")

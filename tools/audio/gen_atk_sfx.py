@@ -12,6 +12,7 @@
 """
 import math
 import pathlib
+import shutil
 import struct
 import wave
 
@@ -19,6 +20,7 @@ import numpy as np
 
 SR = 48000
 OUT = pathlib.Path(__file__).resolve().parent / "atk"
+ASSETS = pathlib.Path(__file__).resolve().parents[2] / "godot" / "assets" / "audio" / "atk"
 
 
 def _env(n, attack=0.004, decay=6.0):
@@ -135,6 +137,11 @@ RECIPES = {
     "redpanda":  ("fire", {}),
     "wolf":      ("slash", dict(lo=1200, hi=5200, tone=0.2)),
     "crane":     ("slash", dict(lo=2000, hi=8000, tone=0.1)),
+    "monkey":    ("slash", dict(lo=1200, hi=6000, tone=0.2)),
+    "elephant":  ("thud", dict(f0=48.0)),
+    "penguin":   ("magic", dict(base=1180.0)),
+    "sheep":     ("magic", dict(base=660.0)),
+    "bat":       ("slash", dict(lo=3000, hi=12000, tone=0.12)),
 }
 
 FUNCS = {"slash": slash, "thud": thud, "wood": wood, "magic": magic,
@@ -170,6 +177,11 @@ def main():
         lines.append(f"  {p.name:22s} {kind:6s} {len(x)/SR:.2f}s")
     print("\n".join(lines))
     print(f"共 {len(RECIPES)} 条 → {OUT}")
+    # 直接覆盖游戏资产，避免生成在 tools/audio/atk 却忘记拷贝。
+    ASSETS.mkdir(parents=True, exist_ok=True)
+    for wav in OUT.glob("atk_*.wav"):
+        shutil.copy2(wav, ASSETS / wav.name)
+    print(f"已同步游戏资产 {ASSETS}")
 
 
 if __name__ == "__main__":

@@ -150,6 +150,56 @@
       "line": "风之领域，起风了。",
       "dur": 2.25,
       "lead": 0.0
+    },
+    {
+      "hero": "monkey",
+      "name": "阿跳",
+      "gender": "boy",
+      "ult": "定海神针",
+      "voice": "junlang_nanyou",
+      "line": "长棍一扫，让开！",
+      "dur": 1.25,
+      "lead": 0.01
+    },
+    {
+      "hero": "elephant",
+      "name": "阿吨",
+      "gender": "boy",
+      "ult": "大地践踏",
+      "voice": "male-qn-badao",
+      "line": "大地，听我脚步！",
+      "dur": 1.45,
+      "lead": 0.01
+    },
+    {
+      "hero": "penguin",
+      "name": "冰冰",
+      "gender": "girl",
+      "ult": "暴风雪",
+      "voice": "Chinese (Mandarin)_Crisp_Girl",
+      "line": "冰雪，听我号令！",
+      "dur": 2.07,
+      "lead": 0.01
+    },
+    {
+      "hero": "sheep",
+      "name": "云朵",
+      "gender": "girl",
+      "ult": "暖云牧场",
+      "voice": "Sweet_Girl",
+      "line": "云朵，护住大家！",
+      "dur": 1.54,
+      "lead": 0.01
+    },
+    {
+      "hero": "bat",
+      "name": "夜羽",
+      "gender": "girl",
+      "ult": "音波风暴",
+      "voice": "female-yujie",
+      "line": "黑夜，为我让路！",
+      "dur": 2.13,
+      "lead": 0.0
     }
   ],
   "failed": []

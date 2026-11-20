@@ -37,6 +37,11 @@ LINES = [
     ("redpanda", "火火", "boy",  "烈焰冲锋", "male-qn-daxuesheng",                      1.08,  0, "烈焰冲锋，烧起来！"),
     ("wolf",     "灰灰", "boy",  "猎影突袭", "male-qn-jingying",                        0.96, -1, "猎影突袭！"),
     ("crane",    "小白", "girl", "风之领域", "female-tianmei",                          1.00,  0, "风之领域，起风了。"),
+    ("monkey",   "阿跳", "boy",  "定海神针", "junlang_nanyou",                          1.06, -1, "长棍一扫，让开！"),
+    ("elephant", "阿吨", "boy",  "大地践踏", "male-qn-badao",                           0.94, -1, "大地，听我脚步！"),
+    ("penguin",  "冰冰", "girl", "暴风雪",   "Chinese (Mandarin)_Crisp_Girl",           1.04,  1, "冰雪，听我号令！"),
+    ("sheep",    "云朵", "girl", "暖云牧场", "Sweet_Girl",                              1.02,  0, "云朵，护住大家！"),
+    ("bat",      "夜羽", "girl", "音波风暴", "female-yujie",                            1.04,  0, "黑夜，为我让路！"),
 ]
 
 

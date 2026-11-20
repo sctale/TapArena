@@ -8,7 +8,7 @@
 - **唯一主线：Godot 4.7.2 版**，工程在 `godot/`，出 Android APK。
 - **Web 版 1.3 已冻结**：`www/`、`android/`、`build.ps1`、`开始游戏.cmd` 属于历史存档，不接收功能更新。
 - **Unity 3.2.0 存档已移除**（2026-11-15），不要再引入 Unity 相关文件、脚本或文档。
-- 玩法：3v3 单路 / 5v5 三路森林推塔，15 位自制像素动物英雄（5v5 额外解锁 5 位），6 个野区营地；无联网、无内购、无广告。
+- 玩法：3v3 单路 / 5v5 三路森林推塔，20 位自制像素动物英雄（3v3/5v5 都可选），6 个野区营地；无联网、无内购、无广告。
 
 ## 2. 目录与职责
 
@@ -22,7 +22,7 @@ godot/                        唯一主线工程
   scripts/ui/home.gd          首页选人（版本号从 project.godot 读取）
   scripts/ui/input_hub.gd     触屏摇杆 + 技能 + 键盘
   scripts/art/                像素图集、图标、体素模型
-  data/heroes.json            15 位英雄与 45 个技能
+  data/heroes.json            20 位英雄与 60 个技能
   data/rules.json             数值、节奏、巨兽与结算规则
   tests/sim_headless.gd       10 局回归 + 规则单测（SIM_OK / RULE_OK）
   tests/flow_headless.gd      首页→战斗→首页状态机（FLOW_OK）
@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 65），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 66），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell

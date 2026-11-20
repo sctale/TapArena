@@ -1509,6 +1509,22 @@ func _weapon_strike(u) -> void:
 		"axolotl":
 			_spawn_tip_spark(at, u.face_dir, Color("b8f0ff"))
 			_spawn_ring(at, Color("8ff0e0"), 38.0, 0.30)
+		"monkey":
+			_spawn_swing_arc(at, u.face_dir, Color("f2c14e"), 54.0)
+			_spawn_tip_spark(at, u.face_dir, Color("ffe08a"))
+		"elephant":
+			_spawn_swing_arc(at, u.face_dir, Color("a8b8c8"), 56.0)
+			_spawn_ring(at, Color("8a9bb0"), 58.0, 0.45)
+			_spawn_debris(at + Vector3(0, 4, 0), Color("8a9bb0"), 4)
+		"penguin":
+			_spawn_tip_spark(at, u.face_dir, Color("bfe9ff"))
+			_spawn_burst(at + Vector3(0, 44, 0), Color("dff6ff"), 0.12)
+		"sheep":
+			_spawn_tip_spark(at, u.face_dir, Color("f6aebc"))
+			_spawn_style("heart", at + Vector3(0, 10, 0), Color("f6aebc"), 60.0)
+		"bat":
+			_spawn_swing_arc(at, u.face_dir, Color("c0a0f0"), 52.0)
+			_spawn_tip_spark(at, u.face_dir, Color("e0d0ff"))
 
 
 func _spawn_swing_arc(center: Vector3, dir: Vector2, c: Color, radius := 46.0) -> void:
@@ -1662,6 +1678,10 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_leaves(pos, color, maxf(radius, 130.0))
 		"boomerang":
 			_spawn_stars(pos, color, 4, maxf(radius, 90.0))
+		"sonic":
+			_spawn_ring(pos, color, maxf(radius, 150.0), 0.55)
+			_spawn_ring(pos, color, maxf(radius, 90.0), 0.35)
+			_spawn_burst(pos, color, 0.30)
 		"beam", "chain":
 			_spawn_burst(pos, color, 0.30)
 		_:

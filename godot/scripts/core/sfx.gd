@@ -21,6 +21,13 @@ const HERO_AUDIO := {
 	"redpanda": {"cast0": 300.0, "cast1": 720.0, "wave": "square", "hit0": 280.0, "hit1": 140.0, "noise": 0.42, "shoot": 0.0},
 	"wolf": {"cast0": 420.0, "cast1": 960.0, "wave": "triangle", "hit0": 300.0, "hit1": 120.0, "noise": 0.38, "shoot": 0.0},
 	"crane": {"cast0": 700.0, "cast1": 1700.0, "wave": "sine", "hit0": 660.0, "hit1": 990.0, "noise": 0.10, "shoot": 1120.0},
+	"axolotl": {"cast0": 460.0, "cast1": 980.0, "wave": "sine", "hit0": 520.0, "hit1": 760.0, "noise": 0.05, "shoot": 780.0},
+	"deer": {"cast0": 680.0, "cast1": 1600.0, "wave": "triangle", "hit0": 640.0, "hit1": 980.0, "noise": 0.08, "shoot": 1020.0},
+	"monkey": {"cast0": 360.0, "cast1": 900.0, "wave": "triangle", "hit0": 300.0, "hit1": 150.0, "noise": 0.30, "shoot": 0.0},
+	"elephant": {"cast0": 150.0, "cast1": 380.0, "wave": "square", "hit0": 110.0, "hit1": 45.0, "noise": 0.70, "shoot": 0.0},
+	"penguin": {"cast0": 620.0, "cast1": 1500.0, "wave": "sine", "hit0": 720.0, "hit1": 1200.0, "noise": 0.08, "shoot": 980.0},
+	"sheep": {"cast0": 560.0, "cast1": 880.0, "wave": "sine", "hit0": 480.0, "hit1": 720.0, "noise": 0.06, "shoot": 720.0},
+	"bat": {"cast0": 780.0, "cast1": 1800.0, "wave": "triangle", "hit0": 820.0, "hit1": 1300.0, "noise": 0.10, "shoot": 0.0},
 }
 
 var enabled := true

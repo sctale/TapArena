@@ -22,7 +22,6 @@ const BASE := 3
 const BOSS := 4
 const JUNGLE := 5
 const NEUTRAL := 2
-const BASE_HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl", "deer"]
 # 不需要敌方目标的自身/区域技能；其余方向型技能走智能瞄准。
 const SELF_SKILL_KINDS := ["aoe", "radial", "heal", "heal_zone", "shield", "vanish",
 	"spin", "taunt", "fear", "mark"]
@@ -399,8 +398,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	var others: Array = []
 	for d in heroes_data:
 		var hid := str(d.get("id", ""))
-		if not five_v_five and not BASE_HERO_IDS.has(hid):
-			continue
+		# 3v3 与 5v5 都开放全部英雄（2026-11-20 起 20 位），只是上场人数不同。
 		if hid != player_hero:
 			others.append(hid)
 	for i in range(others.size() - 1, 0, -1):
@@ -994,12 +992,8 @@ func step_boss(u, dt: float) -> void:
 		if u.cds[1] <= 0.0 and count_enemy_units_near(u, float(second.get("radius", 300.0))) > 0:
 			_begin_boss_cast(u, "cyclone", second, 1)
 			return
-		var front_fly = front_structure(u.team, 1 if five_v_five else -1)
-		if front_fly != null and front_fly.is_alive():
-			var fd2: float = u.pos.distance_to(front_fly.pos)
-			if fd2 > u.attack_range * 0.8:
-				_move_along_lane(u, dt, 0.92)
-				return
+		# 不再在这里「向前塔移动并 return」：那会让巨兽从路径敌人头顶飞过去。
+		# 飞行形态与地面形态共用下面的选敌/普攻/推塔逻辑。
 	else:
 		# 地面形态：裂地重击 / 咆哮 / 冲撞。
 		if u.cds[0] <= 0.0 and count_enemy_units_near(u, float(first.get("radius", 250.0))) > 0:

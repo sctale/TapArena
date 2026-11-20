@@ -63,6 +63,8 @@ func _ready() -> void:
 			current_hero = str(a).substr(7)
 		elif str(a) == "--mode=5v5":
 			current_mode_5v5 = true
+		elif str(a).begins_with("--difficulty="):
+			current_difficulty = clampi(int(str(a).substr(13)), 0, 1)
 	if "--skip-home" in args or "--top" in args or "--no-hud" in args:
 		_start_match(current_hero, current_difficulty, current_seed, current_mode_5v5)
 	else:
@@ -95,6 +97,11 @@ func _show_home() -> void:
 	add_child(home)
 	home.mode_5v5 = current_mode_5v5
 	home._apply_mode()
+	home.difficulty = current_difficulty
+	for i in range(home.heroes.size()):
+		if str(home.heroes[i].get("id", "")) == current_hero:
+			home.sel_index = i
+			break
 	home._refresh_labels()
 	home.start_requested.connect(_on_home_start)
 	home.ui_click.connect(_on_ui_click)

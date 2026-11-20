@@ -87,11 +87,11 @@
     "hp": 4200,
     "radius": 58,
     "height": 140,
-    "range": 350,
-    "dmg": 100,
+    "range": 380,
+    "dmg": 110,
     "atk_interval": 1.0,
     "hp_5v5": 2600,
-    "dmg_5v5": 82
+    "dmg_5v5": 90
   },
   "minion": {
     "hp": 280,

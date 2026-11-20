@@ -51,6 +51,8 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 		"panda": accent, "owl": Color("485474"), "axolotl": accent,
 		"deer": accent, "turtle": Color("e0604f"), "hedgehog": Color("e0604f"),
 		"redpanda": Color("f2c14e"), "wolf": Color("485474"), "crane": accent,
+		"monkey": Color("e0604f"), "elephant": accent, "penguin": accent,
+		"sheep": Color("f6aebc"), "bat": Color("2e2440"),
 	}.get(id, accent)
 	_add(ops, _rect(8, 24, 16, 3), scarf)
 	_add(ops, _rect(13, 26, 6, 2), _lighter(scarf, 0.10))
@@ -172,6 +174,51 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(10, 16, 12, 5), cream)
 			_add(ops, _rect(15, 16, 2, 2), dark)
 			_add(ops, _rect(11, 10, 3, 2), cream)
+		"monkey":
+			_add(ops, _disc(7, 5, 3), fur)
+			_add(ops, _disc(25, 5, 3), fur)
+			_add(ops, _disc(7, 5, 1.4), cream)
+			_add(ops, _disc(25, 5, 1.4), cream)
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(15, 16, 2, 2), dark)
+			_add(ops, _rect(9, 6, 14, 2), Color("f2c14e"))
+			_add(ops, _rect(15, 5, 2, 3), Color("f2c14e"))
+			_add(ops, _rect(23, 24, 3, 6), fur)
+			_add(ops, _rect(25, 28, 3, 3), fur)
+		"elephant":
+			for sx in [-1, 1]:
+				_add(ops, _rect(1 if sx < 0 else 25, 8, 6, 14), fur)
+				_add(ops, _rect(2 if sx < 0 else 26, 10, 4, 10), cream)
+			_add(ops, _rect(14, 18, 4, 10), fur)
+			_add(ops, _rect(10, 20, 3, 5), cream)
+			_add(ops, _rect(19, 20, 3, 5), cream)
+			_add(ops, _rect(10, 24, 12, 3), cream)
+			_add(ops, _rect(14, 17, 4, 2), dark)
+		"penguin":
+			for sx in [-1, 1]:
+				_add(ops, _disc(5 if sx < 0 else 27, 9, 3), accent)
+				_add(ops, _rect(7 if sx < 0 else 18, 8, 7, 10), cream)
+			_add(ops, _rect(14, 0, 4, 3), accent)
+			_add(ops, _poly([Vector2(14, 18), Vector2(18, 18), Vector2(16, 21)]), Color("f2a03c"))
+			_add(ops, _rect(13, 25, 6, 2), cream)
+		"sheep":
+			for k in range(6):
+				var wa := TAU * float(k) / 6.0
+				_add(ops, _disc(16.0 + cos(wa) * 9.0, 8.0 + sin(wa) * 7.0, 3.2), cream)
+			_add(ops, _rect(7, 3, 4, 3), Color("b28c5c"))
+			_add(ops, _rect(21, 3, 4, 3), Color("b28c5c"))
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(15, 17, 2, 2), Color("e888a8"))
+			_add(ops, _rect(13, 26, 6, 2), Color("f2c14e"))
+		"bat":
+			_add(ops, _poly([Vector2(10, 7), Vector2(9, 0), Vector2(15, 6)]), dark)
+			_add(ops, _poly([Vector2(22, 7), Vector2(23, 0), Vector2(17, 6)]), dark)
+			_add(ops, _rect(3, 12, 4, 14), _darker(fur, 0.8))
+			_add(ops, _rect(25, 12, 4, 14), _darker(fur, 0.8))
+			_add(ops, _rect(10, 16, 12, 5), cream)
+			_add(ops, _rect(13, 18, 2, 3), Color.WHITE)
+			_add(ops, _rect(17, 18, 2, 3), Color.WHITE)
+			_add(ops, _rect(15, 23, 2, 2), Color("f2c14e"))
 		"crane":
 			_add(ops, _rect(14, 0, 4, 4), accent)
 			_add(ops, _poly([Vector2(14, 16), Vector2(18, 16), Vector2(16, 22)]), accent)
@@ -252,6 +299,23 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(7, 22, 18, 3), Color("485474"))
 			for k in range(3):
 				_add(ops, _rect(12 + k * 3, 25, 2, 3), Color("f2f4f6"))
+		"monkey":
+			_add(ops, _rect(6, 23, 20, 3), Color("e0604f"))
+			_add(ops, _rect(4, 27, 3, 3), Color("f2c14e"))
+		"elephant":
+			_add(ops, _rect(8, 23, 16, 3), accent)
+			_add(ops, _rect(15, 26, 2, 2), Color("f2c14e"))
+		"penguin":
+			_add(ops, _rect(9, 23, 14, 2), accent)
+			_add(ops, _rect(14, 27, 4, 2), cream)
+		"sheep":
+			_add(ops, _rect(9, 23, 14, 3), accent)
+			_add(ops, _disc(16, 27, 2.2), Color("f2c14e"))
+			_add(ops, _rect(15, 26, 2, 1), Color("e8d08a"))
+		"bat":
+			_add(ops, _rect(7, 22, 18, 3), Color("2e2440"))
+			_add(ops, _rect(15, 23, 2, 3), Color("f2c14e"))
+			_add(ops, _rect(13, 26, 6, 2), _darker(Color("5a4a78"), 0.8))
 		"crane":
 			_add(ops, _rect(9, 23, 14, 2), Color("f2c14e"))
 			_add(ops, _rect(15, 22, 2, 2), Color("f2c14e"))
@@ -331,6 +395,30 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(29, 12, 1, 5), Color("dfe8f0"))
 			_add(ops, _rect(4, 25, 3, 6), Color("9aa8b8"))
 			_add(ops, _rect(25, 25, 3, 6), Color("9aa8b8"))
+		"monkey":
+			_add(ops, _rect(29, 4, 2, 23), Color("b28c5c"))
+			_add(ops, _rect(28, 3, 4, 2), Color("f2c14e"))
+			_add(ops, _rect(28, 26, 4, 2), Color("f2c14e"))
+		"elephant":
+			_add(ops, _rect(28, 12, 2, 14), Color("b28c5c"))
+			_add(ops, _rect(24, 5, 8, 7), Color("8a5a3b"))
+			_add(ops, _rect(24, 6, 8, 1), Color("9aa39a"))
+			_add(ops, _rect(24, 10, 8, 1), Color("9aa39a"))
+		"penguin":
+			_add(ops, _rect(28, 8, 2, 16), Color("b28c5c"))
+			_add(ops, _rect(26, 5, 6, 2), Color("9fe8f0"))
+			_add(ops, _rect(28, 4, 2, 5), Color("9fe8f0"))
+			_add(ops, _rect(27, 6, 4, 1), Color("c8f4ff"))
+		"sheep":
+			_add(ops, _rect(28, 9, 2, 15), Color("b28c5c"))
+			_add(ops, _rect(24, 5, 7, 5), Color("f5eedc"))
+			_add(ops, _rect(26, 3, 4, 3), Color("f5eedc"))
+			_add(ops, _rect(27, 6, 2, 2), Color("f6aebc"))
+		"bat":
+			_add(ops, _rect(2, 10, 2, 12), Color("b08ae8"))
+			_add(ops, _rect(29, 10, 2, 12), Color("b08ae8"))
+			_add(ops, _rect(1, 8, 1, 4), Color("f0e0ff"))
+			_add(ops, _rect(30, 8, 1, 4), Color("f0e0ff"))
 		"crane":
 			_add(ops, _rect(28, 8, 2, 16), Color("b28c5c"))
 			_add(ops, _rect(25, 5, 7, 2), Color("f5eedc"))

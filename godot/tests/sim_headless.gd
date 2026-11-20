@@ -194,6 +194,30 @@ func _init() -> void:
 		for issue in boss_issues:
 			print("BOSS_FAIL " + issue)
 
+	var air_issues := _boss_air_checks()
+	if air_issues.is_empty():
+		print("BOSS_AIR_OK flying_hits_path_enemy")
+	else:
+		failures += 1
+		for issue in air_issues:
+			print("BOSS_AIR_FAIL " + issue)
+
+	var roster_issues := _roster_checks()
+	if roster_issues.is_empty():
+		print("HEROES_OK roster=20 skills=3")
+	else:
+		failures += 1
+		for issue in roster_issues:
+			print("HEROES_FAIL " + issue)
+
+	var new_issues := _new_hero_matches()
+	if new_issues.is_empty():
+		print("NEW_OK monkey/elephant/penguin/sheep/bat 3v3")
+	else:
+		failures += 1
+		for issue in new_issues:
+			print("NEW_FAIL " + issue)
+
 	if failures == 0:
 		print("SIM_OK matches=%d dt=%.4f" % [MATCHES, DT])
 		quit(0)
@@ -1580,4 +1604,94 @@ func _boss_checks() -> Array:
 			ally.prev_pos = ally.pos
 			if sim.ai_target(ally) != boss:
 				issues.append(tag + "巨兽 AI 不集火")
+	return issues
+
+
+func _boss_air_checks() -> Array:
+	# 4.24：飞行巨兽在前塔很远时也要攻击路径上的敌人，不能直接飞过去。
+	var issues: Array = []
+	for flying in [true, false]:
+		var tag: String = "飞行" if flying else "地面"
+		var sim = BattleSimScript.new()
+		sim.setup("tiger", 0, 881)
+		sim.spawn_boss(BattleSimScript.RED)
+		var boss = sim.boss
+		if boss == null:
+			issues.append(tag + "巨兽没有生成")
+			continue
+		boss.boss_phase = 2 if flying else 1
+		boss.boss_flying = flying
+		boss.cds = [99.0, 99.0, 99.0]
+		boss.atk_timer = 0.0
+		boss.stun_t = 0.0
+		# 玩家站在巨兽身边 100px（巨兽是红方，玩家是蓝方）；前塔远在另一头。
+		var h = sim.player
+		h.pos = boss.pos + Vector2(100, 0)
+		h.prev_pos = h.pos
+		h.hp = h.max_hp
+		h.invuln_t = 0.0
+		var before: float = h.hp
+		var start_x: float = boss.pos.x
+		for i in range(90):
+			sim.step(1.0 / 60.0)
+		if h.hp >= before:
+			issues.append(tag + "巨兽没有攻击路径上的敌人")
+		if absf(boss.pos.x - start_x) > 60.0:
+			issues.append(tag + "巨兽没有停下来打人（位移 %.1f）" % absf(boss.pos.x - start_x))
+	return issues
+
+
+func _roster_checks() -> Array:
+	# 4.24：20 位英雄都能建局，三条技能都能释放且不产生 NaN。
+	var issues: Array = []
+	var ids := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl",
+		"deer", "turtle", "hedgehog", "redpanda", "wolf", "crane",
+		"monkey", "elephant", "penguin", "sheep", "bat"]
+	for id in ids:
+		var sim = BattleSimScript.new()
+		sim.setup(id, 0, 660)
+		var h = sim.player
+		if h == null or str(h.hero_id) != id:
+			issues.append(id + " 建局失败")
+			continue
+		if h.skills.size() != 3:
+			issues.append(id + " 技能不是 3 条")
+			continue
+		h.level = 2
+		h.xp = sim.xp_to_level2
+		var foe = null
+		for u in sim.heroes:
+			if u.team != h.team:
+				foe = u
+				break
+		if foe != null:
+			foe.pos = h.pos + Vector2(160, 0)
+			foe.prev_pos = foe.pos
+		for i in range(3):
+			h.cds[i] = 0.0
+			sim.try_cast(h, i)
+			for k in range(10):
+				sim.step(1.0 / 60.0)
+		if is_nan(h.hp) or is_nan(h.pos.x) or is_nan(h.pos.y):
+			issues.append(id + " 技能后出现 NaN")
+	return issues
+
+
+func _new_hero_matches() -> Array:
+	# 4.24 新增 5 位英雄：各跑一局 3v3，确认对局能收束、能升 2 级。
+	var issues: Array = []
+	for id in ["monkey", "elephant", "penguin", "sheep", "bat"]:
+		var sim = BattleSimScript.new()
+		sim.setup(id, 0, 770)
+		var elapsed := 0.0
+		while not sim.over and elapsed < 320.0:
+			sim.step(DT)
+			elapsed += DT
+		if not sim.over:
+			issues.append(id + " 对局没有结束")
+			continue
+		if sim.winner != BattleSimScript.BLUE and sim.winner != BattleSimScript.RED:
+			issues.append(id + " 胜者无效")
+		if sim.player == null or sim.player.level2_time <= 0.0:
+			issues.append(id + " 没有解锁大招")
 	return issues

@@ -8,7 +8,8 @@ signal start_requested(hero_id: String, difficulty: int, mode_5v5: bool)
 signal ui_click
 
 const HeroPortraitsScript = preload("res://scripts/art/hero_portraits.gd")
-const BASE_HERO_IDS := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl", "deer"]
+const GRID_COLS := 5
+const GRID_ROWS_VISIBLE := 2
 const GOLD := Color("f5c542")
 const CREAM := Color("f5eedc")
 const PANEL_FILL := Color("2b3531")
@@ -18,6 +19,11 @@ const PANEL_DARK := Color("0f1512")
 const INK := Color("221a12")
 const GREEN := Color("5aa83c")
 const SKY := Color("9fd9f2")
+const MODE3_ON := Color("4fc3e8")
+const MODE5_ON := Color("f0845c")
+const EASY_ON := Color("7fc45c")
+const CHALLENGE_ON := Color("e0604f")
+const BTN_OFF := Color("4a5a50")
 const GRASS := Color("7fc45c")
 
 var all_heroes: Array = []
@@ -29,6 +35,11 @@ var font: Font = null
 var icons = null
 var portraits = null
 var detail_open := false
+var grid_scroll := 0.0
+var drag_active := false
+var drag_start := Vector2.ZERO
+var drag_start_scroll := 0.0
+var drag_moved := false
 
 var lbl_title: Label
 var lbl_sub: Label
@@ -79,7 +90,13 @@ func _ready() -> void:
 		# main 在 add_child 之后还会调一次 _apply_mode()，会关掉弹窗；延后一帧再开。
 		_open_detail_debug.call_deferred()
 	_refresh_labels()
+	if "--grid-bottom" in OS.get_cmdline_user_args():
+		_set_grid_bottom.call_deferred()
 	set_process(true)
+
+
+func _set_grid_bottom() -> void:
+	set_grid_scroll(max_grid_scroll())
 
 
 func viewport_size() -> Vector2:
@@ -119,12 +136,12 @@ func _open_detail_debug() -> void:
 
 
 func _apply_mode() -> void:
+	# 2026-11-20：3v3 与 5v5 都开放全部英雄（当前 20 位），只是对局人数不同。
 	heroes.clear()
 	for d in all_heroes:
-		var hid := str(d.get("id", ""))
-		if mode_5v5 or BASE_HERO_IDS.has(hid):
-			heroes.append(d)
+		heroes.append(d)
 	sel_index = clampi(sel_index, 0, maxi(0, heroes.size() - 1))
+	grid_scroll = 0.0
 	detail_open = false
 
 
@@ -171,16 +188,48 @@ func _bar_rect() -> Rect2:
 		safe.size.x * 0.91, safe.size.y * 0.188)
 
 
+func _grid_gap() -> float:
+	return _grid_rect().size.x * 0.010
+
+
+func _grid_card_size() -> Vector2:
+	# 视口固定两排；第三排起靠滚动，不再把卡片压扁。
+	var g := _grid_rect()
+	var gap := _grid_gap()
+	var cw := (g.size.x - gap * float(GRID_COLS - 1)) / float(GRID_COLS)
+	var ch := (g.size.y - gap * float(GRID_ROWS_VISIBLE - 1)) / float(GRID_ROWS_VISIBLE)
+	return Vector2(cw, ch)
+
+
+func _grid_content_h() -> float:
+	var cs := _grid_card_size()
+	var rows := int(ceil(float(maxi(1, heroes.size())) / float(GRID_COLS)))
+	return float(rows) * cs.y + float(maxi(0, rows - 1)) * _grid_gap()
+
+
+func max_grid_scroll() -> float:
+	return maxf(0.0, _grid_content_h() - _grid_rect().size.y)
+
+
+func set_grid_scroll(v: float) -> void:
+	grid_scroll = clampf(v, 0.0, max_grid_scroll())
+	_refresh_labels()
+	queue_redraw()
+
+
+func _card_fully_visible(card: Rect2) -> bool:
+	var g := _grid_rect()
+	return card.position.y >= g.position.y - 0.5 and card.end.y <= g.end.y + 0.5 		and card.position.x >= g.position.x - 0.5 and card.end.x <= g.end.x + 0.5
+
+
 func card_rect(i: int) -> Rect2:
 	var g := _grid_rect()
-	var cols := 5
-	var rows := int(ceil(float(heroes.size()) / float(cols)))
-	var gap := g.size.x * 0.010
-	var cw := (g.size.x - gap * float(cols - 1)) / float(cols)
-	var ch := (g.size.y - gap * float(maxi(1, rows - 1))) / float(maxi(1, rows))
-	var col := i % cols
-	var row := i / cols
-	return Rect2(g.position + Vector2(float(col) * (cw + gap), float(row) * (ch + gap)), Vector2(cw, ch))
+	var gap := _grid_gap()
+	var cs := _grid_card_size()
+	var col := i % GRID_COLS
+	var row := i / GRID_COLS
+	return Rect2(Vector2(g.position.x + float(col) * (cs.x + gap),
+		g.position.y + float(row) * (cs.y + gap) - grid_scroll), cs)
 
 
 func mode3_rect() -> Rect2:
@@ -363,6 +412,7 @@ func _refresh_labels() -> void:
 		hero_name_labels[i].text = "%s · %s" % [str(d.get("name", "?")), str(d.get("role", ""))]
 		hero_name_labels[i].add_theme_color_override("font_color",
 			GOLD if i == sel_index else CREAM)
+		hero_name_labels[i].visible = (not detail_open) and _card_fully_visible(card)
 		hero_blurb_labels[i].visible = false
 	for i in range(heroes.size(), hero_name_labels.size()):
 		hero_name_labels[i].visible = false
@@ -386,7 +436,7 @@ func _refresh_labels() -> void:
 	_place(lbl_start, start_rect())
 	lbl_start.text = "开始冒险"
 	_place(lbl_hint, hint_rect())
-	lbl_hint.text = ("15 位英雄" if mode_5v5 else "10 位英雄") + " · 点卡片看技能"
+	lbl_hint.text = "%d 位英雄 · 点卡片看技能（上滑看更多）" % heroes.size()
 	_place(lbl_foot, _version_rect())
 	lbl_foot.text = "v%s · Godot 4.7.2" % str(
 		ProjectSettings.get_setting("application/config/version", "dev"))
@@ -442,8 +492,6 @@ func _refresh_labels() -> void:
 	for l in [lbl_title, lbl_sub, lbl_start, lbl_easy, lbl_challenge, lbl_mode3, lbl_mode5,
 			lbl_hint, lbl_foot, lbl_mode_tag, lbl_diff_tag]:
 		l.visible = main_visible
-	for l in hero_name_labels:
-		l.visible = main_visible
 	for l in [lbl_detail_name, lbl_detail_sub, lbl_detail_blurb, lbl_detail_tip,
 			lbl_detail_mode, lbl_detail_close, lbl_detail_start]:
 		l.visible = detail_open
@@ -477,9 +525,17 @@ func _draw() -> void:
 	_panel(_brand_rect(), PANEL_FILL)
 	_panel(_version_badge_rect(), PANEL_DEEP)
 
+	var grid_r := _grid_rect()
 	for i in range(heroes.size()):
 		var card := card_rect(i)
+		var vis := card.intersection(grid_r)
+		if vis.size.x <= 0.0 or vis.size.y <= 0.0:
+			continue
 		var selected := i == sel_index
+		if not _card_fully_visible(card):
+			# 滚到视口边缘的半张卡只画底板，头像/名字等滚全了再出现。
+			draw_rect(vis, Color("2f4038") if selected else PANEL_DEEP)
+			continue
 		_panel(card, Color("2f4038") if selected else PANEL_DEEP)
 		if selected:
 			_outline(card, GOLD, 4.0)
@@ -498,6 +554,16 @@ func _draw() -> void:
 		draw_rect(Rect2(card.position.x + 8, card.end.y - 8, card.size.x - 16, 3),
 			d.get("accent_c", GOLD))
 
+	# 滚动条：内容超过两排时显示，提示下面还有人物。
+	var max_s := max_grid_scroll()
+	if max_s > 0.5:
+		var track := Rect2(grid_r.end.x - 5.0, grid_r.position.y, 4.0, grid_r.size.y)
+		draw_rect(track, Color(0, 0, 0, 0.22))
+		var frac := grid_r.size.y / _grid_content_h()
+		var th := maxf(28.0, grid_r.size.y * frac)
+		var ty := grid_r.position.y + (grid_r.size.y - th) * (grid_scroll / max_s)
+		draw_rect(Rect2(track.position.x, ty, 4.0, th), Color(1, 1, 1, 0.5))
+
 	_panel(_bar_rect(), PANEL_DEEP)
 
 	var start := start_rect()
@@ -512,16 +578,16 @@ func _draw() -> void:
 	draw_colored_polygon(tri, PANEL_DARK)
 
 	var m3 := mode3_rect()
-	draw_rect(m3, GOLD if not mode_5v5 else Color("4a5a50"))
+	draw_rect(m3, BTN_OFF if mode_5v5 else MODE3_ON)
 	_outline(m3, PANEL_DARK, 3.0)
 	var m5 := mode5_rect()
-	draw_rect(m5, GOLD if mode_5v5 else Color("4a5a50"))
+	draw_rect(m5, MODE5_ON if mode_5v5 else BTN_OFF)
 	_outline(m5, PANEL_DARK, 3.0)
 	var er := easy_rect()
-	draw_rect(er, GOLD if difficulty == 0 else Color("4a5a50"))
+	draw_rect(er, EASY_ON if difficulty == 0 else BTN_OFF)
 	_outline(er, PANEL_DARK, 3.0)
 	var cr := challenge_rect()
-	draw_rect(cr, GOLD if difficulty == 1 else Color("4a5a50"))
+	draw_rect(cr, CHALLENGE_ON if difficulty == 1 else BTN_OFF)
 	_outline(cr, PANEL_DARK, 3.0)
 
 	if detail_open:
@@ -605,12 +671,71 @@ func _outline(r: Rect2, c: Color, t: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
-	if event is InputEventScreenTouch and event.pressed:
-		_tap(event.position)
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_press(event.position)
+		else:
+			_release(event.position)
+	elif event is InputEventScreenDrag:
+		_drag_to(event.position)
+	elif event is InputEventMouseButton:
 		# Android 上鼠标事件是从触摸模拟出来的，坐标空间可能不同，直接忽略。
-		if OS.get_name() != "Android":
-			_tap(event.position)
+		if OS.get_name() == "Android":
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_press(event.position)
+			else:
+				_release(event.position)
+		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			set_grid_scroll(grid_scroll - _grid_card_size().y * 0.45)
+			_snap_grid_scroll()
+		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			set_grid_scroll(grid_scroll + _grid_card_size().y * 0.45)
+			_snap_grid_scroll()
+	elif event is InputEventMouseMotion and drag_active:
+		_drag_to(event.position)
+
+
+func _press(pos: Vector2) -> void:
+	if detail_open:
+		_tap(pos)
+		return
+	# 只有从网格里按下才可能是滚动；按钮仍按下即生效，保持原来的手感。
+	drag_active = _grid_rect().has_point(pos)
+	drag_start = pos
+	drag_start_scroll = grid_scroll
+	drag_moved = false
+	if not drag_active:
+		_tap(pos)
+
+
+func _drag_to(pos: Vector2) -> void:
+	if not drag_active:
+		return
+	var dy := pos.y - drag_start.y
+	if absf(dy) > 10.0:
+		drag_moved = true
+	if drag_moved:
+		set_grid_scroll(drag_start_scroll - dy)
+
+
+func _release(pos: Vector2) -> void:
+	if not drag_active:
+		return
+	drag_active = false
+	if drag_moved:
+		_snap_grid_scroll()
+	else:
+		_tap(pos)
+
+
+func _snap_grid_scroll() -> void:
+	# 松手后按整排吸附，避免停在两排之间露出半张空卡。
+	var step := _grid_card_size().y + _grid_gap()
+	if step <= 1.0:
+		return
+	set_grid_scroll(roundf(grid_scroll / step) * step)
 
 
 func _tap(pos: Vector2) -> void:
@@ -635,8 +760,10 @@ func _tap(pos: Vector2) -> void:
 		# 弹窗内的技能区不响应点击，避免误触关闭。
 		return
 
+	var grid_r := _grid_rect()
 	for i in range(heroes.size()):
-		if card_rect(i).has_point(pos):
+		var cr := card_rect(i)
+		if grid_r.has_point(pos) and cr.has_point(pos) and cr.intersection(grid_r).size.x > 0.0:
 			if sel_index != i:
 				sel_index = i
 				ui_click.emit()

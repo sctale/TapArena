@@ -671,6 +671,45 @@ func ult_icon(hero_id: String) -> ImageTexture:
 			_add(ops, _line_mask(Vector2(4, 8), Vector2(13, 8), 1.4), Color("b8f0ff"))
 			_add(ops, _line_mask(Vector2(2, 11), Vector2(10, 11), 1.4), ICE)
 			_add(ops, _line_mask(Vector2(6, 3), Vector2(10, 13), 1.4), CREAM)
+		"monkey":
+			# 定海神针：斜落长棍 + 落点冲击
+			_add(ops, _line_mask(Vector2(3, 13), Vector2(12, 3), 2.2), BROWN)
+			_add(ops, _rect_mask(11, 2, 3, 3), YELLOW)
+			_add(ops, _rect_mask(2, 12, 3, 3), YELLOW)
+			_add(ops, _line_mask(Vector2(10, 11), Vector2(13, 9), 1.2), YELLOW)
+			_add(ops, _line_mask(Vector2(10, 11), Vector2(12, 13), 1.2), YELLOW)
+			_add(ops, _line_mask(Vector2(10, 11), Vector2(8, 13), 1.2), YELLOW)
+		"elephant":
+			# 大地践踏：大脚印 + 两侧震波
+			_add(ops, _disc_mask(8.0, 8.0, 4.2), GRAY)
+			for k in range(3):
+				_add(ops, _disc_mask(5.4 + float(k) * 2.6, 4.6, 1.2), DARKGRAY)
+			_add(ops, _rect_mask(4, 9, 8, 3), DARKGRAY)
+			_add(ops, _line_mask(Vector2(1, 13), Vector2(5, 13), 1.4), ICE)
+			_add(ops, _line_mask(Vector2(11, 13), Vector2(15, 13), 1.4), ICE)
+			_add(ops, _line_mask(Vector2(2, 10), Vector2(5, 12), 1.2), CREAM)
+		"penguin":
+			# 暴风雪：六角雪花 + 冰环
+			for k in range(3):
+				var a := PI * float(k) / 3.0
+				_add(ops, _line_mask(Vector2(8.0 - cos(a) * 6.0, 8.0 - sin(a) * 6.0),
+					Vector2(8.0 + cos(a) * 6.0, 8.0 + sin(a) * 6.0), 1.2), ICE)
+			_add(ops, _disc_mask(8.0, 8.0, 2.0), Color("dff6ff"))
+			_add(ops, _ring_mask(8.0, 8.0, 6.6, 6.0), BLUE)
+		"sheep":
+			# 暖云牧场：云团 + 粉色十字
+			_add(ops, _disc_mask(6.5, 8.5, 3.2), CREAM)
+			_add(ops, _disc_mask(10.0, 8.5, 3.2), CREAM)
+			_add(ops, _rect_mask(4, 8, 10, 4), CREAM)
+			_add(ops, _rect_mask(7, 5, 2, 7), PINK)
+			_add(ops, _rect_mask(4, 8, 8, 2), PINK)
+		"bat":
+			# 音波风暴：同心音波 + 小蝠耳
+			_add(ops, _ring_mask(8.0, 8.0, 6.4, 5.5), PURPLE)
+			_add(ops, _ring_mask(8.0, 8.0, 4.6, 3.9), Color("c0a0f0"))
+			_add(ops, _disc_mask(8.0, 8.0, 1.6), CREAM)
+			_add(ops, _poly_mask([Vector2(2, 4), Vector2(5, 2), Vector2(5, 6)]), PURPLE)
+			_add(ops, _poly_mask([Vector2(14, 4), Vector2(11, 2), Vector2(11, 6)]), PURPLE)
 		_:
 			_add(ops, _diamond_mask(8, 8, 4), YELLOW)
 	var t := _compose(ops)
