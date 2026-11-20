@@ -5,7 +5,7 @@ extends Node3D
 # 4.14 起视觉对齐宣传片：太阳光 + 实时阴影 + FILMIC 影调 + 环境点缀；
 # 模型仍走像素图集 + 调色板（不写 ALPHA），面明暗只做轻量烘焙避免双重压暗。
 
-const CAST_ACTIONS := ["spin", "twirl", "slam", "stomp", "charge", "cast",
+const CAST_ACTIONS := ["spin", "twirl", "sweep", "slam", "stomp", "charge", "cast",
 	"slash", "roar", "pray", "crouch", "dive", "none"]
 const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
@@ -542,6 +542,8 @@ func _hero_scale(u) -> float:
 
 func cast_action_for(hero_id: String, index: int, kind: String) -> String:
 	# 每条技能都对应一个全身释放动作：旋转/跳砸/前冲/施法/吼叫/祈祷等。
+	if hero_id == "monkey" and index == 1:
+		return "sweep"
 	if index == 2:
 		match hero_id:
 			"tiger", "cat", "penguin", "bat", "hedgehog":
@@ -914,7 +916,7 @@ func _sync_hero(u, delta: float) -> void:
 	var cast_now: bool = u.cast_anim > 0.0
 	if cast_now and not bool(item.get("cast_active", false)):
 		item["cast_action"] = cast_action_for(str(u.hero_id), int(u.cast_index), str(u.cast_kind))
-		if u.cast_total > 0.4:
+		if int(u.cast_index) == 2:
 			_queue_ult(u)
 	item["cast_active"] = cast_now
 	var step := 1.0 / 30.0
@@ -1046,7 +1048,7 @@ func _sync_hero(u, delta: float) -> void:
 		var has_move: bool = u.move_skill_total > 0.0
 		match act:
 			"spin":
-				var turns: float = 2.2 if u.cast_total > 0.4 else 1.2
+				var turns: float = 2.2 if int(u.cast_index) == 2 else 1.2
 				act_yaw = TAU * turns * ck
 				act_lift = env * 8.0
 				arm_l.rotation.x = 0.0
@@ -1055,6 +1057,15 @@ func _sync_hero(u, delta: float) -> void:
 				arm_r.rotation.z = -env * 1.35
 				head.rotation.x = env * 0.05
 				tail.rotation.y += env * 0.8
+			"sweep":
+				act_yaw = TAU * ck
+				act_lift = env * 6.0
+				arm_l.rotation.x = 0.0
+				arm_r.rotation.x = 0.0
+				arm_l.rotation.z = env * 1.5
+				arm_r.rotation.z = -env * 1.5
+				head.rotation.x = env * 0.05
+				tail.rotation.y += env * 0.9
 			"twirl":
 				act_yaw = TAU * 1.6 * ck
 				act_lift = env * 14.0
@@ -1068,7 +1079,7 @@ func _sync_hero(u, delta: float) -> void:
 				var s_down: float = clampf((ck - 0.45) / 0.2, 0.0, 1.0)
 				var s_raise: float = sin(s_up * PI * 0.5) * (1.0 - s_down)
 				if not has_move:
-					act_lift = s_raise * 34.0
+					act_lift = s_raise * 50.0
 				act_sy = 1.0 - sin(s_down * PI) * 0.16
 				arm_l.rotation.x = -2.5 * s_raise + 0.9 * sin(s_down * PI)
 				arm_r.rotation.x = arm_l.rotation.x
@@ -1842,15 +1853,16 @@ func _spawn_staff_ult(pos: Vector3, color: Color, radius: float) -> void:
 	# 定海神针：长棍从空中砸下 + 双层冲击环 + 尘土。
 	var staff := _fx_mesh("fx_staff_ult", func():
 		var b := BoxMesh.new()
-		b.size = Vector3(7, 150, 7)
+		b.size = Vector3(9, 170, 9)
 		return b)
 	_add_fx_mesh(staff, _fx_mat(Color("f2c14e"), 0.95),
-		Vector3(pos.x, 150.0, pos.z), 0.45, 0.7, 1.0,
+		Vector3(pos.x + 24.0, 170.0, pos.z), 0.50, 0.7, 1.0,
 		Vector3(0.0, -420.0, 0.0), Vector3.ZERO,
 		Vector3(deg_to_rad(18.0), 0.0, deg_to_rad(-22.0)))
 	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(radius, 180.0), 0.55)
 	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color.lightened(0.2), maxf(radius, 120.0), 0.40)
 	_spawn_debris(Vector3(pos.x, 4.0, pos.z), Color("d8c09a"), 9)
+	_spawn_burst(Vector3(pos.x + 24.0, 18.0, pos.z), Color("ffe8a8"), 0.28)
 	_spawn_spark(Vector3(pos.x, 20.0, pos.z), Color("ffe8a8"), 12.0)
 
 
@@ -1925,6 +1937,13 @@ func _spawn_pasture_ult(pos: Vector3, color: Color, radius: float) -> void:
 func _spawn_staff_sweep(pos: Vector3, color: Color, radius: float) -> void:
 	# 长棍横扫：四道金色棍影 + 一道横向亮痕。
 	_spawn_slashes(pos, Color("f2c14e"), 4, maxf(radius, 120.0))
+	var trail := _fx_mesh("fx_staff_trail", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(maxf(radius * 1.1, 130.0), 7, 7)
+		return b)
+	_add_fx_mesh(trail, _fx_mat(Color("f2c14e"), 0.90), pos + Vector3(0, 38, 0), 0.50, 0.7, 1.15,
+		Vector3.ZERO, Vector3(0.0, TAU * 2.0, 0.0), Vector3(0.0, 0.35, 0.0))
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), Color("f2c14e"), maxf(radius, 110.0), 0.40)
 	var bar := _fx_mesh("fx_staff_bar", func():
 		var b := BoxMesh.new()
 		b.size = Vector3(110, 6, 8)
@@ -1963,6 +1982,35 @@ func _spawn_arrow_cast(pos: Vector3, color: Color, radius: float) -> void:
 		_add_fx_mesh(shaft, wood, at, 0.32, 0.6, 1.0, dir * 260.0,
 			Vector3.ZERO, Vector3(0.0, atan2(dir.x, dir.z), 0.0))
 	_spawn_ring(Vector3(pos.x, 6.0, pos.z), color, maxf(60.0, radius * 0.4), 0.30)
+
+
+func _spawn_fire_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 烈焰冲锋：火球向外翻滚 + 火星上窜 + 地面火环。
+	var flame := _fx_mesh("fx_fire_ball", func():
+		var s := SphereMesh.new()
+		s.radius = 20.0
+		s.height = 36.0
+		s.radial_segments = 10
+		s.rings = 5
+		return s)
+	var ember := _fx_mesh("fx_ember", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(5, 5, 5)
+		return b)
+	var fire := _fx_mat(Color("ff8a3c"), 0.80)
+	var hot := _fx_mat(Color("ffd08a"), 0.95)
+	for i in range(10):
+		var ang := TAU * float(i) / 10.0
+		var at := pos + Vector3(cos(ang) * radius * 0.35, 18.0 + float(i % 3) * 22.0,
+			sin(ang) * radius * 0.35)
+		_add_fx_mesh(flame, fire, at, 0.60, 0.6 + 0.1 * float(i % 3), 1.4, Vector3(0.0, 40.0, 0.0))
+	for i in range(12):
+		var ang := randf() * TAU
+		var at := pos + Vector3(cos(ang) * radius * 0.5, 20.0 + randf() * 50.0,
+			sin(ang) * radius * 0.5)
+		_add_fx_mesh(ember, hot, at, 0.55, 0.6, 1.2,
+			Vector3(cos(ang) * 40.0, 140.0, sin(ang) * 40.0))
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), Color("ffb36b"), maxf(radius, 160.0), 0.55)
 
 
 func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> void:
@@ -2030,6 +2078,8 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_frost_ult(pos, color, radius)
 		"pasture_ult":
 			_spawn_pasture_ult(pos, color, radius)
+		"fire_ult":
+			_spawn_fire_ult(pos, color, radius)
 		"staff":
 			_spawn_staff_sweep(pos, color, radius)
 		"frost":

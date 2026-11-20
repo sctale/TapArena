@@ -202,6 +202,12 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 		sim.player.level = 2
 		sim.player.xp = sim.xp_to_level2
 		sim.try_cast(sim.player, 2)
+	# 调试：--skill=1 直接释放指定小技能，配合 --hero= 逐条看施法动作。
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--skill="):
+			sim.player.level = 2
+			sim.player.xp = sim.xp_to_level2
+			sim.try_cast(sim.player, clampi(int(str(a).substr(8)), 0, 2))
 	# 调试：`--lv=3` 直接升到指定等级，经验条停在该级中段，用于核对 HUD 与成长。
 	for a in OS.get_cmdline_user_args():
 		if str(a).begins_with("--lv="):
@@ -421,8 +427,8 @@ func _on_fx(kind: String, _pos: Vector3, _color: Color, radius: float) -> void:
 	if cam == null:
 		return
 	if kind == "punch":
-		cam.add_punch(0.9)
-		cam.add_shake(4.0)
+		cam.add_punch(3.4)
+		cam.add_shake(5.5)
 	elif kind == "ring" and radius >= 170.0:
 		cam.add_shake(3.0)
 

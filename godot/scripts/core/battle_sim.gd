@@ -1759,6 +1759,9 @@ func move_ai(h, dir: Vector2, dt: float, speed_k: float) -> void:
 
 
 func step_hero_skills(h, hp_p: float, retreat: bool) -> void:
+	# 施法动作期间不再连放：0.5/1.2 秒的动作要能完整看见。
+	if h.cast_anim > 0.0:
+		return
 	for i in range(3):
 		var s: Dictionary = h.skills[i]
 		if s.get("unlock_at_2", false) and h.level < 2:
@@ -2993,7 +2996,7 @@ func try_cast(h, index: int) -> void:
 		return
 	h.cds[index] = float(s.get("cd", 6.0))
 	# 小技能收招更快：技能 1/2 的施法姿势 0.34 秒，大招保留 0.5 秒。
-	h.cast_total = 0.34 if index < 2 else 0.9
+	h.cast_total = 0.5 if index < 2 else 1.2
 	h.cast_anim = h.cast_total
 	h.cast_index = index
 	h.cast_kind = str(s.get("kind", "projectile"))

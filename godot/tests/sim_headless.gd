@@ -1680,7 +1680,7 @@ func _roster_checks() -> Array:
 			sim.try_cast(h, i)
 			if h.cast_index != i or str(h.cast_kind) != str(h.skills[i].get("kind", "")):
 				issues.append("%s 技能%d 施法索引/类型没有写入" % [id, i])
-			var want_cast: float = 0.34 if i < 2 else 0.9
+			var want_cast: float = 0.5 if i < 2 else 1.2
 			if absf(h.cast_total - want_cast) > 0.01:
 				issues.append("%s 技能%d 施法时长 %.2f，期望 %.2f" % [id, i, h.cast_total, want_cast])
 			for k in range(10):
