@@ -10,6 +10,32 @@
 
 - 移除已冻结的 Unity 3.2.0 存档（`unity/`）、`打开Unity工程.cmd`、Unity 构建与 Polyfork/Blender 美术脚本、v3.2 预览图及对应 `.gitignore` 规则；仓库只保留 Godot 主线与 Web 存档。
 
+## [4.23.0] - 2026-11-20
+
+**大招台词重配：贴帧起声，男孩/女孩声线明确。**
+
+### 修复
+
+- 台词文件首段自带 0.11–0.24 秒静音，听起来像「特效先放、话晚半拍」；生成脚本现在
+      去首静音（保留 20ms）、尾音保留 120ms，施法第一帧就起声（包络互相关实测延迟 0.00s）。
+- 原来的 `cute_boy`（333Hz）与 `clever_boy`（296Hz）基频比 `lovely_girl`（254Hz）、
+      `qiaopi_mengmei`（277Hz）还高，男孩反而更像女孩；15 位英雄全部换新音色，
+      男孩 8 位（128–228Hz）、女孩 7 位（251–354Hz），15 个音色互不重复。
+- 按头像设定修正性别：泡泡（粉花帽）与角角（鹿角）对调；成年男/女声换成少年/少女声。
+
+### 新增
+
+- `gen_ult_voice.py` 的 manifest 增加 `gender`、`lead`；生成后自动同步到
+      `godot/assets/audio/ult/`，中间产物 `tools/audio/ult/` 走 gitignore。
+- `flow_headless` 新增台词 manifest 断言：15 条、8 男/7 女、音色不重复、首静音 ≤50ms。
+
+### 验证
+
+- 15 条 WAV：48kHz / 单声道 / 16-bit，时长 0.84–2.27s，首静音 0.00–0.01s，峰值 ≤−1.5 dBFS。
+- F0 实测：男孩 128–228Hz，女孩 251–354Hz；同句候选测试表见 `SPEC-ult-voice-timing-gender.md`。
+- `--ult` 录像：混音与原始台词的包络互相关最佳延迟 0.00s；`SIM_OK` / `FLOW_OK`。
+- APK：27,989,691 字节，versionCode 65 / versionName 4.23.0 / arm64-v8a / `CN=TapArena`，
+      SHA-256 `AB0A858DF879CF0AA9CF95C9D69F7101557943C6A80268E906E14FBC7178756E`。
 ## [4.22.0] - 2026-11-20
 
 **修三个玩家报障：飞行巨兽可攻击、大招台词听得清、水晶后清掉大树。**

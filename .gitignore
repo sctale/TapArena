@@ -29,6 +29,8 @@ reference/
 *.wav
 # 游戏音频资产（自制/合成）：随仓库入库
 !godot/assets/audio/**/*.wav
+# 台词生成中间产物（脚本会自动复制到 godot/assets/audio/ult）
+tools/audio/ult/
 *.mp4
 *.avi
 *.tmp

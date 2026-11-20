@@ -147,6 +147,34 @@ func _check_audio_assets() -> void:
 			main.view.audio_atk.size(), main.view.audio_ult.size()])
 	if main.view.audio_pool.is_empty():
 		failures.append("视图没有 3D 音频播放器")
+		# 台词 manifest：15 条、男女各 8/7、音色不重复、首静音 ≤50ms。
+		var mpath := "res://assets/audio/ult/manifest.json"
+		if not FileAccess.file_exists(mpath):
+			failures.append("缺少 ult/manifest.json")
+		else:
+			var mdata = JSON.parse_string(FileAccess.get_file_as_string(mpath))
+			if typeof(mdata) != TYPE_DICTIONARY or not mdata.has("lines"):
+				failures.append("ult/manifest.json 解析失败")
+			else:
+				var lines: Array = mdata["lines"]
+				if lines.size() != 15:
+					failures.append("台词 manifest 不是 15 条：%d" % lines.size())
+				var genders := {"boy": 0, "girl": 0}
+				var voices: Dictionary = {}
+				for e in lines:
+					var g := str(e.get("gender", ""))
+					if genders.has(g):
+						genders[g] += 1
+					else:
+						failures.append("台词缺少性别：" + str(e.get("hero", "")))
+					if float(e.get("lead", 1.0)) > 0.05:
+						failures.append("台词首静音过长：" + str(e.get("hero", "")))
+					var v := str(e.get("voice", ""))
+					if voices.has(v):
+						failures.append("台词音色重复：" + v)
+					voices[v] = true
+				if genders["boy"] != 8 or genders["girl"] != 7:
+					failures.append("台词男女数量不是 8/7：%d/%d" % [genders["boy"], genders["girl"]])
 	if main.view.voice_pool.size() != 4:
 		failures.append("台词播放器池不是 4 个：%d" % main.view.voice_pool.size())
 	else:

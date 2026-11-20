@@ -1,6 +1,6 @@
 # SPEC — 大招台词 + 普攻音效（音频资产第一批）
 
-状态：已接入（4.21.0 / code 63）
+状态：已接入（4.21.0 / code 63）；4.23.0 重配台词（见 `SPEC-ult-voice-timing-gender.md`）
 日期：2026-11-20
 版本目标：4.21.0 / versionCode 63
 
@@ -63,9 +63,10 @@ panda / owl / axolotl / deer / turtle / hedgehog / redpanda / wolf / crane。
 | wolf | 灰灰 | 猎影突袭 | 猎影突袭！ | 1.56s |
 | crane | 小白 | 风之领域 | 风之领域，起风了。 | 2.87s |
 
-配音规则：按角色性格分音色——战士/坦克偏低沉（male-qn-jingying、male-qn-badao），
-法师/射手偏清脆（Crisp_Girl、Warm_Girl、Sweet_Lady），辅助偏柔和（Cute_Spirit、Soft_Girl、
-Lyrical_Voice），刺客/火火偏少年（Pure-hearted_Boy、Unrestrained_Young_Man）。
+配音规则（4.23.0 起以下表为准，见 `SPEC-ult-voice-timing-gender.md`）：按**性别**分声，
+男孩 8 位、女孩 7 位，男孩 F0 ≤ 228Hz、女孩 ≥ 251Hz；不再用成年男/女声，
+台词文件去掉首段静音后贴帧起声。本表是 4.21.0 的历史记录，时长与音色以
+`ult/manifest.json` 为准。
 台词统一「大招名 + 一个短动作或情绪尾句」，控制在 4–10 字，保证团战里两秒内听完。
 
 ## 4. 音效设计表（15）
