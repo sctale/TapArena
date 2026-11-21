@@ -48,7 +48,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 80），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 81），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -88,6 +88,31 @@ godot --path godot -- --skip-home --auto-run
 - 英雄身高守卫：`flow_headless.gd` 会计算「装配后包围盒高度 × heroes.json height ÷ HERO_DESIGN_H」，并按定位卡范围（法师 55–90、辅助 55–108、坦克 72–110、战士 65–96、刺客/射手 50–82 等）；超出即 `FLOW_FAIL`，新模型必须过这一关。
 - 相机相关改动的判据：机位高度、俯角、朝向恒定；行走录像背景位移稳定，无停顿/回跳帧。
 - 播报相关改动的判据：顶部玩家面板、小地图、比分、状态标签、播报条互不叠字。
+
+### 模拟器 / adb 端口
+
+- adb 默认端口 **5037** 可能落在 Windows（winnat / Hyper-V）动态保留区间里，表现为
+  `cannot bind to 127.0.0.1:5037 … (10013)` / `could not read ok from ADB Server`。
+  先查 `netsh interface ipv4 show excludedportrange protocol=tcp`，挑一个不在任何区间内的端口
+  （4.33.1 发版时用过 7000；区间每次重启会变，**不要照抄端口号，先查再用**）。
+- 端口通过 `ANDROID_ADB_SERVER_PORT` 指定，**adb 客户端和模拟器进程必须用同一个值**：
+  模拟器只按这个环境变量连 adb server，漏设就会出现 `adb devices` 空列表或 `offline`。
+- `TMP` / `TEMP` 指到项目 `.adbtmp`，避免 `%TEMP%\adb.log` 权限拒绝导致 daemon 起不来。
+- AVD `test-android-36` 必须 `-gpu host`；窗口模式若在 `opengl32sw` / Vulkan 初始化后崩溃
+  （crashpad 弹窗、qemu 不监听 5554/5555），改用 `-no-window -gpu host` 可正常启动，
+  `screencap` 截图不受影响。
+- 装包前先确认 `adb devices` 显示 `emulator-5554 device`；`offline` 时重启模拟器，
+  不要反复 `install`。
+
+```powershell
+# 先查保留区间，挑一个没被圈占的端口（示例；以当场 netsh 输出为准）
+netsh interface ipv4 show excludedportrange protocol=tcp
+$env:TMP = "D:\V-Coding\TapArena\.adbtmp"; $env:TEMP = $env:TMP
+$env:ANDROID_ADB_SERVER_PORT = "7000"   # adb 与模拟器共用
+adb start-server
+emulator -avd test-android-36 -gpu host -no-window   # 继承同一份环境变量
+adb devices   # 必须是 emulator-5554  device
+```
 
 ## 6. 代码与设计约束（必须遵守）
 

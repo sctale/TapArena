@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 文档
+
+- `AGENTS.md` 记录模拟器 / adb 端口选择：5037 被 Windows 保留区间圈占时的排查与
+  `ANDROID_ADB_SERVER_PORT` 用法（adb 与模拟器必须同值）、`.adbtmp` 临时目录、
+  `-gpu host -no-window` 启动兜底。
+
 ### 仓库
 
 - 移除已冻结的 Unity 3.2.0 存档（`unity/`）、`打开Unity工程.cmd`、Unity 构建与 Polyfork/Blender 美术脚本、v3.2 预览图及对应 `.gitignore` 规则；仓库只保留 Godot 主线与 Web 存档。
