@@ -120,12 +120,16 @@
     "match_cap": 480.0,
     "sudden_death_time": 300.0,
     "boss_time": 240.0,
-    "level_cap": 5,
+    "level_cap": 9,
     "xp_levels": [
       110,
       380,
       900,
-      1500
+      1500,
+      2100,
+      2700,
+      3300,
+      3900
     ],
     "hp_per_level": 0.09,
     "dmg_per_level": 0.08,
@@ -277,7 +281,7 @@
     "move_speed": 170,
     "radius": 58,
     "height": 132,
-    "respawn": 25,
+    "respawn": 60,
     "structure_damage_mul": 1.6,
     "skills": {
       "slam": {
@@ -327,7 +331,7 @@
         "knock": 60.0
       }
     },
-    "team_buff_time": 15.0,
+    "team_buff_time": 45.0,
     "team_buff_dmg": 0.15
   },
   "ai": {

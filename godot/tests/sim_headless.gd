@@ -188,7 +188,7 @@ func _init() -> void:
 
 	var lv_issues := _level_checks()
 	if lv_issues.is_empty():
-		print("LEVEL_OK xp5/stat_growth/skill_power/3v3_frozen/diagonal_face")
+		print("LEVEL_OK xp9/stat_growth/skill_power/3v3_frozen/diagonal_face")
 	else:
 		failures += 1
 		for issue in lv_issues:
@@ -220,7 +220,7 @@ func _init() -> void:
 
 	var buff_issues := _boss_buff_checks()
 	if buff_issues.is_empty():
-		print("BUFF_OK boss_counterattack=15s/15%")
+		print("BUFF_OK boss_counterattack=45s/15%")
 	else:
 		failures += 1
 		for issue in buff_issues:
@@ -236,7 +236,7 @@ func _init() -> void:
 
 	var comeback_issues := _comeback_checks()
 	if comeback_issues.is_empty():
-		print("COMEBACK_OK trailing_boss/respawn_loyal/shutdown/ai_defend")
+		print("COMEBACK_OK random_boss/respawn60/buff45/shutdown/ai_defend")
 	else:
 		failures += 1
 		for issue in comeback_issues:
@@ -396,31 +396,33 @@ func _rule_checks() -> Array:
 	if dash_hero.pos.x > dash_x - 40.0:
 		issues.append("位移技能没有朝移动方向")
 
-	# 3 分钟出现峡谷巨兽，站到落后方（逆风守护兽）；被击败后 25 秒复活仍回到落后方。
+	# 3 分钟出现峡谷巨兽，随机选边（测试强制蓝方）；被击败后 60 秒复活仍回蓝方。
 	var sim7 = BattleSimScript.new()
 	sim7.setup("tiger", 0, 784)
+	sim7.boss_side_override = BattleSimScript.BLUE
 	sim7.clock = 179.9
 	sim7.step(0.2)
 	if sim7.boss == null or sim7.boss.kind != BattleSimScript.BOSS:
 		issues.append("3 分钟后没有出现峡谷巨兽")
 	else:
-		if sim7.boss.team != sim7.trailing_team():
-			issues.append("峡谷巨兽没有加入落后方")
+		if sim7.boss.team != BattleSimScript.BLUE:
+			issues.append("峡谷巨兽没有按强制选边加入蓝方")
 		if sim7.boss.hp <= 0.0:
 			issues.append("峡谷巨兽初始血量为 0")
 		var foe = sim7.heroes[3] if sim7.boss.team == BattleSimScript.BLUE else sim7.player
 		sim7.deal_damage(sim7.boss, 99999.0, foe)
 		if sim7.boss.is_alive():
 			issues.append("峡谷巨兽无法被击败")
-		sim7.step_unit(sim7.boss, 26.0)
+		sim7.step_unit(sim7.boss, 61.0)
 		if not sim7.boss.is_alive() or sim7.boss.hp < sim7.boss.max_hp:
-			issues.append("峡谷巨兽 25 秒后没有复活")
-		if sim7.boss.team != sim7.trailing_team():
-			issues.append("巨兽复活后没有回到当时的落后方")
+			issues.append("峡谷巨兽 60 秒后没有复活")
+		if sim7.boss.team != BattleSimScript.BLUE:
+			issues.append("巨兽复活后没有回到本局选中的蓝方")
 
 	# 峡谷巨兽技能：有敌方单位时会先起手，伤害命中并进入冷却。
 	var sim9 = BattleSimScript.new()
 	sim9.setup("tiger", 0, 784)
+	sim9.boss_side_override = BattleSimScript.BLUE
 	sim9.clock = 179.9
 	sim9.step(0.2)
 	if sim9.boss == null:
@@ -535,6 +537,7 @@ func _rule_checks() -> Array:
 	# ---- BOSS 第二形态：复活后带翅膀飞行，技能切换为陨石/旋风 ----
 	var simf = BattleSimScript.new()
 	simf.setup("tiger", 0, 9200)
+	simf.boss_side_override = BattleSimScript.RED
 	simf.clock = 179.9
 	simf.step(0.2)
 	if simf.boss == null:
@@ -545,10 +548,11 @@ func _rule_checks() -> Array:
 			issues.append("巨兽第一次出现不应是飞行形态")
 		var bf_foe = simf.heroes[3] if bf.team == BattleSimScript.BLUE else simf.player
 		simf.deal_damage(bf, 99999.0, bf_foe)
-		simf.step_unit(bf, 26.0)
+		simf.step_unit(bf, 61.0)
 		if not bf.boss_flying or bf.boss_phase != 2:
 			issues.append("巨兽第二次出现没有切换飞行形态")
-		# 复活时可能转投落后方，按新阵营重新挑对手。
+		if bf.team != BattleSimScript.RED:
+			issues.append("巨兽复活后没有回到本局选中的红方")
 		bf_foe = simf.heroes[3] if bf.team == BattleSimScript.BLUE else simf.player
 		bf.pos = bf_foe.pos + Vector2(-70.0, 0.0)
 		bf.prev_pos = bf.pos
@@ -649,14 +653,15 @@ func _pass_checks() -> Array:
 
 func _level_checks() -> Array:
 	var issues: Array = []
-	# 5v5 五级成长：阈值 110/380/900/1500，属性 ×1.36 / ×1.32，技能 ×1.40。
+	# 5v5 九级成长：阈值 110/380/900/1500/2100/2700/3300/3900，
+	# 五级 ×1.36/×1.32/×1.40，九级 ×1.72/×1.64/×1.80。
 	var s1 = BattleSimScript.new()
 	s1.setup("fox", 0, 9900, true)
 	var p1 = s1.player
 	var base_hp := float(p1.def.get("hp", 900))
 	var base_dmg := float(p1.def.get("dmg", 45))
-	if s1.level_cap != 5:
-		issues.append("5v5 等级上限不是 5，实际 %d" % s1.level_cap)
+	if s1.level_cap != 9:
+		issues.append("5v5 等级上限不是 9，实际 %d" % s1.level_cap)
 	s1.add_xp(p1, 1499.0)
 	if p1.level != 4:
 		issues.append("5v5 1499xp 等级不是 4，实际 %d" % p1.level)
@@ -669,11 +674,23 @@ func _level_checks() -> Array:
 		issues.append("5v5 五级普攻不是 ×1.32，实际 %.2f 基础 %.2f" % [p1.dmg, base_dmg])
 	if absf(p1.hp - p1.max_hp) > 0.5:
 		issues.append("升级没有补回新增血量 hp=%.1f max=%.1f" % [p1.hp, p1.max_hp])
-	s1.add_xp(p1, 500.0)
-	if p1.level != 5 or absf(p1.max_hp - base_hp * 1.36) > 0.5:
-		issues.append("5v5 满级后仍然成长")
 	if absf(s1.skill_power(p1) - 1.4) > 0.001:
 		issues.append("5v5 五级技能强度不是 ×1.4，实际 %.3f" % s1.skill_power(p1))
+	s1.add_xp(p1, 2399.0)
+	if p1.level != 8:
+		issues.append("5v5 3899xp 等级不是 8，实际 %d" % p1.level)
+	s1.add_xp(p1, 1.0)
+	if p1.level != 9:
+		issues.append("5v5 3900xp 等级不是 9，实际 %d" % p1.level)
+	if absf(p1.max_hp - base_hp * 1.72) > 0.5:
+		issues.append("5v5 九级血量不是 ×1.72，实际 %.1f 基础 %.1f" % [p1.max_hp, base_hp])
+	if absf(p1.dmg - base_dmg * 1.64) > 0.01:
+		issues.append("5v5 九级普攻不是 ×1.64，实际 %.2f 基础 %.2f" % [p1.dmg, base_dmg])
+	if absf(s1.skill_power(p1) - 1.8) > 0.001:
+		issues.append("5v5 九级技能强度不是 ×1.8，实际 %.3f" % s1.skill_power(p1))
+	s1.add_xp(p1, 500.0)
+	if p1.level != 9 or absf(p1.max_hp - base_hp * 1.72) > 0.5:
+		issues.append("5v5 满级后仍然成长")
 	# 3v3 冻结：2 级封顶、零属性成长、技能强度 1.0。
 	var s2 = BattleSimScript.new()
 	s2.setup("fox", 0, 9901)
@@ -1865,7 +1882,7 @@ func _respawn_checks() -> Array:
 
 
 func _boss_buff_checks() -> Array:
-	# 4.29：击败巨兽的一方全员 15 秒伤害 +15%。
+	# 4.36：击败巨兽的一方全员 45 秒伤害 +15%。
 	var issues: Array = []
 	var sim = BattleSimScript.new()
 	sim.setup("tiger", 0, 884)
@@ -1875,8 +1892,8 @@ func _boss_buff_checks() -> Array:
 	boss.hp = 1.0
 	boss.invuln_t = 0.0
 	sim.deal_damage(boss, 99999.0, killer)
-	if absf(float(sim.team_buff_t[BattleSimScript.BLUE]) - 15.0) > 0.05:
-		issues.append("蓝方巨兽增益计时不是 15 秒：%.2f" % sim.team_buff_t[BattleSimScript.BLUE])
+	if absf(float(sim.team_buff_t[BattleSimScript.BLUE]) - 45.0) > 0.05:
+		issues.append("蓝方巨兽增益计时不是 45 秒：%.2f" % sim.team_buff_t[BattleSimScript.BLUE])
 	if float(sim.team_buff_t[BattleSimScript.RED]) > 0.01:
 		issues.append("红方不应获得巨兽增益")
 	var red = null
@@ -1895,10 +1912,10 @@ func _boss_buff_checks() -> Array:
 	var got: float = before - red.hp
 	if absf(got - 115.0) > 1.0:
 		issues.append("巨兽增益伤害不是 115：%.1f" % got)
-	for i in range(960):
+	for i in range(2760):
 		sim.step(DT)
 	if float(sim.team_buff_t[BattleSimScript.BLUE]) > 0.01:
-		issues.append("巨兽增益 16 秒后没有结束")
+		issues.append("巨兽增益 46 秒后没有结束")
 	return issues
 
 
@@ -1931,12 +1948,27 @@ func _base_collision_checks() -> Array:
 
 
 func _comeback_checks() -> Array:
-	# 4.34：逆风守护兽 + 终结赏金 + AI 回防。
+	# 4.36：巨兽随机选边（本局锁定）+ 终结赏金 + AI 回防。
 	var issues: Array = []
 
-	# 1) 落后方拿到巨兽；击杀后仍回落后方；反超后功成身退（不再复活）。
+	# 0) 随机选边：20 个 seed 里蓝/红都出现；override 可强制。
+	var seen_sides: Dictionary = {}
+	for i in range(20):
+		var sr = BattleSimScript.new()
+		sr.setup("tiger", 0, 9500 + i)
+		seen_sides[sr.boss_side_for_match()] = true
+	if not (seen_sides.has(BattleSimScript.BLUE) and seen_sides.has(BattleSimScript.RED)):
+		issues.append("20 个 seed 中巨兽没有出现蓝红两种选边")
+	var so = BattleSimScript.new()
+	so.setup("tiger", 0, 9600)
+	so.boss_side_override = BattleSimScript.RED
+	if so.boss_side_for_match() != BattleSimScript.RED:
+		issues.append("boss_side_override 没有强制阵营")
+
+	# 1) 强制蓝方后，击杀/复活都回蓝方；即使蓝方反超也不换边。
 	var sim = BattleSimScript.new()
 	sim.setup("tiger", 0, 9401)
+	sim.boss_side_override = BattleSimScript.BLUE
 	sim.base_blue.hp = sim.base_blue.max_hp * 0.72
 	sim.clock = sim.boss_time - 0.1
 	sim.step(0.2)
@@ -1944,18 +1976,18 @@ func _comeback_checks() -> Array:
 		issues.append("翻盘测试没有生成巨兽")
 	else:
 		if sim.boss.team != BattleSimScript.BLUE:
-			issues.append("蓝方落后时巨兽没有帮蓝方")
+			issues.append("强制蓝方时巨兽没有帮蓝方")
 		var red_hero = sim.heroes[3]
 		sim.deal_damage(sim.boss, 99999.0, red_hero)
-		sim.step_unit(sim.boss, 26.0)
+		sim.step_unit(sim.boss, 61.0)
 		if not sim.boss.is_alive() or sim.boss.team != BattleSimScript.BLUE:
-			issues.append("巨兽复活后没有回到当时的落后方")
-		# 红方水晶掉到 50%：蓝方反超，巨兽仍然忠于蓝方，不换边、不帮红方。
+			issues.append("巨兽 60 秒复活后没有回到本局选中的蓝方")
+		# 红方水晶掉到 50%：蓝方反超，巨兽仍然忠于本局选中的蓝方。
 		sim.base_red.hp = sim.base_red.max_hp * 0.5
 		sim.deal_damage(sim.boss, 99999.0, red_hero)
-		sim.step_unit(sim.boss, 26.0)
+		sim.step_unit(sim.boss, 61.0)
 		if not sim.boss.is_alive() or sim.boss.team != BattleSimScript.BLUE:
-			issues.append("反超后巨兽换边了（应始终忠于落后方）")
+			issues.append("反超后巨兽换边了（应忠于本局选中的一方）")
 
 	# 2) 终结赏金：落后方击杀领先方英雄 1.5 倍经验；领先方击杀不变。
 	for behind in [true, false]:

@@ -211,9 +211,10 @@ var player = null
 var boss = null
 var boss_spawned := false
 var boss_team := -1
-# 巨兽认定的「逆风方」：出场时锁定，之后只帮这一方；反超后功成身退。
+# 巨兽本局阵营：出场时随机选边并锁定，之后只帮这一方；击杀后 60 秒回到同一方。
 var boss_home_team := -1
-var boss_respawn := 25.0
+var boss_side_override := -1
+var boss_respawn := 60.0
 
 var winner: int = -1
 var end_reason: String = ""
@@ -314,7 +315,8 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	boss_spawned = false
 	boss_team = -1
 	boss_home_team = -1
-	boss_respawn = 25.0
+	boss_side_override = -1
+	boss_respawn = 60.0
 	_uid = 0
 	_shot_view = 0
 	team_buff_t = [0.0, 0.0]
@@ -360,7 +362,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	ai_cfg = rules.get("ai", {})
 	targeting_cfg = rules.get("targeting", {})
 	combat_cfg = rules.get("combat", {})
-	boss_respawn = float(boss_cfg.get("respawn", 25.0))
+	boss_respawn = float(boss_cfg.get("respawn", 60.0))
 	var hs: Dictionary = rules.get("hitstop", {})
 	hitstop_threshold = float(hs.get("threshold", 45))
 	hitstop_duration = float(hs.get("duration", 0.045))
@@ -380,13 +382,13 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 		sudden_death_time = float(mode_cfg.get("sudden_death_time", sudden_death_time))
 		boss_time = float(mode_cfg.get("boss_time", boss_time))
 		keep_protection = bool(mode_cfg.get("keep_protection_in_sudden_death", true))
-		# 5v5 五级成长：阈值与增幅全部来自 rules.json，便于按节奏调整。
-		level_cap = int(mode_cfg.get("level_cap", 5))
+		# 5v5 九级成长：阈值与增幅全部来自 rules.json，便于按节奏调整。
+		level_cap = int(mode_cfg.get("level_cap", 9))
 		hp_per_level = float(mode_cfg.get("hp_per_level", 0.09))
 		dmg_per_level = float(mode_cfg.get("dmg_per_level", 0.08))
 		skill_per_level = float(mode_cfg.get("skill_per_level", 0.10))
 		xp_levels.clear()
-		for t in mode_cfg.get("xp_levels", [110, 280, 520, 840]):
+		for t in mode_cfg.get("xp_levels", [110, 380, 900, 1500, 2100, 2700, 3300, 3900]):
 			xp_levels.append(float(t))
 		map_w = float(mode_cfg.get("map_w", map_w))
 		map_h = float(mode_cfg.get("map_h", map_h))
@@ -927,6 +929,13 @@ func is_trailing_team(team: int) -> bool:
 	return s >= 0 and s != team
 
 
+func boss_side_for_match() -> int:
+	# 巨兽出场时 50/50 随机选边（同 seed 可复现）；测试可用 boss_side_override 强制。
+	if boss_side_override >= 0:
+		return boss_side_override
+	return BLUE if rng.randi_range(0, 1) == 0 else RED
+
+
 func spawn_boss(team: int) -> void:
 	var offset := Vector2(190.0 if team == BLUE else -190.0, 0.0)
 	var u = new_unit(BOSS, team, "峡谷巨兽", base_pos(team) + offset)
@@ -960,15 +969,15 @@ func spawn_boss(team: int) -> void:
 	boss_home_team = team
 	if boss_time < sudden_death_time - 0.01:
 		# 5v5：巨兽 4:00 先出场，终极对决 5:00 只是状态切换。
-		banner.emit("峡谷巨兽出现！加入%s（只帮落后的一方）" % ("蓝方" if team == BLUE else "红方"), 4.2)
+		banner.emit("峡谷巨兽出现！它这次站%s！" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	else:
-		banner.emit("终极对决！巨兽加入%s（只帮落后的一方）" % ("蓝方" if team == BLUE else "红方"), 4.2)
+		banner.emit("终极对决！巨兽站%s！" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	sfx.emit("ult", u.pos)
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(team), 200.0)
 
 
 func respawn_boss(u) -> void:
-	# 逆风守护兽：只帮出场时锁定的落后方，击杀后 25 秒回到同一方；反超也不换边。
+	# 随机选边后本局锁定：击杀后 60 秒回到同一方，不中途换边。
 	var home_team: int = boss_home_team if boss_home_team >= 0 else u.team
 	u.team = home_team
 	boss_team = home_team
@@ -1357,7 +1366,7 @@ func step(dt: float) -> void:
 		sfx.emit("ult", Vector2.INF)
 	if not boss_spawned and clock >= boss_time:
 		boss_spawned = true
-		spawn_boss(trailing_team())
+		spawn_boss(boss_side_for_match())
 	if not warned_45 and clock >= match_cap - 45.0:
 		warned_45 = true
 		final_push = true
@@ -2575,11 +2584,11 @@ func kill(target, killer) -> void:
 		target.respawn_t = boss_respawn
 		var buff_team: int = killer.team if killer != null else 1 - target.team
 		if buff_team != target.team:
-			var buff_time := float(boss_cfg.get("team_buff_time", 15.0))
+			var buff_time := float(boss_cfg.get("team_buff_time", 45.0))
 			team_buff_t[buff_team] = maxf(float(team_buff_t[buff_team]), buff_time)
 			var pct := int(round(float(boss_cfg.get("team_buff_dmg", 0.15)) * 100.0))
-			banner.emit("峡谷巨兽被击败！%s全体英雄能力 +%d%%（%d 秒）" % [
-				"蓝方" if buff_team == BLUE else "红方", pct, int(buff_time)], 3.6)
+			banner.emit("峡谷巨兽被击败！%s +%d%%（%d 秒）· 1 分钟后回来" % [
+				"蓝方" if buff_team == BLUE else "红方", pct, int(buff_time)], 3.8)
 			for a in heroes:
 				if a.is_alive() and a.team == buff_team:
 					float_text.emit(Vector3(a.pos.x, a.height + 28.0, a.pos.y),
