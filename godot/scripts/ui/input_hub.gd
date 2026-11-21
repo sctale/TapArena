@@ -63,7 +63,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			return
 		for i in range(3):
 			if hud.skill_rect(i).has_point(pos):
-				sim.set_skill(i)
+				var ok: bool = sim.set_skill(i)
+				hud.press_skill(i, ok)
 				return
 		if joy_finger == -1 and _in_joy_zone(pos):
 			joy_finger = event.index
@@ -114,11 +115,11 @@ func _handle_key(keycode: int) -> void:
 		return
 	match keycode:
 		KEY_Q, KEY_1:
-			sim.set_skill(0)
+			hud.press_skill(0, sim.set_skill(0))
 		KEY_E, KEY_2:
-			sim.set_skill(1)
+			hud.press_skill(1, sim.set_skill(1))
 		KEY_R, KEY_3:
-			sim.set_skill(2)
+			hud.press_skill(2, sim.set_skill(2))
 
 
 func _process(_delta: float) -> void:

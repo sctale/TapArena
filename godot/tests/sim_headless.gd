@@ -578,6 +578,17 @@ func _rule_checks() -> Array:
 		if bf_foe.hp >= chp0:
 			issues.append("飞行巨兽的旋风没有造成伤害")
 
+	# 技能输入可用性：set_skill 必须返回真实可用性，供 HUD 做按压/拒绝反馈。
+	var simk = BattleSimScript.new()
+	simk.setup("tiger", 0, 9410)
+	if simk.set_skill(2):
+		issues.append("1 级大招未解锁却返回可施放")
+	if not simk.set_skill(0):
+		issues.append("1 技能可用却返回失败")
+	simk.step(0.016)
+	if simk.set_skill(0):
+		issues.append("1 技能冷却中仍返回成功")
+
 	# 所有英雄的大招都应立刻进入冷却。
 	for id in HERO_IDS:
 		var simu = BattleSimScript.new()

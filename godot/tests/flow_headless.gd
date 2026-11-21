@@ -118,6 +118,15 @@ func _process(_delta: float) -> bool:
 		_check_base_clear("3v3")
 		_check_tree_height("3v3")
 		_check_audio_assets()
+		if main.hud == null:
+			failures.append("战斗 HUD 缺失")
+		else:
+			main.hud.press_skill(0, false)
+			if bool(main.hud.skill_press_ok[0]) or float(main.hud.skill_reject_t[0]) <= 0.0:
+				failures.append("技能拒绝反馈状态没有记录")
+			main.hud.press_skill(0, true)
+			if not bool(main.hud.skill_press_ok[0]):
+				failures.append("技能可用高亮状态没有记录")
 	elif frame == 66:
 		if main.sim != null and main.sim.clock <= 0.0:
 			failures.append("战斗没有推进时钟")

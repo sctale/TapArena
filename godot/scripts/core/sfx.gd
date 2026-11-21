@@ -6,7 +6,7 @@ extends Node
 
 const RATE := 16000
 
-# 8 位英雄的施法/命中/大招音色参数：波形、起止频率、噪声量、普攻音高。
+# 25 位英雄的施法/命中/大招音色参数：波形、起止频率、噪声量、普攻音高。
 const HERO_AUDIO := {
 	"tiger": {"cast0": 320.0, "cast1": 820.0, "wave": "square", "hit0": 240.0, "hit1": 90.0, "noise": 0.55, "shoot": 0.0},
 	"fox": {"cast0": 520.0, "cast1": 1280.0, "wave": "triangle", "hit0": 460.0, "hit1": 300.0, "noise": 0.18, "shoot": 920.0},

@@ -409,7 +409,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	var others: Array = []
 	for d in heroes_data:
 		var hid := str(d.get("id", ""))
-		# 3v3 与 5v5 都开放全部英雄（2026-11-20 起 20 位），只是上场人数不同。
+		# 3v3 与 5v5 都开放全部英雄（2026-11-20 起 25 位），只是上场人数不同。
 		if hid != player_hero:
 			others.append(hid)
 	for i in range(others.size() - 1, 0, -1):
@@ -1325,9 +1325,24 @@ func render_pos(u) -> Vector2:
 	return u.prev_pos.lerp(u.pos, clampf(interp_alpha, 0.0, 1.0))
 
 
-func set_skill(i: int) -> void:
-	if i >= 0 and i < 3:
-		skill_pressed[i] = true
+func set_skill(i: int) -> bool:
+	# 返回是否真正进入施法队列：锁定/冷却/死亡/眩晕时返回 false，供 HUD 做拒绝反馈。
+	if i < 0 or i >= 3:
+		return false
+	var h = player
+	if h == null or not h.is_alive() or h.stun_t > 0.0:
+		return false
+	if i >= h.skills.size():
+		return false
+	var s: Dictionary = h.skills[i]
+	if s == null or s.is_empty():
+		return false
+	if bool(s.get("unlock_at_2", false)) and h.level < 2:
+		return false
+	if h.cds[i] > 0.0:
+		return false
+	skill_pressed[i] = true
+	return true
 
 
 func step(dt: float) -> void:

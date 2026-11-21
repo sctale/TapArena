@@ -32,6 +32,13 @@ var potion_nodes: Dictionary = {}
 var shot_free: Array = []
 var zone_nodes: Array = []
 var fx_items: Array = []
+# FX 池：死亡节点回池复用，避免团战里 MeshInstance3D 反复 new/free。
+var fx_free: Array = []
+const FX_MAX := 360
+var fx_evict_warned := false
+var fx_peak := 0
+var fx_pool_hits := 0
+var fx_pool_misses := 0
 var debris_items: Array = []
 var sprout_items: Array = []
 var shot_mats: Dictionary = {}
@@ -47,7 +54,7 @@ var shadow_quality := "high"
 # 待机武器微光：每 0.55 秒轮转一位英雄，交错闪烁。
 var glint_t := 0.0
 var glint_idx := 0
-# 音频资产（4.21）：15 条大招台词 + 15 条普攻音效，3D 声源。
+# 音频资产（4.21）：25 条大招台词 + 25 条普攻音效，3D 声源。
 var audio_atk: Dictionary = {}
 var audio_ult: Dictionary = {}
 var audio_pool: Array = []
@@ -827,7 +834,13 @@ func _process(delta: float) -> void:
 	sync_us_total += Time.get_ticks_usec() - t0
 	sync_frames += 1
 	if sync_frames >= 300:
-		print("[VIEW] sync_ms=%.2f" % (sync_us_total / 1000.0 / float(sync_frames)))
+		if OS.is_debug_build():
+			var pool_total := fx_pool_hits + fx_pool_misses
+			var hit_pct := 0.0 if pool_total == 0 else 100.0 * float(fx_pool_hits) / float(pool_total)
+			print("[VIEW] sync_ms=%.2f fx_peak=%d fx_live=%d pool_hit=%.0f%% (%d/%d)" % [
+				sync_us_total / 1000.0 / float(sync_frames), fx_peak, fx_items.size(),
+				hit_pct, fx_pool_hits, pool_total])
+			fx_peak = fx_items.size()
 		sync_us_total = 0
 		sync_frames = 0
 
@@ -1051,9 +1064,18 @@ func _sync_hero(u, delta: float) -> void:
 		var k: float = 1.0 - u.atk_anim / 0.34
 		var punch := sin(k * PI)
 		if u.attack_range > 250.0:
-			# 远程：双手前推。
-			arm_l_x = -1.25 * punch
-			arm_r_x = -1.25 * punch
+			# 远程按武器分化：弓手拉弦、杖系抬杖，其余保持双手前推。
+			if u.hero_id == "cat" or u.hero_id == "deer":
+				arm_l_x = -1.15 * punch
+				arm_r_x = 0.55 * punch
+				arm_r_z = -0.45 * punch
+			elif u.hero_id in ["fox", "owl", "rabbit", "frog", "penguin", "sheep",
+					"giraffe", "koala", "crane"]:
+				arm_r_x = -1.55 * punch
+				arm_l_x = -0.95 * punch
+			else:
+				arm_l_x = -1.25 * punch
+				arm_r_x = -1.25 * punch
 		else:
 			# 近战：右手抡爪，左手后撤。
 			arm_r_x = -2.15 * punch
@@ -1469,20 +1491,15 @@ func _on_beam_fx(from: Vector3, to: Vector3, color: Color, width: float) -> void
 		var bm := BoxMesh.new()
 		bm.size = Vector3(1.0, 1.0, 1.0)
 		return bm)
-	var node := MeshInstance3D.new()
-	node.mesh = mesh
+	var node := _acquire_fx_node(mesh, _fx_mat(color, 0.85))
 	node.position = from + delta * 0.5
 	node.scale = Vector3(length, maxf(width, 8.0), maxf(width, 8.0))
 	node.rotation = Vector3(0.0, atan2(-delta.z, delta.x), 0.0)
-	node.material_override = _fx_mat(color, 0.85)
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(node)
-	fx_items.append({"node": node, "t": 0.0, "life": 0.24, "start": 0.35, "end": 2.2})
+	_push_fx(node, 0.24, 0.35, 2.2)
 	_spawn_burst(to, color, 0.28)
 
 
 func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void:
-	var node := MeshInstance3D.new()
 	var rkey := "fx_ring_%d" % int(round(radius))
 	var torus: Mesh
 	if fx_mesh_cache.has(rkey):
@@ -1495,16 +1512,12 @@ func _spawn_ring(pos: Vector3, color: Color, radius: float, life: float) -> void
 		tm.ring_segments = 6
 		fx_mesh_cache[rkey] = tm
 		torus = tm
-	node.mesh = torus
+	var node := _acquire_fx_node(torus, _alpha_material(Color(color.r, color.g, color.b, 0.85)))
 	node.position = Vector3(pos.x, 1.6, pos.z)
-	node.material_override = _alpha_material(Color(color.r, color.g, color.b, 0.85))
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(node)
-	fx_items.append({"node": node, "t": 0.0, "life": life, "start": 0.75, "end": 1.15})
+	_push_fx(node, life, 0.75, 1.15)
 
 
 func _spawn_burst(pos: Vector3, color: Color, life: float) -> void:
-	var node := MeshInstance3D.new()
 	var cube: Mesh
 	if fx_mesh_cache.has("fx_burst"):
 		cube = fx_mesh_cache["fx_burst"]
@@ -1513,16 +1526,12 @@ func _spawn_burst(pos: Vector3, color: Color, life: float) -> void:
 		bm.size = Vector3(20, 20, 20)
 		fx_mesh_cache["fx_burst"] = bm
 		cube = bm
-	node.mesh = cube
+	var node := _acquire_fx_node(cube, _alpha_material(Color(color.r, color.g, color.b, 0.92)))
 	node.position = Vector3(pos.x, maxf(pos.y, 10.0), pos.z)
-	node.material_override = _alpha_material(Color(color.r, color.g, color.b, 0.92))
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(node)
-	fx_items.append({"node": node, "t": 0.0, "life": life, "start": 0.5, "end": 1.7})
+	_push_fx(node, life, 0.5, 1.7)
 
 
 func _spawn_slash(pos: Vector3, color: Color) -> void:
-	var node := MeshInstance3D.new()
 	var box: Mesh
 	if fx_mesh_cache.has("fx_slash"):
 		box = fx_mesh_cache["fx_slash"]
@@ -1531,13 +1540,10 @@ func _spawn_slash(pos: Vector3, color: Color) -> void:
 		bm.size = Vector3(96, 8, 18)
 		fx_mesh_cache["fx_slash"] = bm
 		box = bm
-	node.mesh = box
+	var node := _acquire_fx_node(box, _alpha_material(Color(color.r, color.g, color.b, 0.9)))
 	node.position = Vector3(pos.x, 34.0, pos.z)
 	node.rotation_degrees = Vector3(0, 0, 22)
-	node.material_override = _alpha_material(Color(color.r, color.g, color.b, 0.9))
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(node)
-	fx_items.append({"node": node, "t": 0.0, "life": 0.13, "start": 0.6, "end": 1.1})
+	_push_fx(node, 0.13, 0.6, 1.1)
 
 
 func _fx_mat(c: Color, a := 0.9) -> StandardMaterial3D:
@@ -1561,21 +1567,72 @@ func _fx_mesh(key: String, factory: Callable) -> Mesh:
 	return m
 
 
-func _add_fx_mesh(mesh: Mesh, mat: Material, at: Vector3, life: float, start: float, end: float,
-		vel := Vector3.ZERO, spin := Vector3.ZERO, rot := Vector3.ZERO) -> void:
-	var node := MeshInstance3D.new()
+func _fx_evict_one() -> bool:
+	# 超容时淘汰最旧的非大招粒子（life ≤ 0.5s），节点直接回池。
+	for i in range(fx_items.size()):
+		var it: Dictionary = fx_items[i]
+		if float(it["life"]) <= 0.5:
+			var n: MeshInstance3D = it["node"]
+			n.visible = false
+			n.mesh = null
+			n.material_override = null
+			fx_free.append(n)
+			fx_items.remove_at(i)
+			return true
+	return false
+
+
+func _acquire_fx_node(mesh: Mesh, mat: Material) -> MeshInstance3D:
+	# 材质按实例复制：共享模板在淡出时会被同色 FX 互相覆盖 alpha。
+	var node: MeshInstance3D
+	if not fx_free.is_empty():
+		node = fx_free.pop_back()
+		fx_pool_hits += 1
+	else:
+		node = MeshInstance3D.new()
+		add_child(node)
+		fx_pool_misses += 1
+	node.visible = true
 	node.mesh = mesh
-	node.position = at
-	node.rotation = rot
-	node.material_override = mat
+	node.material_override = mat.duplicate() if mat is StandardMaterial3D else mat
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(node)
-	var item: Dictionary = {"node": node, "t": 0.0, "life": life, "start": start, "end": end}
+	node.position = Vector3.ZERO
+	node.rotation = Vector3.ZERO
+	node.scale = Vector3.ONE
+	return node
+
+
+func _push_fx(node: MeshInstance3D, life: float, start: float, end: float,
+		vel := Vector3.ZERO, spin := Vector3.ZERO) -> void:
+	if fx_items.size() >= FX_MAX and not _fx_evict_one():
+		if not fx_evict_warned:
+			fx_evict_warned = true
+			push_warning("[VIEW] fx capacity %d reached, drop new fx" % FX_MAX)
+		node.visible = false
+		node.mesh = null
+		node.material_override = null
+		fx_free.append(node)
+		return
+	var base_a := 1.0
+	var m := node.material_override as StandardMaterial3D
+	if m != null:
+		base_a = m.albedo_color.a
+	var item: Dictionary = {"node": node, "t": 0.0, "life": life, "start": start, "end": end,
+		"base_a": base_a}
 	if vel != Vector3.ZERO:
 		item["vel"] = vel
 	if spin != Vector3.ZERO:
 		item["spin"] = spin
 	fx_items.append(item)
+	fx_peak = maxi(fx_peak, fx_items.size())
+
+
+func _add_fx_mesh(mesh: Mesh, mat: Material, at: Vector3, life: float, start: float, end: float,
+		vel := Vector3.ZERO, spin := Vector3.ZERO, rot := Vector3.ZERO) -> void:
+	var node := _acquire_fx_node(mesh, mat)
+	node.position = at
+	node.rotation = rot
+	_push_fx(node, life, start, end, vel, spin)
 
 
 func _build_audio() -> void:
@@ -1880,6 +1937,24 @@ func _glint_color(id: String) -> Color:
 			return Color("f5eedc")
 		"redpanda":
 			return Color("ffb066")
+		"monkey":
+			return Color("f2c14e")
+		"elephant":
+			return Color("b8c4d0")
+		"penguin":
+			return Color("b8f0ff")
+		"sheep":
+			return Color("f6aebc")
+		"bat":
+			return Color("b08ae8")
+		"croc":
+			return Color("7fc4b8")
+		"giraffe", "koala":
+			return Color("a8d878")
+		"raccoon":
+			return Color("ffd166")
+		"peacock":
+			return Color("d8b8ff")
 	return Color("ffffff")
 
 
@@ -2349,8 +2424,12 @@ func _spawn_spin(pos: Vector3, color: Color, radius: float) -> void:
 
 func _spawn_slashes(pos: Vector3, color: Color, count: int, radius: float) -> void:
 	var mat := _fx_mat(color, 0.92)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(maxf(46.0, radius * 0.50), 6, 10)
+	var width := maxf(46.0, radius * 0.50)
+	var key := "fx_slashes_%d" % int(width)
+	var mesh := _fx_mesh(key, func():
+		var bm := BoxMesh.new()
+		bm.size = Vector3(width, 6, 10)
+		return bm)
 	for i in range(count):
 		var a := -0.95 + (1.9 * float(i) / maxf(1.0, float(count - 1)))
 		_add_fx_mesh(mesh, mat, pos + Vector3(0, 30.0, 0), 0.34, 0.55, 1.35,
@@ -2855,7 +2934,10 @@ func _step_fx(delta: float) -> void:
 		var k: float = float(item["t"]) / float(item["life"])
 		var node: MeshInstance3D = item["node"]
 		if k >= 1.0:
-			node.queue_free()
+			node.visible = false
+			node.mesh = null
+			node.material_override = null
+			fx_free.append(node)
 			fx_items.remove_at(i)
 			continue
 		var s: float = lerp(float(item["start"]), float(item["end"]), k)
@@ -2866,4 +2948,4 @@ func _step_fx(delta: float) -> void:
 			node.rotation += (item["spin"] as Vector3) * delta
 		var m := node.material_override as StandardMaterial3D
 		if m != null:
-			m.albedo_color.a = 1.0 - k
+			m.albedo_color.a = float(item.get("base_a", 1.0)) * (1.0 - k)

@@ -328,7 +328,8 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 		sim.step(0.016)
 		hud.queue_redraw()
 
-	print("[MATCH] hero=%s difficulty=%d seed=%d mode=%s" % [hero_id, difficulty, seed_value, "5v5" if mode_5v5 else "3v3"])
+	if OS.is_debug_build():
+		print("[MATCH] hero=%s difficulty=%d seed=%d mode=%s" % [hero_id, difficulty, seed_value, "5v5" if mode_5v5 else "3v3"])
 
 
 func _process(delta: float) -> void:
@@ -339,7 +340,8 @@ func _process(delta: float) -> void:
 	var now_ms := Time.get_ticks_msec()
 	if now_ms - fps_start_ms >= 5000:
 		var sim_ms := sim_us_total / 1000.0 / maxf(1.0, float(sim_frames))
-		print("[FPS] %.1f sim_ms=%.2f" % [float(fps_frames) * 1000.0 / float(now_ms - fps_start_ms), sim_ms])
+		if OS.is_debug_build():
+			print("[FPS] %.1f sim_ms=%.2f" % [float(fps_frames) * 1000.0 / float(now_ms - fps_start_ms), sim_ms])
 		fps_start_ms = now_ms
 		fps_frames = 0
 		sim_us_total = 0

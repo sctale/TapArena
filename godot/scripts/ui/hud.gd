@@ -17,6 +17,10 @@ var icons = null
 var banners: Array = []
 var floats: Array = []
 var redraw_acc := 0.0
+# 技能钮按压/拒绝反馈：按下时间、是否可用、拒绝抖动起点。
+var skill_press_t: Array = [0.0, 0.0, 0.0]
+var skill_press_ok: Array = [false, false, false]
+var skill_reject_t: Array = [0.0, 0.0, 0.0]
 
 var rect_mm: MultiMesh
 var disc_mm: MultiMesh
@@ -30,6 +34,7 @@ var rect_i := 0
 var disc_i := 0
 var disc_ui_i := 0
 var disc_ui_warned := false
+var batch_warned: Dictionary = {}
 var front := false
 
 var lbl_plate_name: Label
@@ -131,6 +136,39 @@ func skill_rect(i: int) -> Rect2:
 	var cx: Array = [safe.end.x - h * 0.250, safe.end.x - h * 0.145, safe.end.x - h * 0.155]
 	var cy: Array = [safe.end.y - h * 0.170, safe.end.y - h * 0.335, safe.end.y - h * 0.500]
 	return Rect2(cx[i] - bs[i] * 0.5, cy[i] - bs[i] * 0.5, bs[i], bs[i])
+
+
+func _now_s() -> float:
+	return Time.get_ticks_msec() / 1000.0
+
+
+func _skill_shake_x(i: int) -> float:
+	# 冷却/锁定时 0.18 秒横向抖动，振幅随时间衰减。
+	var el := _now_s() - float(skill_reject_t[i])
+	if el < 0.0 or el >= 0.18:
+		return 0.0
+	return sin(el * 70.0) * (1.0 - el / 0.18) * 10.0
+
+
+func _skill_rect_now(i: int) -> Rect2:
+	var r := skill_rect(i)
+	var dx := _skill_shake_x(i)
+	if absf(dx) > 0.01:
+		r.position.x += dx
+	return r
+
+
+func press_skill(i: int, ok: bool) -> void:
+	# 输入层在 set_skill 后调用：可用亮一圈，不可用抖动 + Android 短震动。
+	if i < 0 or i >= 3:
+		return
+	skill_press_t[i] = _now_s()
+	skill_press_ok[i] = ok
+	if not ok:
+		skill_reject_t[i] = skill_press_t[i]
+		if sound_on and OS.get_name() == "Android":
+			Input.vibrate_handheld(15)
+	queue_redraw()
 
 
 func joystick_center() -> Vector2:
@@ -317,11 +355,19 @@ func _begin_batch(front_layer := false) -> void:
 	disc_i = 0
 
 
+func _warn_batch(key: String, cap: int) -> void:
+	if batch_warned.has(key):
+		return
+	batch_warned[key] = true
+	push_warning("[HUD] %s batch overflow (cap %d), dropping elements" % [key, cap])
+
+
 func _add_rect(r: Rect2, c: Color) -> void:
 	if r.size.x <= 0.0 or r.size.y <= 0.0:
 		return
 	var mm := rect_mm_fg if front else rect_mm
 	if rect_i >= mm.instance_count:
+		_warn_batch("rect_fg" if front else "rect", mm.instance_count)
 		return
 	mm.set_instance_transform_2d(rect_i, Transform2D(0.0, r.size, 0.0, r.get_center()))
 	mm.set_instance_color(rect_i, c)
@@ -340,6 +386,7 @@ func _add_rot_rect(center: Vector2, size: Vector2, angle: float, c: Color) -> vo
 		return
 	var mm := rect_mm_fg if front else rect_mm
 	if rect_i >= mm.instance_count:
+		_warn_batch("rect_fg" if front else "rect", mm.instance_count)
 		return
 	mm.set_instance_transform_2d(rect_i, Transform2D(angle, size, 0.0, center))
 	mm.set_instance_color(rect_i, c)
@@ -360,6 +407,7 @@ func _add_seg(a: Vector2, b: Vector2, width: float, c: Color) -> void:
 func _add_disc(center: Vector2, radius: float, c: Color) -> void:
 	var mm := disc_mm_fg if front else disc_mm
 	if disc_i >= mm.instance_count:
+		_warn_batch("disc_fg" if front else "disc", mm.instance_count)
 		return
 	mm.set_instance_transform_2d(disc_i, Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
 	mm.set_instance_color(disc_i, c)
@@ -371,7 +419,7 @@ func _add_ui_disc(center: Vector2, radius: float, c: Color) -> void:
 	if disc_ui_i >= disc_ui.instance_count:
 		if not disc_ui_warned:
 			disc_ui_warned = true
-			print("[HUD] minimap disc overlay overflow")
+			push_warning("[HUD] minimap disc overlay overflow (cap %d)" % disc_ui.instance_count)
 		return
 	disc_ui.set_instance_transform_2d(disc_ui_i, Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
 	disc_ui.set_instance_color(disc_ui_i, c)
@@ -509,6 +557,9 @@ func _on_banner(text: String, duration: float) -> void:
 
 
 func _on_float_text(pos: Vector3, text: String, color: Color) -> void:
+	# 飘字限流：团战峰值最多 40 条，超出丢最旧，避免挤爆矩形批次。
+	if floats.size() >= 40:
+		floats.remove_at(0)
 	floats.append({"pos": pos, "text": text, "color": color, "t": 0.0, "life": 0.9})
 	queue_redraw()
 
@@ -567,6 +618,7 @@ func _update_labels() -> void:
 
 	# 其他英雄名字
 	var seen: Dictionary = {}
+	var placed: Array = []
 	for u in sim.heroes:
 		if u.is_player:
 			continue
@@ -585,7 +637,14 @@ func _update_labels() -> void:
 			continue
 		var sp := cam.unproject_position(wp)
 		var sz := Vector2(h * 0.14, h * 0.030)
-		_place(l, Rect2(sp.x - sz.x * 0.5, sp.y - sz.y, sz.x, sz.y), true)
+		var nr := Rect2(sp.x - sz.x * 0.5, sp.y - sz.y, sz.x, sz.y)
+		# 抱团时同名牌重叠：按 uid 奇偶左右各偏 0.6 个牌宽；玩家自己的名字不在这一层。
+		for pr in placed:
+			if nr.intersects(pr):
+				nr.position.x += (sz.x * 0.6 if u.uid % 2 == 0 else -sz.x * 0.6)
+				break
+		placed.append(nr)
+		_place(l, nr, true)
 		l.add_theme_color_override("font_color", BLUE if u.team == sim.BLUE else Color("ffb3a6"))
 		_set_label(l, str(u.def.get("name", "")))
 
@@ -1155,7 +1214,7 @@ func _draw_skill_bg(safe: Rect2, h: float) -> void:
 	if p == null:
 		return
 	for i in range(3):
-		var r := skill_rect(i)
+		var r := _skill_rect_now(i)
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
 		var c := r.get_center()
@@ -1171,7 +1230,7 @@ func _draw_skill_icons(safe: Rect2, h: float) -> void:
 	if p == null:
 		return
 	for i in range(3):
-		var r := skill_rect(i)
+		var r := _skill_rect_now(i)
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
 		var c := r.get_center()
@@ -1188,7 +1247,7 @@ func _draw_skill_fg(safe: Rect2, h: float) -> void:
 	if p == null:
 		return
 	for i in range(3):
-		var r := skill_rect(i)
+		var r := _skill_rect_now(i)
 		var s: Dictionary = p.skills[i]
 		var locked: bool = s.get("unlock_at_2", false) and p.level < 2
 		var cooling: bool = p.cds[i] > 0.0
@@ -1213,6 +1272,11 @@ func _draw_skill_fg(safe: Rect2, h: float) -> void:
 		if i == 2 and not locked and not cooling:
 			var glow := 0.5 + sin(Time.get_ticks_msec() * 0.004) * 0.3
 			draw_arc(c, rad + 5.0, 0.0, TAU, 44, Color(1.0, 0.86, 0.35, glow), 2.5, true)
+
+		var pt := _now_s() - float(skill_press_t[i])
+		if bool(skill_press_ok[i]) and pt >= 0.0 and pt < 0.12:
+			draw_arc(c, rad + 4.0, 0.0, TAU, 48, Color(1.0, 0.95, 0.55, 1.0 - pt / 0.12),
+				maxf(2.0, h * 0.0026), true)
 
 
 func _draw_cd_sweep(center: Vector2, radius: float, ratio: float, color: Color) -> void:
@@ -1260,7 +1324,12 @@ func _draw_floats(safe: Rect2, h: float) -> void:
 		var a := clampf(1.0 - k, 0.0, 1.0)
 		var color: Color = item["color"]
 		var sz: Vector2 = icons.number_size(str(item["text"]), px)
-		_digit(str(item["text"]), Vector2(sp.x - sz.x * 0.5, sp.y - px * 8.0 - k * h * 0.03), px,
+		# 边缘夹取：顶部不能钻进计分板，左右不越过安全区。
+		var top_limit: float = _score_rect(safe, h).end.y + 8.0
+		var tx := clampf(sp.x - sz.x * 0.5, safe.position.x + 2.0, safe.end.x - sz.x - 2.0)
+		var ty := sp.y - px * 8.0 - k * h * 0.03
+		ty = clampf(ty, top_limit, safe.end.y - px * 8.0)
+		_digit(str(item["text"]), Vector2(tx, ty), px,
 			Color(color.r, color.g, color.b, a), true)
 
 

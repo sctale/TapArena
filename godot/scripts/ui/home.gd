@@ -171,7 +171,7 @@ func _open_detail_debug() -> void:
 
 
 func _apply_mode() -> void:
-	# 2026-11-20：3v3 与 5v5 都开放全部英雄（当前 20 位），只是对局人数不同。
+	# 2026-11-20：3v3 与 5v5 都开放全部英雄（当前 25 位），只是对局人数不同。
 	heroes.clear()
 	for d in all_heroes:
 		heroes.append(d)
@@ -1013,7 +1013,6 @@ func _tap(pos: Vector2) -> void:
 	if frame == last_tap_frame:
 		return
 	last_tap_frame = frame
-	print("[HOME] tap=(%.0f,%.0f) sel=%d" % [pos.x, pos.y, sel_index])
 
 	if detail_open:
 		if detail_close_rect().has_point(pos) or not detail_rect().has_point(pos):
