@@ -17,6 +17,7 @@ class GridCanvas extends Control:
 			home._draw_grid(self)
 
 const HeroPortraitsScript = preload("res://scripts/art/hero_portraits.gd")
+const HeroPreviewStageScript = preload("res://scripts/ui/hero_preview_stage.gd")
 const GRID_COLS := 5
 const GRID_ROWS_VISIBLE := 2
 const GOLD := Color("f5c542")
@@ -84,6 +85,15 @@ var detail_skill_meta: Array = []
 
 var last_tap_frame := -1
 
+# 详情页 3D 展示台与首页动效时间
+var preview_stage = null
+var preview_rect: TextureRect = null
+var lbl_preview_tag: Label
+var lbl_preview_hint: Label
+var preview_drag := false
+var preview_last_x := 0.0
+var bg_t := 0.0
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -100,6 +110,7 @@ func _ready() -> void:
 	portraits = HeroPortraitsScript.new()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_build_grid_layer()
+	_build_preview_layer()
 	_load_heroes()
 	_make_labels()
 	detail_open = "--detail" in OS.get_cmdline_user_args()
@@ -168,6 +179,7 @@ func _apply_mode() -> void:
 	grid_scroll = 0.0
 	scroll_velocity = 0.0
 	momentum_active = false
+	preview_drag = false
 	detail_open = false
 
 
@@ -257,6 +269,21 @@ func _build_grid_layer() -> void:
 	add_child(scroll_thumb)
 
 
+func _build_preview_layer() -> void:
+	# 详情页的 3D 展示台；TextureRect 只负责把 SubViewport 画面贴到弹窗里。
+	preview_stage = HeroPreviewStageScript.new()
+	preview_stage.name = "HeroPreviewStage"
+	add_child(preview_stage)
+	preview_rect = TextureRect.new()
+	preview_rect.texture = preview_stage.get_texture()
+	preview_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	preview_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	preview_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	preview_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_rect.visible = false
+	add_child(preview_rect)
+
+
 func _layout_grid_layer() -> void:
 	if grid_clip == null:
 		return
@@ -299,6 +326,13 @@ func set_grid_scroll(v: float) -> void:
 
 
 func _process(delta: float) -> void:
+	# 首页云层/落叶/按钮呼吸与详情页 3D 展示台的逐帧更新。
+	bg_t += delta
+	if detail_open:
+		if preview_stage != null:
+			preview_stage.tick(delta)
+	else:
+		queue_redraw()
 	# 松手后的惯性滚动：连续减速，不再整排吸附。
 	if not momentum_active or detail_open or grid_canvas == null:
 		return
@@ -345,10 +379,15 @@ func _draw_grid(ci: Control) -> void:
 		var row := i / GRID_COLS
 		var card := Rect2(Vector2(float(col) * (cs.x + gap), float(row) * (cs.y + gap)), cs)
 		var selected := i == sel_index
+		var d: Dictionary = heroes[i]
+		var role_c := _role_color(str(d.get("role", "")))
+		if selected:
+			ci.draw_rect(Rect2(card.position - Vector2(6, 6), card.size + Vector2(12, 12)),
+				Color(1.0, 0.86, 0.40, 0.12 + 0.05 * sin(bg_t * 3.0)))
 		_panel_on(ci, card, Color("2f4038") if selected else PANEL_DEEP)
 		if selected:
 			_outline_on(ci, card, GOLD, 4.0)
-		var d: Dictionary = heroes[i]
+		ci.draw_rect(Rect2(card.position.x, card.position.y + 4, 4, card.size.y - 8), role_c)
 		var pad := card.size.y * 0.055
 		var av := minf(card.size.x - pad * 2.0, card.size.y * 0.66)
 		var ar := Rect2(card.get_center().x - av * 0.5, card.position.y + pad, av, av)
@@ -363,10 +402,27 @@ func _draw_grid(ci: Control) -> void:
 			d.get("accent_c", GOLD))
 		var nr := Rect2(card.position.x, card.position.y + av + pad * 0.7,
 			card.size.x, card.size.y * 0.19)
+		ci.draw_rect(Rect2(nr.position.x + 6, nr.position.y - 2,
+			nr.size.x - 12, nr.size.y + 4), Color(0.04, 0.07, 0.06, 0.42))
 		var label := "%s · %s" % [str(d.get("name", "?")), str(d.get("role", ""))]
 		var baseline := nr.position.y + nr.size.y * 0.5 + float(fs) * 0.36
 		ci.draw_string(font, Vector2(nr.position.x, baseline), label,
 			HORIZONTAL_ALIGNMENT_CENTER, nr.size.x, fs, GOLD if selected else CREAM)
+		# 难度小菱点：1–3 颗，金色表示难度。
+		var diff := clampi(int(d.get("difficulty", 1)), 1, 3)
+		for k in range(3):
+			var dx := card.end.x - 12.0 - float(k) * 10.0
+			var dy := card.position.y + 13.0
+			ci.draw_colored_polygon(PackedVector2Array([
+				Vector2(dx, dy - 4), Vector2(dx + 3, dy),
+				Vector2(dx, dy + 4), Vector2(dx - 3, dy),
+			]), GOLD if k < diff else Color(0, 0, 0, 0.35))
+		if selected:
+			var tag := Rect2(card.position.x + 8, card.position.y + 8,
+				card.size.x * 0.27, card.size.y * 0.075)
+			ci.draw_rect(tag, GOLD)
+			ci.draw_string(font, Vector2(tag.position.x, tag.position.y + tag.size.y * 0.78),
+				"已选", HORIZONTAL_ALIGNMENT_CENTER, tag.size.x, int(float(fs) * 0.60), INK)
 
 
 func _card_fully_visible(card: Rect2) -> bool:
@@ -442,7 +498,7 @@ func detail_rect() -> Rect2:
 
 func detail_portrait_rect() -> Rect2:
 	var d := detail_rect()
-	var side := minf(d.size.x * 0.30, d.size.y * 0.54)
+	var side := minf(d.size.x * 0.32, d.size.y * 0.58)
 	return Rect2(d.position.x + d.size.x * 0.035, d.position.y + d.size.y * 0.10,
 		side, side)
 
@@ -526,6 +582,10 @@ func _make_labels() -> void:
 	lbl_detail_mode = _mk_label(int(h * 0.021), Color(0.88, 0.95, 0.88, 0.80))
 	lbl_detail_close = _mk_label(int(h * 0.026), CREAM, HORIZONTAL_ALIGNMENT_CENTER)
 	lbl_detail_start = _mk_label(int(h * 0.036), INK, HORIZONTAL_ALIGNMENT_CENTER)
+	lbl_preview_tag = _mk_label(int(h * 0.018), GOLD, HORIZONTAL_ALIGNMENT_LEFT)
+	lbl_preview_tag.text = "3D 展示"
+	lbl_preview_hint = _mk_label(int(h * 0.017), Color(0.94, 0.98, 0.90, 0.90))
+	lbl_preview_hint.text = "拖动旋转 · 自动展示"
 	for i in range(3):
 		detail_skill_names.append(_mk_label(int(h * 0.026), GOLD, HORIZONTAL_ALIGNMENT_LEFT))
 		var hint := _mk_label(int(h * 0.020), Color(0.93, 0.97, 0.91, 0.84), HORIZONTAL_ALIGNMENT_LEFT)
@@ -538,6 +598,23 @@ func _make_labels() -> void:
 func _place(l: Label, r: Rect2) -> void:
 	l.position = r.position
 	l.size = r.size
+
+
+func _place_preview(pr: Rect2) -> void:
+	var h := _safe().size.y
+	preview_stage.set_hero(str(heroes[sel_index].get("id", "tiger")), heroes[sel_index])
+	preview_stage.set_active(detail_open)
+	preview_rect.visible = detail_open
+	if preview_rect.visible:
+		var inner := pr.grow(-5.0)
+		preview_rect.position = inner.position
+		preview_rect.size = inner.size
+	lbl_preview_tag.visible = detail_open
+	_place(lbl_preview_tag, Rect2(pr.position + Vector2(14, 10),
+		Vector2(pr.size.x - 28, h * 0.028)))
+	lbl_preview_hint.visible = detail_open
+	_place(lbl_preview_hint, Rect2(pr.position + Vector2(8, pr.size.y - h * 0.044),
+		Vector2(pr.size.x - 16, h * 0.034)))
 
 
 func _refresh_labels() -> void:
@@ -575,6 +652,14 @@ func _refresh_labels() -> void:
 	var dsel: Dictionary = heroes[sel_index]
 	var dr := detail_rect()
 	var pr := detail_portrait_rect()
+	if detail_open:
+		_place_preview(pr)
+	else:
+		preview_drag = false
+		preview_stage.set_active(false)
+		preview_rect.visible = false
+		lbl_preview_tag.visible = false
+		lbl_preview_hint.visible = false
 	var tx := detail_text_x()
 	var right_w := dr.end.x - tx - dr.size.x * 0.035
 	_place(lbl_detail_name, Rect2(tx, dr.position.y + dr.size.y * 0.045, right_w, h * 0.055))
@@ -640,12 +725,27 @@ func _draw() -> void:
 		draw_rect(Rect2(0, horizon * t, vp.x, horizon / 5.0 + 1.0), SKY.lerp(Color("e6f7fd"), t))
 	draw_rect(Rect2(0, horizon, vp.x, vp.y - horizon), GRASS)
 	draw_rect(Rect2(0, horizon - 8.0, vp.x, 8.0), Color("5f9e45"))
+	# 远处的暖阳与缓慢漂移的云层。
+	var sun_c := Vector2(vp.x * 0.88, vp.y * 0.085)
+	draw_circle(sun_c, vp.y * 0.115, Color(1.0, 0.95, 0.75, 0.14))
+	draw_circle(sun_c, vp.y * 0.078, Color(1.0, 0.93, 0.66, 0.28))
+	draw_circle(sun_c, vp.y * 0.044, Color(1.0, 0.91, 0.60, 0.60))
+	var drift := fmod(bg_t * 8.0, vp.x * 1.15)
 	for i in range(7):
-		var cx := vp.x * (0.06 + float(i) * 0.145)
+		var cx := fmod(vp.x * (0.06 + float(i) * 0.145) + drift, vp.x * 1.10) - vp.x * 0.04
 		var cy := vp.y * (0.10 + float(i % 3) * 0.035)
-		draw_rect(Rect2(cx, cy, vp.x * 0.075, vp.y * 0.035), Color(1, 1, 1, 0.75))
+		draw_rect(Rect2(cx, cy, vp.x * 0.075, vp.y * 0.035), Color(1, 1, 1, 0.72))
 		draw_rect(Rect2(cx + vp.x * 0.018, cy - vp.y * 0.022, vp.x * 0.042, vp.y * 0.025),
-			Color(1, 1, 1, 0.75))
+			Color(1, 1, 1, 0.72))
+	# 空中漂浮的小叶片，给首页一点生气（画在卡片下层）。
+	for i in range(9):
+		var lt := bg_t * 0.35 + float(i) * 1.7
+		var lx := vp.x * (0.05 + float(i) * 0.112) + sin(lt * 0.8) * vp.x * 0.014
+		var ly := vp.y * (0.25 + float(i % 4) * 0.065) + cos(lt * 1.1) * vp.y * 0.020
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(lx, ly - vp.y * 0.006), Vector2(lx + vp.x * 0.004, ly),
+			Vector2(lx, ly + vp.y * 0.006), Vector2(lx - vp.x * 0.004, ly),
+		]), Color(0.42, 0.66, 0.30, 0.30))
 	# 底部草方块装饰
 	for i in range(10):
 		var bx := vp.x * (0.03 + float(i) * 0.10)
@@ -654,12 +754,17 @@ func _draw() -> void:
 		draw_rect(Rect2(bx, by, vp.x * 0.035, vp.y * 0.008), Color("7fbf5a"))
 
 	var safe := _safe()
-	_panel(_brand_rect(), PANEL_FILL)
+	var brand := _brand_rect()
+	_panel(brand, PANEL_FILL)
+	draw_rect(Rect2(brand.position.x, brand.position.y, 6, brand.size.y), GOLD)
+	draw_rect(Rect2(brand.position.x + 6, brand.position.y, 2, brand.size.y), Color(0.05, 0.08, 0.06, 0.30))
 	_panel(_version_badge_rect(), PANEL_DEEP)
 
 	_panel(_bar_rect(), PANEL_DEEP)
 
 	var start := start_rect()
+	draw_rect(Rect2(start.position - Vector2(6, 6), start.size + Vector2(12, 12)),
+		Color(1.0, 0.86, 0.40, 0.10 + 0.06 * sin(bg_t * 2.6)))
 	draw_rect(start, GOLD)
 	_outline(start, PANEL_DARK, 4.0)
 	draw_rect(Rect2(start.position + Vector2(4, 4), Vector2(start.size.x - 8, 3)),
@@ -682,6 +787,11 @@ func _draw() -> void:
 	var cr := challenge_rect()
 	draw_rect(cr, CHALLENGE_ON if difficulty == 1 else BTN_OFF)
 	_outline(cr, PANEL_DARK, 3.0)
+	for pair in [[m3, not mode_5v5], [m5, mode_5v5], [er, difficulty == 0], [cr, difficulty == 1]]:
+		if bool(pair[1]):
+			var br: Rect2 = pair[0]
+			draw_rect(Rect2(br.position.x + 4, br.end.y - 6, br.size.x - 8, 4),
+				Color(1, 1, 1, 0.38))
 
 	if detail_open:
 		_draw_detail()
@@ -696,18 +806,37 @@ func _draw_detail() -> void:
 
 	var dsel: Dictionary = heroes[sel_index]
 	var pr := detail_portrait_rect()
-	draw_rect(Rect2(pr.position - Vector2(7, 7), pr.size + Vector2(14, 14)), PANEL_DARK)
+	# 3D 舞台：TextureRect 会盖住 pr 内部，深色底与金边画在外圈。
+	var stage_glow := Color(1.0, 0.86, 0.46, 0.18 + 0.06 * sin(bg_t * 2.2))
+	draw_rect(Rect2(pr.position - Vector2(12, 12), pr.size + Vector2(24, 24)), stage_glow)
+	draw_rect(Rect2(pr.position - Vector2(9, 9), pr.size + Vector2(18, 18)), PANEL_DARK)
 	draw_rect(Rect2(pr.position - Vector2(4, 4), pr.size + Vector2(8, 8)),
-		Color(1.0, 0.86, 0.46, 0.40))
-	var portrait: Texture2D = portraits.portrait(str(dsel.get("id", "tiger")),
-		dsel.get("fur_c", Color.WHITE), dsel.get("cream_c", Color.WHITE),
-		dsel.get("dark_c", Color.BLACK), dsel.get("accent_c", Color.WHITE))
-	draw_texture_rect(portrait, pr, false)
-	_outline(pr, GOLD, 3.0)
+		Color(1.0, 0.86, 0.46, 0.42))
+	_outline(Rect2(pr.position - Vector2(4, 4), pr.size + Vector2(8, 8)), GOLD, 3.0)
+	for corner in [[0, 0], [1, 0], [0, 1], [1, 1]]:
+		var lx := pr.position.x - 8.0 if int(corner[0]) == 0 else pr.end.x + 2.0
+		var ly := pr.position.y - 8.0 if int(corner[1]) == 0 else pr.end.y + 2.0
+		draw_rect(Rect2(lx, ly, 16, 2), GOLD)
+		draw_rect(Rect2(lx if int(corner[0]) == 0 else lx + 14, ly if int(corner[1]) == 0 else ly - 14, 2, 16), GOLD)
 
 	var tx := detail_text_x()
+	var right_w := d.end.x - tx - d.size.x * 0.035
+	# 定位药丸：角色色左条 + 半透明底，让「生命/攻击/射程」一眼分组。
+	var role_c := _role_color(str(dsel.get("role", "")))
+	var sub_px := int(vp.y * 0.022)
+	var sub_w := minf(right_w + 4.0, font.get_string_size(lbl_detail_sub.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sub_px).x + 26.0)
+	var pill := Rect2(tx - 4, d.position.y + d.size.y * 0.112, sub_w, vp.y * 0.041)
+	draw_rect(pill, Color(role_c.r, role_c.g, role_c.b, 0.18))
+	draw_rect(Rect2(pill.position.x, pill.position.y, 4, pill.size.y), role_c)
+	_outline(pill, Color(role_c.r, role_c.g, role_c.b, 0.48), 1.0)
 	draw_rect(Rect2(tx - 10, d.position.y + d.size.y * 0.04, 3,
 		d.size.y * 0.56), Color(0.95, 0.84, 0.54, 0.55))
+	# 技能小节标题：填住介绍与技能行之间的空白，层级更清楚。
+	var sec_y := d.position.y + d.size.y * 0.245
+	draw_rect(Rect2(tx, sec_y, right_w, 1), Color(1, 1, 1, 0.10))
+	draw_string(font, Vector2(tx, sec_y + vp.y * 0.026), "技能",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, int(vp.y * 0.020), Color(0.96, 0.85, 0.55, 0.92))
 
 	var skills: Array = dsel.get("skills", [])
 	for i in range(3):
@@ -720,6 +849,8 @@ func _draw_detail() -> void:
 			var ir := Rect2(r.position.x + r.size.y * 0.12, r.position.y + (r.size.y - isz) * 0.5,
 				isz, isz)
 			var sc: Color = Color.from_string(str(s.get("color", "#FFFFFF")), GOLD)
+			draw_rect(Rect2(r.position.x, r.position.y, 4, r.size.y),
+				Color(sc.r, sc.g, sc.b, 0.88))
 			draw_circle(ir.get_center(), isz * 0.58, Color(sc.r, sc.g, sc.b, 0.22))
 			var icon_tex: Texture2D = icons.ult_icon(str(dsel.get("id", "tiger"))) if i == 2 \
 				else icons.tex("skill_" + str(s.get("kind", "aoe")))
@@ -743,6 +874,29 @@ func _draw_detail() -> void:
 		play_c + Vector2(-ts, -ts * 1.2), play_c + Vector2(-ts, ts * 1.2),
 		play_c + Vector2(ts * 1.4, 0),
 	]), PANEL_DARK)
+
+
+func _role_color(role: String) -> Color:
+	match role:
+		"坦克":
+			return Color("e0a04f")
+		"战士":
+			return Color("e0604f")
+		"法师":
+			return Color("b08ae8")
+		"辅助":
+			return Color("7fc45c")
+		"控制":
+			return Color("4fc3e8")
+		"射手":
+			return Color("f2c14e")
+		"刺客":
+			return Color("c86a9a")
+		"打野":
+			return Color("8a9bb0")
+		"法坦":
+			return Color("5aa8a0")
+	return GOLD
 
 
 func _panel(r: Rect2, fill: Color) -> void:
@@ -790,6 +944,12 @@ func _input(event: InputEvent) -> void:
 
 func _press(pos: Vector2) -> void:
 	if detail_open:
+		if detail_portrait_rect().has_point(pos):
+			preview_drag = true
+			preview_last_x = pos.x
+			if preview_stage != null:
+				preview_stage.dragging = true
+			return
 		_tap(pos)
 		return
 	# 只有从网格里按下才可能是滚动；按钮仍按下即生效，保持原来的手感。
@@ -805,6 +965,11 @@ func _press(pos: Vector2) -> void:
 
 
 func _drag_to(pos: Vector2) -> void:
+	if preview_drag:
+		if preview_stage != null:
+			preview_stage.drag(pos.x - preview_last_x)
+		preview_last_x = pos.x
+		return
 	if not drag_active:
 		return
 	var dy := pos.y - drag_start.y
@@ -826,6 +991,11 @@ func _drag_to(pos: Vector2) -> void:
 
 
 func _release(pos: Vector2) -> void:
+	if preview_drag:
+		preview_drag = false
+		if preview_stage != null:
+			preview_stage.dragging = false
+		return
 	if not drag_active:
 		return
 	drag_active = false

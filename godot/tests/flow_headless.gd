@@ -68,11 +68,31 @@ func _process(_delta: float) -> bool:
 				failures.append("大招没有显示解锁等级：" + ult_meta)
 			if dr.end.y > main.home._safe().end.y + 1.0:
 				failures.append("详情弹窗超出安全区")
+			# 详情页 3D 展示台：必须已构建、显示，并且可以被拖动旋转。
+			if main.home.preview_stage == null:
+				failures.append("详情页没有 3D 展示台")
+			elif str(main.home.preview_stage.hero_id) != str(main.home.heroes[1].get("id", "")):
+				failures.append("3D 展示台没有跟随选中英雄")
+			elif not main.home.preview_stage.pivots.has("head"):
+				failures.append("3D 展示台没有装配英雄部件")
+			if main.home.preview_rect == null or not main.home.preview_rect.visible:
+				failures.append("3D 展示台没有显示")
+			var rot0: float = main.home.preview_stage.rot
+			var pc: Vector2 = main.home.detail_portrait_rect().get_center()
+			main.home._press(pc)
+			main.home._drag_to(pc + Vector2(60, 0))
+			main.home._release(pc + Vector2(60, 0))
+			if absf(main.home.preview_stage.rot - rot0) < 0.05:
+				failures.append("拖动没有旋转 3D 英雄")
 	elif frame == 4:
 		if main.home != null and main.home.detail_open:
 			main.home._tap(main.home.detail_close_rect().get_center())
 	elif frame == 6:
 		if main.home != null:
+			if main.home.preview_rect != null and main.home.preview_rect.visible:
+				failures.append("关闭详情后 3D 展示台没有隐藏")
+			if main.home.preview_stage != null 					and main.home.preview_stage.render_target_update_mode != SubViewport.UPDATE_DISABLED:
+				failures.append("关闭详情后 3D 展示台没有停止更新")
 			main.home._tap(main.home.challenge_rect().get_center())
 	elif frame == 9:
 		if main.home != null:

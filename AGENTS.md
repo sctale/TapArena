@@ -21,6 +21,7 @@ godot/                        唯一主线工程
   scripts/ui/hud.gd           战斗 HUD、播报、暂停、结算
   scripts/ui/home.gd          首页选人（版本号从 project.godot 读取）
   scripts/ui/input_hub.gd     触屏摇杆 + 技能 + 键盘
+  scripts/ui/hero_preview_stage.gd 首页详情 3D 英雄展示台（SubViewport + 灯光 + 圆台）
   scripts/art/                像素图集、图标、体素模型
   data/heroes.json            25 位英雄与 75 个技能
   data/rules.json             数值、节奏、巨兽与结算规则
@@ -47,7 +48,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 79），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 80），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -101,6 +102,7 @@ godot --path godot -- --skip-home --auto-run
 - 相机：机位高度、俯角、朝向为常量；推镜/打击感只改 `fov`，震屏只平移机位、不重新对准。
 - 播报条固定位于 `h*0.245`，宽度 0.52w；3v3 巨兽与终极对决同帧，合并为一条播报；5v5 巨兽 4:00 单独播报，5:00 终极对决不再叠一条横幅。
 - HUD 以 1920×1080 为基准，必须适配 Android 安全区；触摸热区不小于 44vp。
+- 首页详情 3D 展示台在 `scripts/ui/hero_preview_stage.gd`：模型按装配 AABB 归一到 94 高；SubViewport 只在详情打开时 `UPDATE_ALWAYS`，关闭时 `UPDATE_DISABLED`；拖动旋转与自动旋转不能互相打架。
 - 像素美术、音效均为项目自制或运行时合成；不引入任何第三方游戏素材。
 - 新英雄建模以 88 单位人形模板为基准：长脖子、高冠、尾屏等超出模板的结构，必须在 `HERO_DESIGN_H` 登记**模型实测自然高度**（例：长长 118），`heroes.json.height` 填期望的进游戏身高；两者任一填错都会被 `height/设计身高` 二次放大。登记条目本身不代表尺寸正确，必须用模拟器同屏对比同定位老英雄。
 - 体素模型的「视觉身高」以装配后 AABB 为准（body 的世界高度 + head/tail 等枢轴抬升），不是单个 mesh 的局部包围盒；调尺寸时用 `flow_headless` 的守卫输出核对。
