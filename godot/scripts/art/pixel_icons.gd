@@ -710,6 +710,47 @@ func ult_icon(hero_id: String) -> ImageTexture:
 			_add(ops, _disc_mask(8.0, 8.0, 1.6), CREAM)
 			_add(ops, _poly_mask([Vector2(2, 4), Vector2(5, 2), Vector2(5, 6)]), PURPLE)
 			_add(ops, _poly_mask([Vector2(14, 4), Vector2(11, 2), Vector2(11, 6)]), PURPLE)
+		"croc":
+			# 死亡翻滚：绿水漩涡 + 四颗牙。
+			_add(ops, _ring_mask(8.0, 8.0, 6.2, 5.0), Color("3FA8A0"))
+			_add(ops, _ring_mask(8.0, 8.0, 4.2, 3.2), Color("2b7d78"))
+			_add(ops, _disc_mask(8.0, 8.0, 1.6), Color("9be0d0"))
+			for k in range(4):
+				var a := TAU * float(k) / 4.0 + 0.4
+				_add(ops, _poly_mask([Vector2(8.0 + cos(a) * 5.2, 8.0 + sin(a) * 5.2),
+					Vector2(8.0 + cos(a + 0.42) * 5.2, 8.0 + sin(a + 0.42) * 5.2),
+					Vector2(8.0 + cos(a + 0.2) * 7.0, 8.0 + sin(a + 0.2) * 7.0)]),
+					Color.WHITE)
+		"giraffe":
+			# 高处治愈：光束 + 树叶 + 十字。
+			_add(ops, _line_mask(Vector2(8, 13), Vector2(8, 4), 2.0), Color("c8e878"))
+			_add(ops, _disc_mask(8.0, 3.0, 2.4), Color("9bd968"))
+			_add(ops, _rect_mask(4, 6, 3, 2), Color("7cbf4a"))
+			_add(ops, _rect_mask(10, 8, 3, 2), Color("a8d878"))
+			_add(ops, _line_mask(Vector2(3, 12), Vector2(13, 12), 1.0), CREAM)
+		"raccoon":
+			# 翻箱倒柜：圆盖 + 眼罩 + 金币。
+			_add(ops, _disc_mask(8.0, 8.0, 4.8), Color("b28c5c"))
+			_add(ops, _ring_mask(8.0, 8.0, 4.2, 3.4), Color("8a8f88"))
+			_add(ops, _rect_mask(5, 6, 3, 2), INK)
+			_add(ops, _rect_mask(9, 6, 3, 2), INK)
+			_add(ops, _diamond_mask(12, 3, 1), YELLOW)
+		"koala":
+			# 沉睡领域：桉叶 + Zzz。
+			_add(ops, _disc_mask(8.0, 8.0, 4.0), Color("8fc45c"))
+			_add(ops, _line_mask(Vector2(8, 11), Vector2(8, 5), 1.2), Color("4e8c34"))
+			_add(ops, _line_mask(Vector2(3, 3), Vector2(6, 3), 1.0), CREAM)
+			_add(ops, _line_mask(Vector2(6, 3), Vector2(3, 6), 1.0), CREAM)
+			_add(ops, _line_mask(Vector2(3, 6), Vector2(6, 6), 1.0), CREAM)
+		"peacock":
+			# 孔雀翎：五根扇形羽毛。
+			for k in range(5):
+				var a := deg_to_rad(-60.0 + 30.0 * float(k))
+				var pc: Color = [Color("3FA8A0"), Color("B08AE8"), Color("F2C14E"),
+					Color("B08AE8"), Color("3FA8A0")][k]
+				_add(ops, _line_mask(Vector2(8, 13),
+					Vector2(8.0 + cos(a) * 6.0, 13.0 + sin(a) * 7.0), 1.5), pc)
+			_add(ops, _disc_mask(8.0, 13.0, 1.4), Color("F2E8A8"))
 		_:
 			_add(ops, _diamond_mask(8, 8, 4), YELLOW)
 	var t := _compose(ops)

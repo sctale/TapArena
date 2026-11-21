@@ -53,6 +53,8 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 		"redpanda": Color("f2c14e"), "wolf": Color("485474"), "crane": accent,
 		"monkey": Color("e0604f"), "elephant": accent, "penguin": accent,
 		"sheep": Color("f6aebc"), "bat": Color("2e2440"),
+		"croc": accent, "giraffe": accent, "raccoon": accent, "koala": accent,
+		"peacock": Color("B08AE8"),
 	}.get(id, accent)
 	_add(ops, _rect(8, 24, 16, 3), scarf)
 	_add(ops, _rect(13, 26, 6, 2), _lighter(scarf, 0.10))
@@ -219,6 +221,69 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(13, 18, 2, 3), Color.WHITE)
 			_add(ops, _rect(17, 18, 2, 3), Color.WHITE)
 			_add(ops, _rect(15, 23, 2, 2), Color("f2c14e"))
+		"croc":
+			# 小鳄：长吻 + 白牙 + 眉骨。
+			_add(ops, _rect(9, 9, 4, 1), _darker(fur, 0.8))
+			_add(ops, _rect(19, 9, 4, 1), _darker(fur, 0.8))
+			_add(ops, _rect(8, 14, 16, 7), fur)
+			_add(ops, _rect(9, 17, 14, 5), cream)
+			for k in range(4):
+				_add(ops, _rect(10 + k * 4, 20, 2, 2), Color.WHITE)
+			_add(ops, _rect(11, 17, 2, 2), dark)
+			_add(ops, _rect(19, 17, 2, 2), dark)
+		"giraffe":
+			# 小长颈鹿：拉长的脸 + 小角 + 斑点。
+			_add(ops, _rect(10, 4, 12, 19), fur)
+			_add(ops, _rect(8, 5, 2, 4), fur)
+			_add(ops, _rect(22, 5, 2, 4), fur)
+			_add(ops, _rect(12, 0, 2, 4), accent)
+			_add(ops, _rect(18, 0, 2, 4), accent)
+			_add(ops, _disc(12, 0, 1.3), _darker(fur, 0.8))
+			_add(ops, _disc(20, 0, 1.3), _darker(fur, 0.8))
+			_add(ops, _rect(11, 6, 3, 3), Color("fbf8ef"))
+			_add(ops, _rect(18, 6, 3, 3), Color("fbf8ef"))
+			_add(ops, _rect(12, 7, 2, 2), dark)
+			_add(ops, _rect(19, 7, 2, 2), dark)
+			_add(ops, _rect(12, 15, 8, 6), cream)
+			_add(ops, _rect(13, 17, 2, 2), dark)
+			_add(ops, _rect(17, 17, 2, 2), dark)
+			for k in range(2):
+				_add(ops, _rect(11 + k * 7, 12, 3, 2), _darker(fur, 0.9))
+		"raccoon":
+			# 小浣熊：圆耳 + 黑眼罩 + 白鼻梁。
+			_add(ops, _disc(9, 4, 3), fur)
+			_add(ops, _disc(23, 4, 3), fur)
+			_add(ops, _disc(9, 4, 1.4), cream)
+			_add(ops, _disc(23, 4, 1.4), cream)
+			_add(ops, _rect(9, 10, 14, 5), dark)
+			_add(ops, _rect(10, 11, 4, 3), Color.WHITE)
+			_add(ops, _rect(18, 11, 4, 3), Color.WHITE)
+			_add(ops, _rect(11, 12, 2, 2), dark)
+			_add(ops, _rect(19, 12, 2, 2), dark)
+			_add(ops, _rect(12, 17, 8, 5), cream)
+			_add(ops, _rect(15, 17, 2, 2), dark)
+		"koala":
+			# 小考拉：大圆耳 + 大鼻子 + 半睡眼。
+			_add(ops, _disc(5, 8, 4.6), fur)
+			_add(ops, _disc(27, 8, 4.6), fur)
+			_add(ops, _disc(5, 8, 2.6), cream)
+			_add(ops, _disc(27, 8, 2.6), cream)
+			_add(ops, _rect(10, 9, 12, 4), fur)
+			_add(ops, _rect(11, 12, 4, 1), dark)
+			_add(ops, _rect(17, 12, 4, 1), dark)
+			_add(ops, _rect(13, 15, 6, 5), dark)
+			_add(ops, _rect(14, 16, 2, 1), _lighter(dark, 0.22))
+			_add(ops, _rect(12, 20, 8, 3), cream)
+		"peacock":
+			# 小孔雀：三根翎羽 + 小金喙。
+			for k in range(3):
+				var pc: Color = [Color("3FA8A0"), Color("B08AE8"), Color("F2C14E")][k]
+				_add(ops, _rect(12 + k * 3, 0, 2, 6), pc)
+				_add(ops, _disc(13 + k * 3, 0, 1.3), Color("F2E8A8"))
+			_add(ops, _rect(10, 6, 12, 2), Color("B08AE8"))
+			_add(ops, _rect(13, 16, 6, 4), Color("F2C14E"))
+			_add(ops, _poly([Vector2(13, 18), Vector2(19, 18), Vector2(16, 22)]),
+				Color("E8A83C"))
 		"crane":
 			_add(ops, _rect(14, 0, 4, 4), accent)
 			_add(ops, _poly([Vector2(14, 16), Vector2(18, 16), Vector2(16, 22)]), accent)
@@ -316,6 +381,40 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(7, 22, 18, 3), Color("2e2440"))
 			_add(ops, _rect(15, 23, 2, 3), Color("f2c14e"))
 			_add(ops, _rect(13, 26, 6, 2), _darker(Color("5a4a78"), 0.8))
+		"croc":
+			# 背脊 + 牙项链。
+			_add(ops, _rect(4, 22, 24, 2), _darker(fur, 0.8))
+			for k in range(6):
+				_add(ops, _poly([Vector2(5 + k * 4, 22), Vector2(7 + k * 4, 22),
+					Vector2(6 + k * 4, 19)]), _darker(fur, 0.72))
+			for k in range(4):
+				_add(ops, _rect(11 + k * 3, 26, 1, 2), Color.WHITE)
+		"giraffe":
+			# 肩部斑点 + 树叶结。
+			for k in range(3):
+				_add(ops, _rect(8 + k * 6, 24 + (k % 2), 3, 2), Color("8a5a3b"))
+			_add(ops, _rect(27, 5, 4, 2), Color("7cbf4a"))
+			_add(ops, _rect(29, 3, 2, 4), Color("9bd968"))
+		"raccoon":
+			# 环纹尾 + 金币。
+			_add(ops, _rect(26, 20, 4, 9), fur)
+			_add(ops, _rect(26, 22, 4, 2), dark)
+			_add(ops, _rect(26, 26, 4, 2), dark)
+			_add(ops, _disc(5, 27, 2.2), Color("f2c14e"))
+		"koala":
+			# 桉叶花环 + 小金铃。
+			_add(ops, _rect(9, 3, 3, 3), Color("8fc45c"))
+			_add(ops, _rect(13, 2, 3, 3), Color("a8d878"))
+			_add(ops, _rect(17, 3, 3, 3), Color("8fc45c"))
+			_add(ops, _rect(15, 26, 2, 2), Color("f2c14e"))
+		"peacock":
+			# 两侧开屏 + 胸前宝石。
+			for k in range(4):
+				var pc: Color = [Color("3FA8A0"), Color("B08AE8"), Color("F2C14E"),
+					Color("3FA8A0")][k]
+				_add(ops, _rect(1 + k, 8 + k * 4, 4, 2), pc)
+				_add(ops, _rect(27 - k, 8 + k * 4, 4, 2), pc)
+			_add(ops, _rect(14, 23, 4, 3), Color("F2E8A8"))
 		"crane":
 			_add(ops, _rect(9, 23, 14, 2), Color("f2c14e"))
 			_add(ops, _rect(15, 22, 2, 2), Color("f2c14e"))
@@ -419,8 +518,47 @@ func _bust(ops: Array, id: String, fur: Color, cream: Color, dark: Color, accent
 			_add(ops, _rect(29, 10, 2, 12), Color("b08ae8"))
 			_add(ops, _rect(1, 8, 1, 4), Color("f0e0ff"))
 			_add(ops, _rect(30, 8, 1, 4), Color("f0e0ff"))
-		"crane":
+		"croc":
+			# 骨牙大棒：木柄 + 石块 + 三颗牙。
+			_add(ops, _rect(28, 10, 2, 16), Color("b28c5c"))
+			_add(ops, _rect(25, 5, 8, 6), Color("8a8f88"))
+			_add(ops, _rect(25, 7, 8, 1), Color("c8ccc4"))
+			for k in range(3):
+				_add(ops, _rect(25, 11, 2, 2), Color.WHITE)
+		"giraffe":
+			# 树叶长杖。
+			_add(ops, _rect(29, 3, 2, 23), Color("b28c5c"))
+			_add(ops, _rect(25, 3, 5, 3), Color("7cbf4a"))
+			_add(ops, _rect(30, 1, 2, 3), Color("9bd968"))
+			_add(ops, _rect(27, 7, 4, 2), Color("c8e878"))
+			_add(ops, _disc(4, 27, 2.4), Color("f2c14e"))
+		"raccoon":
+			# 左手圆盖盾 + 右手短匕。
+			_add(ops, _disc(4, 26, 4.2), Color("b28c5c"))
+			_add(ops, _disc(4, 26, 2.6), Color("8a8f88"))
+			_add(ops, _disc(4, 26, 1.4), Color("c8ccc4"))
+			_add(ops, _rect(29, 8, 2, 14), Color("dfe8f0"))
+			_add(ops, _rect(29, 20, 2, 3), Color("b28c5c"))
+		"koala":
+			# 桉树枝。
 			_add(ops, _rect(28, 8, 2, 16), Color("b28c5c"))
+			_add(ops, _disc(26, 5, 3), Color("8fc45c"))
+			_add(ops, _disc(30, 4, 2.6), Color("a8d878"))
+			_add(ops, _disc(28, 8, 2.2), Color("7cbf4a"))
+		"peacock":
+			# 羽扇：五根彩色羽毛从手心展开。
+			for k in range(5):
+				var pc: Color = [Color("3FA8A0"), Color("B08AE8"), Color("F2C14E"),
+					Color("3FA8A0"), Color("B08AE8")][k]
+				var a := deg_to_rad(-62.0 + 16.0 * float(k))
+				var dir := Vector2(cos(a), sin(a))
+				var per := Vector2(-dir.y, dir.x)
+				var p0 := Vector2(27.5, 25.0)
+				_add(ops, _poly([p0 + per, p0 + dir * 13.0 + per * 0.5,
+					p0 + dir * 13.0 - per * 0.5]), pc)
+				_add(ops, _disc(27.5 + dir.x * 13.0, 25.0 + dir.y * 13.0, 1.2),
+					Color("F2E8A8"))
+		"crane":
 			_add(ops, _rect(25, 5, 7, 2), Color("f5eedc"))
 			_add(ops, _rect(27, 3, 3, 3), Color("9fe8f0"))
 

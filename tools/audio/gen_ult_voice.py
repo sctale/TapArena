@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""TapArena 大招台词合成 —— 15 位英雄各一句，mmx (MiniMax speech-2.8-hd)。
+"""TapArena 大招台词合成 —— 25 位英雄各一句，mmx (MiniMax speech-2.8-hd)。
 
 产出：ult/ult_<hero_id>.wav，48kHz / 单声道 / 16-bit，响度统一到 -16 LUFS。
 台词与音色写在 LINES 表里，改稿只动这张表。
@@ -20,7 +20,7 @@ OUT = pathlib.Path(__file__).resolve().parent / "ult"
 ASSETS = pathlib.Path(__file__).resolve().parents[2] / "godot" / "assets" / "audio" / "ult"
 
 # hero_id, 角色, 性别, 大招, 音色, 语速, 音调, 台词
-# 选角纪律：男孩音色 F0 ≤ 223Hz、女孩 ≥ 235Hz（同句实测），15 个音色互不重复。
+# 选角纪律：男孩音色 F0 ≤ 228Hz、女孩 ≥ 251Hz（同句实测），25 个音色互不重复。
 LINES = [
     ("tiger",    "阿狮", "boy",  "旋风爪",   "Chinese (Mandarin)_Straightforward_Boy", 1.04, -1, "旋风爪！都让开！"),
     ("fox",      "灵灵", "girl", "星河坠落", "Chinese (Mandarin)_Cute_Spirit",          1.02,  0, "星河，落下来吧！"),
@@ -42,6 +42,11 @@ LINES = [
     ("penguin",  "冰冰", "girl", "暴风雪",   "Chinese (Mandarin)_Crisp_Girl",           1.04,  1, "冰雪，听我号令！"),
     ("sheep",    "云朵", "girl", "暖云牧场", "Sweet_Girl",                              1.02,  0, "云朵，护住大家！"),
     ("bat",      "夜羽", "girl", "音波风暴", "female-yujie",                            1.04,  0, "黑夜，为我让路！"),
+    ("croc",     "阿鳄", "boy",  "沼泽深渊", "lengdan_xiongzhang",                       0.92, -2, "沼泽深渊，沉下去！"),
+    ("giraffe",  "长长", "girl", "高处治愈", "wumei_yujie",                              0.98,  0, "高处治愈，别倒下！"),
+    ("raccoon",  "阿浣", "boy",  "翻箱倒柜", "bingjiao_didi",                            1.12,  0, "翻箱倒柜，都是我的！"),
+    ("koala",    "桉桉", "girl", "沉睡领域", "Chinese (Mandarin)_Warm_Bestie",            0.96,  0, "睡吧，做个好梦。"),
+    ("peacock",  "阿翎", "girl", "孔雀翎",   "Serene_Woman",                             1.02,  0, "开屏，孔雀翎！"),
 ]
 
 

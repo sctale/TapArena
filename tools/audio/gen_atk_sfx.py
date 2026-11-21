@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""TapArena 攻击音效合成器 —— 15 位英雄各一条普攻音效。
+"""TapArena 攻击音效合成器 —— 25 位英雄各一条普攻音效。
 
 规矩（AGENTS.md §102）：音效必须自制或运行时合成，不引第三方素材。
 这里全部用 numpy 现场合成，输出 48kHz / 单声道 / 16-bit PCM。
@@ -142,6 +142,11 @@ RECIPES = {
     "penguin":   ("magic", dict(base=1180.0)),
     "sheep":     ("magic", dict(base=660.0)),
     "bat":       ("slash", dict(lo=3000, hi=12000, tone=0.12)),
+    "croc":      ("thud", dict(f0=58.0)),
+    "giraffe":   ("magic", dict(base=930.0)),
+    "raccoon":   ("slash", dict(lo=2200, hi=8800, tone=0.16)),
+    "koala":     ("wood", {}),
+    "peacock":   ("magic", dict(base=1120.0)),
 }
 
 FUNCS = {"slash": slash, "thud": thud, "wood": wood, "magic": magic,

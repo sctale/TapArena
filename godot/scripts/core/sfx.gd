@@ -28,6 +28,11 @@ const HERO_AUDIO := {
 	"penguin": {"cast0": 620.0, "cast1": 1500.0, "wave": "sine", "hit0": 720.0, "hit1": 1200.0, "noise": 0.08, "shoot": 980.0},
 	"sheep": {"cast0": 560.0, "cast1": 880.0, "wave": "sine", "hit0": 480.0, "hit1": 720.0, "noise": 0.06, "shoot": 720.0},
 	"bat": {"cast0": 780.0, "cast1": 1800.0, "wave": "triangle", "hit0": 820.0, "hit1": 1300.0, "noise": 0.10, "shoot": 0.0},
+	"croc": {"cast0": 240.0, "cast1": 520.0, "wave": "square", "hit0": 190.0, "hit1": 80.0, "noise": 0.62, "shoot": 0.0},
+	"giraffe": {"cast0": 540.0, "cast1": 1350.0, "wave": "sine", "hit0": 600.0, "hit1": 900.0, "noise": 0.06, "shoot": 900.0},
+	"raccoon": {"cast0": 700.0, "cast1": 1500.0, "wave": "triangle", "hit0": 560.0, "hit1": 300.0, "noise": 0.22, "shoot": 1100.0},
+	"koala": {"cast0": 400.0, "cast1": 860.0, "wave": "sine", "hit0": 340.0, "hit1": 210.0, "noise": 0.12, "shoot": 0.0},
+	"peacock": {"cast0": 660.0, "cast1": 1750.0, "wave": "sine", "hit0": 720.0, "hit1": 1080.0, "noise": 0.07, "shoot": 1250.0},
 }
 
 var enabled := true

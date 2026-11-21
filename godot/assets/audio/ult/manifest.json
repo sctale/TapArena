@@ -8,7 +8,7 @@
       "ult": "旋风爪",
       "voice": "Chinese (Mandarin)_Straightforward_Boy",
       "line": "旋风爪！都让开！",
-      "dur": 1.81,
+      "dur": 1.74,
       "lead": 0.01
     },
     {
@@ -18,7 +18,7 @@
       "ult": "星河坠落",
       "voice": "Chinese (Mandarin)_Cute_Spirit",
       "line": "星河，落下来吧！",
-      "dur": 2.24,
+      "dur": 2.12,
       "lead": 0.01
     },
     {
@@ -28,7 +28,7 @@
       "ult": "满月祝福",
       "voice": "lovely_girl",
       "line": "满月，照亮大家！",
-      "dur": 2.27,
+      "dur": 2.84,
       "lead": 0.01
     },
     {
@@ -38,7 +38,7 @@
       "ult": "山崩地裂",
       "voice": "badao_shaoye",
       "line": "山崩地裂！",
-      "dur": 1.33,
+      "dur": 1.41,
       "lead": 0.0
     },
     {
@@ -48,7 +48,7 @@
       "ult": "瀑布冲击",
       "voice": "qiaopi_mengmei",
       "line": "瀑布，冲垮他们！",
-      "dur": 1.51,
+      "dur": 1.88,
       "lead": 0.0
     },
     {
@@ -58,8 +58,8 @@
       "ult": "万爪齐发",
       "voice": "female-shaonv",
       "line": "万爪齐发，看招！",
-      "dur": 1.42,
-      "lead": 0.0
+      "dur": 1.54,
+      "lead": 0.01
     },
     {
       "hero": "panda",
@@ -68,7 +68,7 @@
       "ult": "竹林震地",
       "voice": "male-qn-qingse",
       "line": "竹林震地！",
-      "dur": 0.84,
+      "dur": 0.9,
       "lead": 0.01
     },
     {
@@ -78,7 +78,7 @@
       "ult": "夜枭俯冲",
       "voice": "Chinese (Mandarin)_Warm_Girl",
       "line": "夜枭，俯冲！",
-      "dur": 1.21,
+      "dur": 1.27,
       "lead": 0.0
     },
     {
@@ -88,7 +88,7 @@
       "ult": "再生水域",
       "voice": "Chinese (Mandarin)_Soft_Girl",
       "line": "再生水域，别怕！",
-      "dur": 1.87,
+      "dur": 1.98,
       "lead": 0.01
     },
     {
@@ -98,7 +98,7 @@
       "ult": "林间箭雨",
       "voice": "chunzhen_xuedi",
       "line": "林间箭雨，落！",
-      "dur": 1.29,
+      "dur": 1.34,
       "lead": 0.01
     },
     {
@@ -108,7 +108,7 @@
       "ult": "龟甲震地",
       "voice": "Chinese (Mandarin)_Gentle_Youth",
       "line": "龟甲震地，站稳！",
-      "dur": 1.57,
+      "dur": 2.37,
       "lead": 0.0
     },
     {
@@ -118,7 +118,7 @@
       "ult": "滚动刺球",
       "voice": "Chinese (Mandarin)_Pure-hearted_Boy",
       "line": "滚动刺球，滚起来！",
-      "dur": 1.6,
+      "dur": 1.75,
       "lead": 0.01
     },
     {
@@ -128,7 +128,7 @@
       "ult": "烈焰冲锋",
       "voice": "male-qn-daxuesheng",
       "line": "烈焰冲锋，烧起来！",
-      "dur": 1.77,
+      "dur": 1.85,
       "lead": 0.01
     },
     {
@@ -138,8 +138,8 @@
       "ult": "猎影突袭",
       "voice": "male-qn-jingying",
       "line": "猎影突袭！",
-      "dur": 0.91,
-      "lead": 0.01
+      "dur": 1.04,
+      "lead": 0.0
     },
     {
       "hero": "crane",
@@ -148,7 +148,7 @@
       "ult": "风之领域",
       "voice": "female-tianmei",
       "line": "风之领域，起风了。",
-      "dur": 2.25,
+      "dur": 1.9,
       "lead": 0.0
     },
     {
@@ -158,7 +158,7 @@
       "ult": "定海神针",
       "voice": "junlang_nanyou",
       "line": "长棍一扫，让开！",
-      "dur": 1.25,
+      "dur": 1.36,
       "lead": 0.01
     },
     {
@@ -168,7 +168,7 @@
       "ult": "大地践踏",
       "voice": "male-qn-badao",
       "line": "大地，听我脚步！",
-      "dur": 1.45,
+      "dur": 1.46,
       "lead": 0.01
     },
     {
@@ -178,7 +178,7 @@
       "ult": "暴风雪",
       "voice": "Chinese (Mandarin)_Crisp_Girl",
       "line": "冰雪，听我号令！",
-      "dur": 2.07,
+      "dur": 1.57,
       "lead": 0.01
     },
     {
@@ -188,7 +188,7 @@
       "ult": "暖云牧场",
       "voice": "Sweet_Girl",
       "line": "云朵，护住大家！",
-      "dur": 1.54,
+      "dur": 2.32,
       "lead": 0.01
     },
     {
@@ -198,8 +198,58 @@
       "ult": "音波风暴",
       "voice": "female-yujie",
       "line": "黑夜，为我让路！",
-      "dur": 2.13,
+      "dur": 2.08,
       "lead": 0.0
+    },
+    {
+      "hero": "croc",
+      "name": "阿鳄",
+      "gender": "boy",
+      "ult": "沼泽深渊",
+      "voice": "lengdan_xiongzhang",
+      "line": "沼泽深渊，沉下去！",
+      "dur": 2.23,
+      "lead": 0.01
+    },
+    {
+      "hero": "giraffe",
+      "name": "长长",
+      "gender": "girl",
+      "ult": "高处治愈",
+      "voice": "wumei_yujie",
+      "line": "高处治愈，别倒下！",
+      "dur": 2.1,
+      "lead": 0.01
+    },
+    {
+      "hero": "raccoon",
+      "name": "阿浣",
+      "gender": "boy",
+      "ult": "翻箱倒柜",
+      "voice": "bingjiao_didi",
+      "line": "翻箱倒柜，都是我的！",
+      "dur": 1.76,
+      "lead": 0.01
+    },
+    {
+      "hero": "koala",
+      "name": "桉桉",
+      "gender": "girl",
+      "ult": "沉睡领域",
+      "voice": "Chinese (Mandarin)_Warm_Bestie",
+      "line": "睡吧，做个好梦。",
+      "dur": 1.81,
+      "lead": 0.0
+    },
+    {
+      "hero": "peacock",
+      "name": "阿翎",
+      "gender": "girl",
+      "ult": "孔雀翎",
+      "voice": "Serene_Woman",
+      "line": "开屏，孔雀翎！",
+      "dur": 1.96,
+      "lead": 0.01
     }
   ],
   "failed": []

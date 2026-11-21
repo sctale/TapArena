@@ -19,17 +19,17 @@ func _process(_delta: float) -> bool:
 		if main.home == null:
 			failures.append("启动后没有首页")
 		else:
-			if main.home.heroes.size() != 20:
-				failures.append("首页英雄数量不是 20，实际 %d" % main.home.heroes.size())
-			# 两排视口：默认第 20 张在视口外，滚到底后完整可见，底部栏不动。
+			if main.home.heroes.size() != 25:
+				failures.append("首页英雄数量不是 25，实际 %d" % main.home.heroes.size())
+			# 两排视口：默认第 25 张在视口外，滚到底后完整可见，底部栏不动。
 			if main.home.max_grid_scroll() <= 0.0:
-				failures.append("20 人首页没有可滚动内容")
+				failures.append("25 人首页没有可滚动内容")
 			var grid_vp: Rect2 = main.home._grid_rect()
-			if grid_vp.encloses(main.home.card_rect(19)):
-				failures.append("第 20 张卡默认就在两排视口内")
+			if grid_vp.encloses(main.home.card_rect(24)):
+				failures.append("第 25 张卡默认就在两排视口内")
 			main.home.set_grid_scroll(main.home.max_grid_scroll())
-			if not grid_vp.encloses(main.home.card_rect(19)):
-				failures.append("滚到底后第 20 张卡不可见")
+			if not grid_vp.encloses(main.home.card_rect(24)):
+				failures.append("滚到底后第 25 张卡不可见")
 			main.home.set_grid_scroll(0.0)
 			# 网格内上滑应产生滚动，且松手不误触卡片。
 			var gc: Vector2 = grid_vp.get_center()
@@ -134,8 +134,8 @@ func _process(_delta: float) -> bool:
 		else:
 			if not main.home.mode_5v5:
 				failures.append("5v5 模式没有切换")
-			if main.home.heroes.size() != 20:
-				failures.append("5v5 首页英雄数量不是 20，实际 %d" % main.home.heroes.size())
+			if main.home.heroes.size() != 25:
+				failures.append("5v5 首页英雄数量不是 25，实际 %d" % main.home.heroes.size())
 			if main.home.max_grid_scroll() <= 0.0:
 				failures.append("5v5 首页没有可滚动内容")
 			main.home._tap(main.home.start_rect().get_center())
@@ -170,39 +170,39 @@ func _check_audio_assets() -> void:
 	if main.view == null:
 		failures.append("音频检查时没有视图")
 		return
-	if main.view.audio_atk.size() != 20 or main.view.audio_ult.size() != 20:
+	if main.view.audio_atk.size() != 25 or main.view.audio_ult.size() != 25:
 		failures.append("视图音频池未加载完整：atk=%d ult=%d" % [
 			main.view.audio_atk.size(), main.view.audio_ult.size()])
 	if main.view.audio_pool.is_empty():
 		failures.append("视图没有 3D 音频播放器")
-		# 台词 manifest：15 条、男女各 8/7、音色不重复、首静音 ≤50ms。
-		var mpath := "res://assets/audio/ult/manifest.json"
-		if not FileAccess.file_exists(mpath):
-			failures.append("缺少 ult/manifest.json")
+	# 台词 manifest：25 条、男女 12/13、音色不重复、首静音 ≤50ms。
+	var mpath := "res://assets/audio/ult/manifest.json"
+	if not FileAccess.file_exists(mpath):
+		failures.append("缺少 ult/manifest.json")
+	else:
+		var mdata = JSON.parse_string(FileAccess.get_file_as_string(mpath))
+		if typeof(mdata) != TYPE_DICTIONARY or not mdata.has("lines"):
+			failures.append("ult/manifest.json 解析失败")
 		else:
-			var mdata = JSON.parse_string(FileAccess.get_file_as_string(mpath))
-			if typeof(mdata) != TYPE_DICTIONARY or not mdata.has("lines"):
-				failures.append("ult/manifest.json 解析失败")
-			else:
-				var lines: Array = mdata["lines"]
-				if lines.size() != 20:
-					failures.append("台词 manifest 不是 20 条：%d" % lines.size())
-				var genders := {"boy": 0, "girl": 0}
-				var voices: Dictionary = {}
-				for e in lines:
-					var g := str(e.get("gender", ""))
-					if genders.has(g):
-						genders[g] += 1
-					else:
-						failures.append("台词缺少性别：" + str(e.get("hero", "")))
-					if float(e.get("lead", 1.0)) > 0.05:
-						failures.append("台词首静音过长：" + str(e.get("hero", "")))
-					var v := str(e.get("voice", ""))
-					if voices.has(v):
-						failures.append("台词音色重复：" + v)
-					voices[v] = true
-				if genders["boy"] != 10 or genders["girl"] != 10:
-					failures.append("台词男女数量不是 10/10：%d/%d" % [genders["boy"], genders["girl"]])
+			var lines: Array = mdata["lines"]
+			if lines.size() != 25:
+				failures.append("台词 manifest 不是 25 条：%d" % lines.size())
+			var genders := {"boy": 0, "girl": 0}
+			var voices: Dictionary = {}
+			for e in lines:
+				var g := str(e.get("gender", ""))
+				if genders.has(g):
+					genders[g] += 1
+				else:
+					failures.append("台词缺少性别：" + str(e.get("hero", "")))
+				if float(e.get("lead", 1.0)) > 0.05:
+					failures.append("台词首静音过长：" + str(e.get("hero", "")))
+				var v := str(e.get("voice", ""))
+				if voices.has(v):
+					failures.append("台词音色重复：" + v)
+				voices[v] = true
+			if genders["boy"] != 12 or genders["girl"] != 13:
+				failures.append("台词男女数量不是 12/13：%d/%d" % [genders["boy"], genders["girl"]])
 	if main.view.voice_pool.size() != 4:
 		failures.append("台词播放器池不是 4 个：%d" % main.view.voice_pool.size())
 	else:
@@ -255,7 +255,7 @@ func _check_base_clear(tag: String) -> void:
 
 
 func _check_roster_art() -> void:
-	# 20 位英雄的模型部件 / 头像 / 大招图标都能生成，调色板 ≤64。
+	# 25 位英雄的模型部件 / 头像 / 大招图标都能生成，调色板 ≤64。
 	if main.sim == null or main.view == null:
 		failures.append("阵容检查时没有战斗视图")
 		return
@@ -266,8 +266,8 @@ func _check_roster_art() -> void:
 	var portraits = Portraits.new()
 	var icons = Icons.new()
 	var ids: Array = main.sim.defs_by_id.keys()
-	if ids.size() != 20:
-		failures.append("英雄定义不是 20 位：%d" % ids.size())
+	if ids.size() != 25:
+		failures.append("英雄定义不是 25 位：%d" % ids.size())
 	var checked := 0
 	for id in ids:
 		var d: Dictionary = main.sim.defs_by_id[id]
@@ -297,12 +297,12 @@ func _check_roster_art() -> void:
 		if icons.ult_icon(str(id)) == null:
 			failures.append(str(id) + " 大招图标生成失败")
 		checked += 1
-	if checked == 20:
-		print("ROSTER_OK art=20 audio=20")
+	if checked == 25:
+		print("ROSTER_OK art=25 audio=25")
 
 
 func _check_cast_actions() -> void:
-	# 20 人 × 3 技能都要映射到一个全身释放动作；大招不允许 none。
+	# 25 人 × 3 技能都要映射到一个全身释放动作；大招不允许 none。
 	if main.view == null or main.sim == null:
 		failures.append("施法动作检查时没有战斗视图")
 		return

@@ -204,7 +204,7 @@ func _init() -> void:
 
 	var roster_issues := _roster_checks()
 	if roster_issues.is_empty():
-		print("HEROES_OK roster=20 skills=3")
+		print("HEROES_OK roster=25 skills=3")
 	else:
 		failures += 1
 		for issue in roster_issues:
@@ -244,7 +244,7 @@ func _init() -> void:
 
 	var new_issues := _new_hero_matches()
 	if new_issues.is_empty():
-		print("NEW_OK monkey/elephant/penguin/sheep/bat 3v3")
+		print("NEW_OK 10hero_matches 3v3")
 	else:
 		failures += 1
 		for issue in new_issues:
@@ -1674,11 +1674,12 @@ func _boss_air_checks() -> Array:
 
 
 func _roster_checks() -> Array:
-	# 4.24：20 位英雄都能建局，三条技能都能释放且不产生 NaN。
+	# 4.30：25 位英雄都能建局，三条技能都能释放且不产生 NaN。
 	var issues: Array = []
 	var ids := ["tiger", "fox", "rabbit", "bear", "frog", "cat", "panda", "owl", "axolotl",
 		"deer", "turtle", "hedgehog", "redpanda", "wolf", "crane",
-		"monkey", "elephant", "penguin", "sheep", "bat"]
+		"monkey", "elephant", "penguin", "sheep", "bat",
+		"croc", "giraffe", "raccoon", "koala", "peacock"]
 	for id in ids:
 		var sim = BattleSimScript.new()
 		sim.setup(id, 0, 660)
@@ -1715,9 +1716,10 @@ func _roster_checks() -> Array:
 
 
 func _new_hero_matches() -> Array:
-	# 4.24 新增 5 位英雄：各跑一局 3v3，确认对局能收束、能升 2 级。
+	# 4.24/4.30 新增 10 位英雄：各跑一局 3v3，确认对局能收束、能升 2 级。
 	var issues: Array = []
-	for id in ["monkey", "elephant", "penguin", "sheep", "bat"]:
+	for id in ["monkey", "elephant", "penguin", "sheep", "bat",
+			"croc", "giraffe", "raccoon", "koala", "peacock"]:
 		var sim = BattleSimScript.new()
 		sim.setup(id, 0, 770)
 		var elapsed := 0.0

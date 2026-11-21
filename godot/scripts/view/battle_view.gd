@@ -11,6 +11,7 @@ const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
 	"panda": 88.0, "owl": 88.0, "axolotl": 88.0, "deer": 88.0,
 	"turtle": 88.0, "hedgehog": 88.0, "redpanda": 88.0, "wolf": 88.0, "crane": 88.0,
+	"croc": 88.0, "giraffe": 88.0, "raccoon": 88.0, "koala": 88.0, "peacock": 88.0,
 	"monkey": 88.0, "elephant": 88.0, "penguin": 88.0, "sheep": 88.0, "bat": 88.0,
 }
 
@@ -566,6 +567,14 @@ func cast_action_for(hero_id: String, index: int, kind: String) -> String:
 				return "cast"
 			"redpanda":
 				return "charge"
+			"croc":
+				return "slam"
+			"giraffe", "koala":
+				return "pray"
+			"raccoon":
+				return "spin"
+			"peacock":
+				return "twirl"
 	match kind:
 		"aoe":
 			return "spin"
@@ -1782,6 +1791,21 @@ func _weapon_strike(u) -> void:
 		"bat":
 			_spawn_swing_arc(at, u.face_dir, Color("c0a0f0"), 52.0)
 			_spawn_tip_spark(at, u.face_dir, Color("e0d0ff"))
+		"croc":
+			_spawn_swing_arc(at, u.face_dir, Color("3FA8A0"), 58.0)
+			_spawn_debris(at + Vector3(0, 4, 0), Color("8a8f88"), 4)
+		"giraffe":
+			_spawn_tip_spark(at, u.face_dir, Color("c8e878"))
+			_spawn_style("leaf", at + Vector3(0, 12, 0), Color("9bd968"), 60.0)
+		"raccoon":
+			_spawn_swing_arc(at, u.face_dir, Color("f2c14e"), 44.0)
+			_spawn_tip_spark(at, u.face_dir, Color("ffe08a"))
+		"koala":
+			_spawn_tip_spark(at, u.face_dir, Color("a8d878"))
+			_spawn_burst(at + Vector3(0, 44, 0), Color("8fc45c"), 0.12)
+		"peacock":
+			_spawn_style("feather", at + Vector3(0, 8, 0), Color("B08AE8"), 70.0)
+			_spawn_tip_spark(at, u.face_dir, Color("F2E8A8"))
 
 
 func _spawn_swing_arc(center: Vector3, dir: Vector2, c: Color, radius := 46.0) -> void:
@@ -1882,6 +1906,21 @@ func _entrance_fx(u) -> void:
 		"crane":
 			_spawn_ring(at, Color("9fe8f0"), 60.0, 0.45)
 			_spawn_feathers(at, Color("c8e8ff"), 100.0)
+		"croc":
+			_spawn_ring(at, Color("3FA8A0"), 56.0, 0.42)
+			_spawn_debris(at + Vector3(0, 4, 0), Color("8a8f88"), 4)
+		"giraffe":
+			_spawn_ring(at, Color("c8e878"), 52.0, 0.40)
+			_spawn_style("leaf", at + Vector3(0, 30, 0), Color("9bd968"), 80.0)
+		"raccoon":
+			_spawn_ring(at, Color("f2c14e"), 46.0, 0.35)
+			_spawn_spark(at + Vector3(0, 40, 0), Color("ffe08a"), 8.0)
+		"koala":
+			_spawn_ring(at, Color("a8d878"), 56.0, 0.44)
+			_spawn_burst(at + Vector3(0, 34, 0), Color("8fc45c"), 0.20)
+		"peacock":
+			_spawn_ring(at, Color("B08AE8"), 58.0, 0.46)
+			_spawn_feathers(at, Color("B08AE8"), 90.0)
 
 
 func _spawn_arrow_rain(pos: Vector3, color: Color, radius: float) -> void:
@@ -2192,6 +2231,8 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_claw_ult(pos, color, maxf(radius, 180.0))
 		"claw_radial":
 			_spawn_claw_radial(pos, color, maxf(radius, 180.0))
+		"spikes_ult":
+			_spawn_spikes_ult(pos, color, maxf(radius, 175.0))
 		"starfall_ult":
 			_spawn_star_fall(pos, color, maxf(radius, 180.0))
 		"moon_ult":
@@ -2252,6 +2293,33 @@ func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> v
 			_spawn_burst(pos, color, 0.30)
 		_:
 			_spawn_burst(pos, color, 0.30)
+
+
+func _spawn_spikes_ult(pos: Vector3, color: Color, radius: float) -> void:
+	# 滚动刺球大招：地面冲击环 + 一圈从土里顶出的尖刺 + 碎块尘埃。
+	var ground := TorusMesh.new()
+	ground.inner_radius = radius * 0.86
+	ground.outer_radius = radius * 0.96
+	ground.rings = 32
+	ground.ring_segments = 4
+	_add_fx_mesh(ground, _fx_mat(color, 0.85), Vector3(pos.x, 6.0, pos.z), 0.9, 0.7, 1.25)
+	var spike := _fx_mesh("fx_spike_ult", func():
+		var cone := CylinderMesh.new()
+		cone.top_radius = 7.5
+		cone.bottom_radius = 0.0
+		cone.height = 58.0
+		cone.radial_segments = 4
+		return cone)
+	var mat := _fx_mat(color, 0.96)
+	for i in range(18):
+		var ang := TAU * float(i) / 18.0 + rng.randf_range(-0.09, 0.09)
+		var rr := radius * rng.randf_range(0.24, 0.94)
+		var at := pos + Vector3(cos(ang), 0.0, sin(ang)) * rr
+		at.y = 22.0
+		_add_fx_mesh(spike, mat, at, 0.62, 0.35, 1.45,
+			Vector3.ZERO, Vector3.ZERO, Vector3(0.0, ang, deg_to_rad(-8.0)))
+	_spawn_ring(pos, color, radius * 0.62, 0.55)
+	_spawn_debris(pos, color, 8)
 
 
 func _spawn_spin(pos: Vector3, color: Color, radius: float) -> void:
