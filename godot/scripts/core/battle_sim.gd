@@ -3007,7 +3007,8 @@ func try_cast(h, index: int) -> void:
 	h.cast_kind = str(s.get("kind", "projectile"))
 	sfx.emit(("ult_" if index == 2 else "cast_") + h.hero_id, h.pos)
 	if h.is_player and index == 2:
-		fx.emit("punch", Vector3(h.pos.x, 40.0, h.pos.y), Color.WHITE, 0.0)
+		fx.emit("punch", Vector3(h.pos.x, 40.0, h.pos.y),
+			Color(s.get("color_c", Color.WHITE)), 0.0)
 	cast(h, s, index)
 
 

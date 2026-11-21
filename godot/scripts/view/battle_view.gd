@@ -53,6 +53,9 @@ var voice_pool: Array = []
 var voice_next := 0
 var audio_queue: Array = []
 var ult_last_ms: Dictionary = {}
+var shot_trail: Dictionary = {}
+var flash_rect: ColorRect = null
+var flash_tween: Tween = null
 var bgm_bus := -1
 var bgm_duck_t := 0.0
 var rng := RandomNumberGenerator.new()
@@ -75,6 +78,7 @@ func attach(s) -> void:
 	rng.seed = 7127
 	_build_audio()
 	_build_world()
+	_build_flash_layer()
 	sim.fx.connect(_on_fx)
 	if sim.has_signal("beam_fx"):
 		sim.beam_fx.connect(_on_beam_fx)
@@ -748,7 +752,7 @@ func _process(delta: float) -> void:
 		return
 	var t0 := Time.get_ticks_usec()
 	_sync_units(delta)
-	_sync_shots()
+	_sync_shots(delta)
 	_sync_zones()
 	_step_fx(delta)
 	_step_debris(delta)
@@ -756,6 +760,10 @@ func _process(delta: float) -> void:
 	_step_clouds(delta)
 	_flush_audio()
 	_step_bgm_duck(delta)
+	if flash_rect != null:
+		var fv := get_viewport().get_visible_rect().size
+		if flash_rect.size != fv:
+			flash_rect.size = fv
 	glint_t += delta
 	if glint_t >= 0.55:
 		glint_t = 0.0
@@ -907,6 +915,13 @@ func _sync_hero(u, delta: float) -> void:
 	root.position = Vector3(rp.x, 0, rp.y)
 	_face_yaw(item, u, delta)
 	var base_yaw: float = root.rotation.y
+	# 冲刺/跳跃/闪现/后跃的残影：王者式位移会留一串速度影。
+	var move_kind := str(u.move_skill_kind)
+	if u.move_skill_total > 0.0 and (move_kind == "dash" or move_kind == "leap" or move_kind == "blink" or move_kind == "backstep"):
+		item["ghost_t"] = float(item.get("ghost_t", 0.0)) + delta
+		if float(item["ghost_t"]) >= 0.07:
+			item["ghost_t"] = 0.0
+			_spawn_ghost(Vector3(rp.x, 0.0, rp.y), u.accent)
 	# 攻击起始帧：按英雄的主武器放一次挥砍/弓弦/法杖闪光。
 	var atk_now: bool = u.atk_anim > 0.0
 	if atk_now and not bool(item.get("atk_active", false)):
@@ -1185,7 +1200,7 @@ func _shot_material(c: Color) -> StandardMaterial3D:
 	return m
 
 
-func _sync_shots() -> void:
+func _sync_shots(delta: float) -> void:
 	var live: Dictionary = {}
 	for p in sim.shots:
 		live[p.view_id] = true
@@ -1204,6 +1219,17 @@ func _sync_shots() -> void:
 		node.material_override = _shot_material(Color(p.color.r, p.color.g, p.color.b, 0.95))
 		var sz: float = maxf(0.7, p.size / 7.0)
 		node.scale = Vector3(sz, sz, sz)
+		# 弹道拖尾：每个弹道每 0.08 秒留一颗发光小点，远程技能不再只是一根线。
+		var tt: float = float(shot_trail.get(p.view_id, 0.0)) + delta
+		if tt >= 0.08:
+			tt = 0.0
+			var tm := _fx_mesh("fx_shot_trail", func():
+				var b := BoxMesh.new()
+				b.size = Vector3(7, 7, 7)
+				return b)
+			_add_fx_mesh(tm, _fx_glow(p.color, 0.65),
+				Vector3(rp.x, 34.0, rp.y), 0.16, 0.7, 0.1)
+		shot_trail[p.view_id] = tt
 		# 箭矢沿飞行方向，其他弹道自旋，让不同英雄的普攻一眼能区分。
 		match p.style:
 			"arrow":
@@ -1234,6 +1260,7 @@ func _sync_shots() -> void:
 			dead.append(vid)
 	for vid in dead:
 		shot_nodes.erase(vid)
+		shot_trail.erase(vid)
 
 
 func _make_shot_node() -> MeshInstance3D:
@@ -1332,7 +1359,11 @@ func _alpha_material(c: Color, unshaded := true) -> StandardMaterial3D:
 
 func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 	if kind.begins_with("cast_"):
+		_spawn_cast_flare(pos, color, radius)
 		_spawn_style(kind.substr(5), pos, color, radius)
+		return
+	if kind == "punch":
+		_flash_screen(color)
 		return
 	match kind:
 		"ring":
@@ -1341,6 +1372,7 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 			_spawn_burst(pos, color, 0.36)
 		"hit":
 			_spawn_burst(pos, color, 0.20)
+			_spawn_spark(pos, color, 6.0)
 		"slash":
 			_spawn_slash(pos, color)
 		"muzzle":
@@ -2011,6 +2043,84 @@ func _spawn_fire_ult(pos: Vector3, color: Color, radius: float) -> void:
 		_add_fx_mesh(ember, hot, at, 0.55, 0.6, 1.2,
 			Vector3(cos(ang) * 40.0, 140.0, sin(ang) * 40.0))
 	_spawn_ring(Vector3(pos.x, 6.0, pos.z), Color("ffb36b"), maxf(radius, 160.0), 0.55)
+
+
+func _fx_glow(c: Color, a := 0.9) -> StandardMaterial3D:
+	# 发光叠加材质：火花/拖尾/残影用，让画面更「亮」。
+	var key := "glow_" + c.to_html() + "_" + str(a)
+	if alpha_mats.has(key):
+		return alpha_mats[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(c.r, c.g, c.b, a)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	alpha_mats[key] = m
+	return m
+
+
+func _spawn_cast_flare(pos: Vector3, color: Color, radius: float) -> void:
+	# 所有技能共用的起手光：地面环 + 中心白闪 + 上窜火花；大招再加一圈。
+	var bright := color.lightened(0.15)
+	var big := radius >= 160.0
+	_spawn_ring(Vector3(pos.x, 6.0, pos.z), bright, maxf(radius * 0.9, 80.0),
+		0.50 if big else 0.35)
+	_spawn_burst(Vector3(pos.x, 28.0, pos.z), Color.WHITE, 0.18)
+	var spark := _fx_mesh("fx_cast_spark", func():
+		var b := BoxMesh.new()
+		b.size = Vector3(6, 6, 6)
+		return b)
+	var mat := _fx_glow(bright, 0.9)
+	var n := 12 if big else 7
+	for i in range(n):
+		var ang := TAU * float(i) / float(n)
+		var at := pos + Vector3(cos(ang) * radius * 0.32, 26.0, sin(ang) * radius * 0.32)
+		_add_fx_mesh(spark, mat, at, 0.45, 0.8, 1.4,
+			Vector3(cos(ang) * 40.0, 150.0, sin(ang) * 40.0))
+	if big:
+		_spawn_ring(Vector3(pos.x, 34.0, pos.z), bright, maxf(radius * 0.55, 80.0), 0.40)
+		for i in range(8):
+			var ang := TAU * float(i) / 8.0
+			_add_fx_mesh(spark, _fx_glow(Color.WHITE, 0.85),
+				pos + Vector3(cos(ang) * radius * 0.18, 42.0, sin(ang) * radius * 0.18),
+				0.35, 0.6, 1.2, Vector3(0.0, 110.0, 0.0))
+
+
+func _spawn_ghost(pos: Vector3, color: Color) -> void:
+	# 位移残影：半透明圆柱，快速淡出。
+	var ghost := _fx_mesh("fx_ghost", func():
+		var c := CylinderMesh.new()
+		c.top_radius = 18.0
+		c.bottom_radius = 18.0
+		c.height = 62.0
+		c.radial_segments = 10
+		return c)
+	_add_fx_mesh(ghost, _fx_mat(color, 0.22), pos + Vector3(0, 30, 0), 0.20, 0.9, 1.05)
+
+
+func _build_flash_layer() -> void:
+	# 玩家大招的整屏轻闪；画布层在 HUD 之下/之上都只持续 0.3 秒。
+	var layer := CanvasLayer.new()
+	layer.layer = 1
+	add_child(layer)
+	flash_rect = ColorRect.new()
+	flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash_rect.color = Color(1, 1, 1, 0)
+	flash_rect.size = get_viewport().get_visible_rect().size
+	layer.add_child(flash_rect)
+
+
+func _flash_screen(color: Color) -> void:
+	if flash_rect == null:
+		return
+	flash_rect.size = get_viewport().get_visible_rect().size
+	flash_rect.color = Color(color.r, color.g, color.b, 0.22)
+	flash_rect.modulate = Color(1, 1, 1, 1)
+	if flash_tween != null and flash_tween.is_valid():
+		flash_tween.kill()
+	flash_tween = create_tween()
+	flash_tween.tween_property(flash_rect, "modulate:a", 0.0, 0.34).set_ease(Tween.EASE_OUT)
 
 
 func _spawn_style(style: String, pos: Vector3, color: Color, radius: float) -> void:
