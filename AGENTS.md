@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 76），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 77），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -95,6 +95,7 @@ godot --path godot -- --skip-home --auto-run
 - 启动图标：自适应前景有效像素必须落在 432 画布中央 264 安全区内并居中；`launcher_icons/adaptive_monochrome_432x432` 必须指向 `app_icon_monochrome.png`，否则 Android 13 主题图标缺 monochrome 节点。
 - 建筑保护层级严格为 **外塔 → 内塔 → 水晶**：前序建筑未毁时后续建筑完全免疫伤害，AI 不得绕过前塔。
 - 节奏固定：3v3 为 3:00 终极对决 + 峡谷巨兽，4:00 起 45 秒结算倒计时，4:45 兜底结算；5v5 为 4:00 峡谷巨兽、5:00 终极对决，8:00 上限，最后 45 秒防御塔停火。巨兽与终极对决由 `boss_time` / `sudden_death_time` 两个字段控制，3v3 默认同帧。
+- 3v3 为 3600×1600 单路（4.31 起由 3000 加宽）：双方外塔相距 1100（蓝 1250 / 红 2350），塔与药剂坐标在 `rules.json`；3v3 树缩放 0.50–0.72，5v5 保持 0.85–1.35。
 - 5v5 为 3600×3600 对角三路（4.20 起由 2400 放大 1.5 倍）：上路沿左/上边、中路对角、下路沿下/右边，河道斜穿野区；每方 3 座路塔，拆掉 2 座后水晶失去保护；野区 6 个营地（野猪/灰狼/河蟹，狼营给增伤、蟹营给加速），双方各一名打野只刷本方野区；终极对决只放大建筑伤害，塔/水晶保护层级全程有效。
 - 结算页必须展示双方全部玩家的完整战绩（3v3 六人 / 5v5 十人：头像/姓名/等级/击杀·死亡/输出），不能只显示玩家本人，也不能出现只有底色的空行。
 - 相机：机位高度、俯角、朝向为常量；推镜/打击感只改 `fov`，震屏只平移机位、不重新对准。

@@ -96,6 +96,7 @@ func _process(_delta: float) -> bool:
 		_check_roster_art()
 		_check_cast_actions()
 		_check_base_clear("3v3")
+		_check_tree_height("3v3")
 		_check_audio_assets()
 	elif frame == 66:
 		if main.sim != null and main.sim.clock <= 0.0:
@@ -345,6 +346,20 @@ func _check_cast_actions() -> void:
 	if not seen.has("spin"):
 		failures.append("没有旋转类施法动作")
 	print("CAST_OK actions=%d" % seen.size())
+
+
+func _check_tree_height(tag: String) -> void:
+	# 3v3 树必须压低（0.50–0.72），超过 0.85 说明又沿用了 5v5 尺寸。
+	# 无头渲染不保存 MultiMesh 实例变换，所以读取建模时同步记录的 tree_scales。
+	var scales: Array = main.view.tree_scales if main.view != null else []
+	if scales.is_empty():
+		failures.append(tag + " 没有树")
+		return
+	var top := 0.0
+	for v in scales:
+		top = maxf(top, float(v))
+	if top > 0.85:
+		failures.append("%s 树太高 scale=%.2f" % [tag, top])
 
 
 func _check_palette(tag: String) -> void:

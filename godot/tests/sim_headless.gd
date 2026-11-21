@@ -154,6 +154,14 @@ func _init() -> void:
 		for issue in map_issues:
 			print("MAP_FAIL " + issue)
 
+	var map3_issues := _map3_checks()
+	if map3_issues.is_empty():
+		print("MAP3_OK 3600x1600 gap=1100")
+	else:
+		failures += 1
+		for issue in map3_issues:
+			print("MAP3_FAIL " + issue)
+
 	var jgl_issues := _jungle_checks()
 	if jgl_issues.is_empty():
 		print("JGL_OK jungler/camp_buff/assist/respawn")
@@ -1021,6 +1029,45 @@ func _dist_to_path(p: Vector2, path: Array) -> float:
 		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
 		best = minf(best, (a + ab * t).distance_to(p))
 	return best
+
+
+func _map3_checks() -> Array:
+	# 4.31：3v3 地图加宽到 3600×1600，双方外塔拉开到 1100，检查数据全部落位。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("fox", 0, 9510)
+	if absf(sim.map_w - 3600.0) > 0.1 or absf(sim.map_h - 1600.0) > 0.1:
+		issues.append("3v3 地图不是 3600×1600（实际 %.0fx%.0f）" % [sim.map_w, sim.map_h])
+	if sim.lane.size() != 7:
+		issues.append("3v3 兵线点数不是 7：%d" % sim.lane.size())
+	if sim.towers_blue.size() != 2 or sim.towers_red.size() != 2:
+		issues.append("3v3 防御塔数量不是 2v2")
+	else:
+		var b0 = sim.towers_blue[0]
+		var b1 = sim.towers_blue[1]
+		var r0 = sim.towers_red[0]
+		var r1 = sim.towers_red[1]
+		var gap: float = b0.pos.distance_to(r0.pos)
+		if gap < 1000.0:
+			issues.append("3v3 外塔间距 %.0f < 1000" % gap)
+		if b0.pos.x <= b1.pos.x:
+			issues.append("蓝方外塔没有比内塔更靠前")
+		if r0.pos.x >= r1.pos.x:
+			issues.append("红方外塔没有比内塔更靠前")
+		for t in [b0, b1, r0, r1]:
+			if _dist_to_path(t.pos, sim.lane) > 2.0:
+				issues.append("3v3 防御塔不在兵线上：%s" % str(t.pos))
+	if sim.potions.size() != 2:
+		issues.append("3v3 药剂不是 2 瓶")
+	else:
+		for p in sim.potions:
+			if _dist_to_path(p.pos, sim.lane) > 2.0:
+				issues.append("3v3 药剂不在兵线上：%s" % str(p.pos))
+		if sim.towers_blue.size() == 2 and sim.potions[0].pos.x >= sim.towers_blue[0].pos.x:
+			issues.append("蓝方药剂不在外塔后方")
+		if sim.towers_red.size() == 2 and sim.potions[1].pos.x <= sim.towers_red[0].pos.x:
+			issues.append("红方药剂不在外塔后方")
+	return issues
 
 
 func _map_checks() -> Array:

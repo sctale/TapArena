@@ -415,8 +415,8 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 		others[i] = others[j]
 		others[j] = tmp
 
-	var blue_home := Vector2(230, 800)
-	var red_home := Vector2(2770, 800)
+	var blue_home := Vector2(230.0, map_h * 0.5)
+	var red_home := Vector2(map_w - 230.0, map_h * 0.5)
 	if five_v_five:
 		var mode_home: Dictionary = rules.get("mode_5v5", {})
 		var bb: Array = mode_home.get("base_blue", [360, 2040])
@@ -440,13 +440,20 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 			make_jungle(str(camp.get("kind", "boar")), Vector2(float(cp[0]), float(cp[1])))
 	else:
 		# 外塔 = 更靠近敌方的一侧，必须先拆；内塔在水晶旁，受外塔保护。
-		towers_blue.append(make_tower(BLUE, 0, Vector2(1180, 800)))
-		towers_blue.append(make_tower(BLUE, 1, Vector2(760, 800)))
-		towers_red.append(make_tower(RED, 0, Vector2(1900, 800)))
-		towers_red.append(make_tower(RED, 1, Vector2(2320, 800)))
+		# 坐标来自 rules.json，3v3 地图加宽时只改数据。
+		var t3: Dictionary = rules.get("towers_3v3", {})
+		var tb: Array = t3.get("blue", [[800, 800], [1250, 800]])
+		var tr: Array = t3.get("red", [[2800, 800], [2350, 800]])
+		towers_blue.append(make_tower(BLUE, 0, Vector2(float(tb[1][0]), float(tb[1][1]))))
+		towers_blue.append(make_tower(BLUE, 1, Vector2(float(tb[0][0]), float(tb[0][1]))))
+		towers_red.append(make_tower(RED, 0, Vector2(float(tr[1][0]), float(tr[1][1]))))
+		towers_red.append(make_tower(RED, 1, Vector2(float(tr[0][0]), float(tr[0][1]))))
 		# 双方一塔后方各放一瓶回血药剂，踩到即喝，30 秒后重新长出来。
-		make_potion(BLUE, Vector2(1050, 800), towers_blue[0])
-		make_potion(RED, Vector2(2030, 800), towers_red[0])
+		var p3: Dictionary = rules.get("potion_3v3", {})
+		var pb: Array = p3.get("blue", [1150, 800])
+		var pr: Array = p3.get("red", [2450, 800])
+		make_potion(BLUE, Vector2(float(pb[0]), float(pb[1])), towers_blue[0])
+		make_potion(RED, Vector2(float(pr[0]), float(pr[1])), towers_red[0])
 
 	var allies: Array = []
 	var red_jungler := ""

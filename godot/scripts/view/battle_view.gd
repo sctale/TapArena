@@ -66,6 +66,7 @@ var sync_us_total := 0
 var sync_frames := 0
 # 散布点快照（调试/自检用，不参与渲染）。
 var scatter_spots: Dictionary = {}
+var tree_scales: Array = []
 
 const C_BLUE := Color("4fc3e8")
 const C_RED := Color("f0845c")
@@ -382,6 +383,7 @@ func _build_hills() -> void:
 
 
 func _build_scatter() -> void:
+	tree_scales.clear()
 	var tree_shadow := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow_quality != "low" \
 		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var leaf_tints := [Color(0.86, 0.86, 0.84), Color(1, 1, 1), Color(1.12, 1.16, 1.04)]
@@ -404,6 +406,10 @@ func _build_scatter() -> void:
 		scatter_spots["tree_%d" % v] = spots.duplicate()
 		for k in range(spots.size()):
 			var s := rng.randf_range(0.85, 1.35)
+			# 3v3 单路视野更贴近兵线：树压低到约 0.5–0.72 倍，避免树冠挡住英雄和兵线。
+			if not sim.five_v_five:
+				s = rng.randf_range(0.50, 0.72)
+			tree_scales.append(s)
 			mm.set_instance_transform(k, Transform3D(
 				Basis.IDENTITY.scaled(Vector3(s, s, s)).rotated(Vector3.UP, rng.randf_range(0.0, TAU)), spots[k]))
 		var node := MultiMeshInstance3D.new()
