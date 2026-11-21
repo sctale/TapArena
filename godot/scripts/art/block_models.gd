@@ -95,11 +95,13 @@ static func _part_of(b: Dictionary) -> String:
 
 static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accent: Color,
 		pants := "navy") -> Array:
+	# 英雄专属分支只放身体/服饰/头饰；主武器、盾、法杖、弓统一放 _gear_boxes。
+	# 两边都放会在首页详情 3D 展示台出现「多一把武器」（4.34.1 修过狐狸/熊猫/老虎）。
 	var boxes: Array = []
 	_humanoid_base(boxes, fur, cream, dark, accent, pants, id != "giraffe")
 	match id:
 		"tiger":
-			# 老虎：黑条纹 + 圆耳 + 上翘长尾 + 绿围巾 + 左臂木盾。
+			# 老虎：黑条纹 + 圆耳 + 上翘长尾 + 绿围巾（短剑/圆盾见 _gear_boxes）。
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(9.5 * sx, 75, 0), Vector3(8, 10, 8), "fur", fur)
 				_b(boxes, Vector3(9.5 * sx, 77, 3.6), Vector3(5, 5, 2), "flat", cream)
@@ -111,10 +113,6 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			# 绿围巾环 + 前垂巾
 			_b(boxes, Vector3(0, 52, 0), Vector3(32, 6, 26), "flat", SCARF_GREEN)
 			_b(boxes, Vector3(4, 38, 12.4), Vector3(7, 14, 2), "flat", SCARF_GREEN)
-			# 左臂圆盾：三层盒子拼出圆盾轮廓 + 绿盾心
-			_b(boxes, Vector3(-26.5, 34, 1), Vector3(4, 14, 22), "wood", Color.WHITE)
-			_b(boxes, Vector3(-26.5, 30, 1), Vector3(4, 22, 14), "wood", Color.WHITE)
-			_b(boxes, Vector3(-28.8, 38, 1), Vector3(1.6, 8, 8), "flat", SCARF_GREEN)
 			_b(boxes, Vector3(10, 34, -14), Vector3(7, 7, 16), "fur", fur)
 			_b(boxes, Vector3(10, 40, -26), Vector3(7, 7, 12), "fur", fur)
 			_b(boxes, Vector3(10, 46, -33), Vector3(7, 7, 6), "flat", dark)
@@ -134,10 +132,6 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			# 紫袍摆 + 浅紫边
 			_b(boxes, Vector3(0, 26, 0), Vector3(33, 20, 25), "purple", Color.WHITE)
 			_b(boxes, Vector3(0, 26, 0), Vector3(35, 5, 27), "purple_light", Color.WHITE)
-			# 右臂星杖：金杆 + 金色十字星
-			_b(boxes, Vector3(27, 28, 6), Vector3(4, 58, 4), "gold", Color.WHITE)
-			_b(boxes, Vector3(27, 84, 6), Vector3(10, 10, 4), "gold", Color.WHITE, {}, "arm_r")
-			_b(boxes, Vector3(27, 87, 6), Vector3(20, 4, 4), "gold", Color.WHITE, {}, "arm_r")
 			_b(boxes, Vector3(9, 32, -14), Vector3(13, 13, 14), "fur", fur)
 			_b(boxes, Vector3(9, 36, -25), Vector3(16, 16, 14), "fur", fur)
 			_b(boxes, Vector3(9, 42, -34), Vector3(10, 10, 8), "flat", cream)
@@ -207,7 +201,7 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(9, 32, -14), Vector3(5, 6, 16), "fur", fur)
 			_b(boxes, Vector3(9, 40, -26), Vector3(5, 6, 12), "fur", _darker(fur, 0.7))
 		"panda":
-			# 熊猫：黑耳朵 + 黑眼圈 + 黑臂环/腿环 + 竹绿围巾 + 右臂竹竿。
+			# 熊猫：黑耳朵 + 黑眼圈 + 黑臂环/腿环 + 竹绿围巾（竹竿/斗笠见 _gear_boxes）。
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(9.5 * sx, 75, 0), Vector3(10, 10, 9), "fur", dark)
 				_b(boxes, Vector3(6.0 * sx, 66, 12.7), Vector3(7, 7, 2), "flat", dark)
@@ -217,11 +211,6 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 62, 13.4), Vector3(4, 2, 1), "flat", Color("1a1a1a"))
 			_b(boxes, Vector3(0, 52, 0), Vector3(31, 6, 24), "flat", accent)
 			_b(boxes, Vector3(0, 40, 10.2), Vector3(14, 12, 1), "flat", cream)
-			# 右臂竹竿
-			_b(boxes, Vector3(27, 28, 4), Vector3(4, 56, 4), "leaves", Color("7cbf4a"))
-			_b(boxes, Vector3(27, 42, 4), Vector3(5.4, 3, 5.4), "leaves", Color("4e8c34"))
-			_b(boxes, Vector3(27, 56, 4), Vector3(5.4, 3, 5.4), "leaves", Color("4e8c34"))
-			_b(boxes, Vector3(31, 78, 4), Vector3(10, 4, 3), "leaves", Color("9bd968"), {}, "arm_r")
 			_b(boxes, Vector3(0, 32, -12), Vector3(9, 9, 8), "fur", dark)
 		"owl":
 			# 猫头鹰：耳羽 + 大圆眼 + 金色喙 + 深色翅膀 + 学者巾 + 金星徽。
