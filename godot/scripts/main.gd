@@ -211,6 +211,15 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 			sim.player.level = 2
 			sim.player.xp = sim.xp_to_level2
 			sim.try_cast(sim.player, clampi(int(str(a).substr(8)), 0, 2))
+	# 调试：--dead 直接击杀玩家并拉到 9 秒复活，用于核对复活倒计时面板。
+	if "--dead" in OS.get_cmdline_user_args() and sim.player != null:
+		var dead_foe = null
+		for u in sim.heroes:
+			if u.team != sim.player.team:
+				dead_foe = u
+				break
+		sim.kill(sim.player, dead_foe)
+		sim.player.respawn_t = 9.0
 	# 调试：`--lv=3` 直接升到指定等级，经验条停在该级中段，用于核对 HUD 与成长。
 	for a in OS.get_cmdline_user_args():
 		if str(a).begins_with("--lv="):

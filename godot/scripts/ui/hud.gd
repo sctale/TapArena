@@ -59,6 +59,8 @@ var lbl_res_btn: Label
 var lbl_res_home: Label
 var lbl_cinematic: Label
 var lbl_cinematic_sub: Label
+var lbl_respawn_title: Label
+var lbl_respawn_tip: Label
 var hero_labels: Dictionary = {}
 
 const PANEL_FILL := Color("2b3531")
@@ -482,6 +484,10 @@ func _make_labels() -> void:
 	lbl_res_home = _mk_label(int(h * 0.028), CREAM)
 	lbl_cinematic = _mk_label(int(h * 0.065), GOLD)
 	lbl_cinematic_sub = _mk_label(int(h * 0.026), Color(1, 0.96, 0.86, 0.85))
+	lbl_respawn_title = _mk_label(int(h * 0.028), Color(1.0, 0.90, 0.64, 0.98))
+	lbl_respawn_title.text = "复活倒计时"
+	lbl_respawn_tip = _mk_label(int(h * 0.020), Color(0.92, 0.95, 0.88, 0.96))
+	lbl_respawn_tip.text = "秒后回到战场"
 
 
 func _set_label(l: Label, text: String) -> void:
@@ -752,6 +758,10 @@ func _draw() -> void:
 	if sim == null:
 		return
 	disc_ui_i = 0
+	if lbl_respawn_title != null:
+		lbl_respawn_title.visible = false
+	if lbl_respawn_tip != null:
+		lbl_respawn_tip.visible = false
 	var safe := _safe()
 	_begin_batch()
 	if sim.over:
@@ -839,13 +849,50 @@ func _draw_battle_fg(safe: Rect2) -> void:
 	_draw_floats(safe, h)
 
 	if p != null and not p.is_alive():
-		var box := Rect2(safe.position.x + safe.size.x * 0.34, safe.position.y + h * 0.40,
-			safe.size.x * 0.32, h * 0.14)
-		_panel(box, PANEL_FILL)
-		_digit_center("%d" % maxi(1, ceili(p.respawn_t)),
-			Rect2(box.position.x, box.position.y + 6, box.size.x, box.size.y * 0.55), h * 0.010,
-			Color(1, 1, 1, 1))
-		_add_rect(Rect2(box.position.x, box.get_center().y + 4, box.size.x, 2), Color(1, 1, 1, 0.18))
+		var rb := _respawn_box(safe, h)
+		lbl_respawn_title.visible = true
+		_place(lbl_respawn_title, Rect2(rb.position.x, rb.position.y - h * 0.054,
+			rb.size.x, h * 0.038))
+		lbl_respawn_tip.visible = true
+		_place(lbl_respawn_tip, Rect2(rb.position.x, rb.end.y + h * 0.008,
+			rb.size.x, h * 0.034))
+		_draw_respawn_panel(safe, h, p)
+
+
+func _respawn_box(safe: Rect2, h: float) -> Rect2:
+	var w := minf(safe.size.x * 0.28, h * 0.52)
+	var bh := h * 0.155
+	return Rect2(safe.position.x + (safe.size.x - w) * 0.5,
+		safe.position.y + h * 0.36, w, bh)
+
+
+func _draw_respawn_panel(safe: Rect2, h: float, p) -> void:
+	# 复活倒计时：数字画在面板正中心，外套金环；标题/提示用 Label 画在面板上/下方。
+	var box := _respawn_box(safe, h)
+	_panel(box, Color(0.07, 0.09, 0.08, 0.92), GOLD, PANEL_DARK)
+	var gold := Color(1.0, 0.86, 0.48, 0.92)
+	for corner in [[0, 0], [1, 0], [0, 1], [1, 1]]:
+		var left := int(corner[0]) == 0
+		var top := int(corner[1]) == 0
+		var cx: float = box.position.x + 7.0 if left else box.end.x - 21.0
+		var cy: float = box.position.y + 7.0 if top else box.end.y - 9.0
+		_add_rect(Rect2(cx, cy, 14, 2), gold)
+		_add_rect(Rect2(cx if left else cx + 12, cy if top else cy - 12, 2, 14), gold)
+	# 标题/提示底衬：Label 在最上层，底衬用批次矩形压在战场之上。
+	_add_rect(Rect2(box.position.x + box.size.x * 0.24, box.position.y - h * 0.058,
+		box.size.x * 0.52, h * 0.046), Color(0.05, 0.07, 0.06, 0.72))
+	_add_rect(Rect2(box.position.x + box.size.x * 0.24, box.end.y + h * 0.004,
+		box.size.x * 0.52, h * 0.042), Color(0.05, 0.07, 0.06, 0.72))
+	var c := box.get_center()
+	var rr := minf(box.size.x, box.size.y) * 0.34
+	# 金环用批次线段拼圆：批次里圆盘先于矩形绘制，直接用圆盘会被面板底色盖住。
+	for i in range(28):
+		var a0 := TAU * float(i) / 28.0
+		var a1 := TAU * float(i + 1) / 28.0
+		_add_seg(c + Vector2(cos(a0), sin(a0)) * rr,
+			c + Vector2(cos(a1), sin(a1)) * rr, 2.6, Color(1.0, 0.86, 0.48, 0.92))
+	_digit_center("%d" % maxi(1, ceili(p.respawn_t)),
+		Rect2(c - Vector2(rr, rr), Vector2(rr, rr) * 2.0), h * 0.0105, Color.WHITE)
 
 
 func _plate_rect(safe: Rect2, h: float) -> Rect2:

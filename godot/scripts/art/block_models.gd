@@ -434,21 +434,24 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 34, 10.3), Vector3(22, 16, 1), "flat", cream)
 			_b(boxes, Vector3(0, 51, 0), Vector3(32, 5, 25), "flat", accent)
 		"giraffe":
-			# 小长颈鹿：长脖子 + 小角 + 斑点 + 树叶围巾。
-			_b(boxes, Vector3(0, 56, 13.0), Vector3(14, 22, 2), "flat", fur)
-			_b(boxes, Vector3(0, 78, 0), Vector3(12, 18, 12), "fur", fur)
-			_b(boxes, Vector3(0, 94, 0), Vector3(11, 16, 11), "fur", fur)
-			_b(boxes, Vector3(0, 106, 0), Vector3(10, 12, 10), "fur", fur)
-			_b(boxes, Vector3(0, 112, 0), Vector3(14, 14, 14), "fur", fur)
-			_b(boxes, Vector3(0, 109, 7.2), Vector3(10, 5, 2), "flat", cream)
-			_b(boxes, Vector3(0, 111, 7.8), Vector3(3, 2, 1), "flat", dark)
+			# 圆头小长颈鹿：粗胸颈 + 细上颈 + 大圆头，短脖子也能一眼认出来。
+			_b(boxes, Vector3(0, 56, 0), Vector3(22, 22, 30), "fur", fur)
+			_b(boxes, Vector3(0, 58, 15.2), Vector3(10, 14, 1.2), "flat", cream)
+			_b(boxes, Vector3(0, 74, 0), Vector3(14, 18, 14), "fur", fur)
+			_b(boxes, Vector3(0, 88, 0), Vector3(24, 22, 22), "fur", fur)
+			_b(boxes, Vector3(0, 88, 11.5), Vector3(14, 8, 5), "flat", cream)
+			_b(boxes, Vector3(0, 92, 14.2), Vector3(5, 3, 2), "flat", dark)
 			for sx in [-1, 1]:
-				_b(boxes, Vector3(4 * sx, 116, 7.1), Vector3(3, 3, 1), "flat", dark)
-				_b(boxes, Vector3(4 * sx, 123, 0), Vector3(3, 7, 3), "flat", Color("b28c5c"))
-				_b(boxes, Vector3(4 * sx, 129, 0), Vector3(4, 3, 4), "flat", _darker(fur, 0.9))
-				_b(boxes, Vector3(8 * sx, 118, 0), Vector3(5, 6, 5), "flat", cream)
-			for k in range(4):
-				_b(boxes, Vector3(4 - k * 2, 84 + k * 7, 6.2), Vector3(4, 5, 2), "flat", _darker(fur, 0.9))
+				_b(boxes, Vector3(6 * sx, 99, 11.2), Vector3(4, 4, 1), "flat", Color("fbf8ef"))
+				_b(boxes, Vector3(6.4 * sx, 99.6, 11.8), Vector3(2, 2, 0.8), "flat", dark)
+				_b(boxes, Vector3(13 * sx, 99, 0), Vector3(8, 9, 6), "fur", cream)
+				_b(boxes, Vector3(13 * sx, 101, 3.2), Vector3(5, 5, 2), "flat", _darker(cream, 0.92))
+				_b(boxes, Vector3(5.5 * sx, 108, 0), Vector3(3, 7, 3), "flat", Color("b28c5c"))
+				_b(boxes, Vector3(5.5 * sx, 114, 0), Vector3(5, 4, 5), "flat", _darker(fur, 0.86))
+				_b(boxes, Vector3(7.6 * sx, 62, 3.4), Vector3(2, 7, 5), "flat", _darker(fur, 0.9))
+				_b(boxes, Vector3(4 * sx, 64, -7.0), Vector3(3, 5, 2), "flat", _darker(fur, 0.9))
+			for k in range(3):
+				_b(boxes, Vector3(0, 60 + k * 9, -7.6), Vector3(5, 8, 3), "flat", _darker(fur, 0.72))
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(7 * sx, 38, 10.3), Vector3(3, 3, 1), "flat", _darker(fur, 0.9))
 				_b(boxes, Vector3(10 * sx, 30, 10.3), Vector3(2, 2, 1), "flat", _darker(fur, 0.9))

@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 77），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 78），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -102,7 +102,7 @@ godot --path godot -- --skip-home --auto-run
 - 播报条固定位于 `h*0.245`，宽度 0.52w；3v3 巨兽与终极对决同帧，合并为一条播报；5v5 巨兽 4:00 单独播报，5:00 终极对决不再叠一条横幅。
 - HUD 以 1920×1080 为基准，必须适配 Android 安全区；触摸热区不小于 44vp。
 - 像素美术、音效均为项目自制或运行时合成；不引入任何第三方游戏素材。
-- 新英雄建模以 88 单位人形模板为基准：长脖子、高冠、尾屏等超出模板的结构，必须在 `HERO_DESIGN_H` 登记**模型实测自然高度**（例：长长 132），`heroes.json.height` 填期望的进游戏身高；两者任一填错都会被 `height/设计身高` 二次放大。登记条目本身不代表尺寸正确，必须用模拟器同屏对比同定位老英雄。
+- 新英雄建模以 88 单位人形模板为基准：长脖子、高冠、尾屏等超出模板的结构，必须在 `HERO_DESIGN_H` 登记**模型实测自然高度**（例：长长 118），`heroes.json.height` 填期望的进游戏身高；两者任一填错都会被 `height/设计身高` 二次放大。登记条目本身不代表尺寸正确，必须用模拟器同屏对比同定位老英雄。
 - 体素模型的「视觉身高」以装配后 AABB 为准（body 的世界高度 + head/tail 等枢轴抬升），不是单个 mesh 的局部包围盒；调尺寸时用 `flow_headless` 的守卫输出核对。
 - GDScript 用 Tab 缩进，注释用中文；数值改 `data/*.json`，不要散落在脚本里。
 - PowerShell 脚本必须保存为 **UTF-8 with BOM**（Windows PowerShell 5.x 否则解析中文报错）。
@@ -112,7 +112,7 @@ godot --path godot -- --skip-home --auto-run
 - `--skip-home` 跳过首页；`--hero=frog` 指定英雄；`--mode=5v5` 进入三路 5v5；`--auto-run` 自动向右推进
 - `--dash` 移动中反复放 1 技能；`--boss` 直接触发峡谷巨兽（3v3 3:00 / 5v5 4:00，含播报/震屏）；`--boss-fly` 直接看飞行第二形态
 - `--walk=up|down|left|right|up-right|down-left…` 按固定方向走，用于核对角色朝向
-- `--ult` 检查大招冷却；`--lv=3` 直接把玩家升到指定等级（2–5，经验条停在该级中段）；`--fx=waterfall_ult` 居中播放指定大招；`--no-hud` 隐藏 HUD
+- `--ult` 检查大招冷却；`--dead` 直接击杀玩家并拉到 9 秒复活，用于核对复活倒计时面板；`--lv=3` 直接把玩家升到指定等级（2–5，经验条停在该级中段）；`--fx=waterfall_ult` 居中播放指定大招；`--no-hud` 隐藏 HUD
 - `--top` 全图俯瞰；`--look-base` / `--look-red` / `--look-lane` / `--look-tower` 定点镜头
 - `--behind` 检查建筑遮挡挖空；`--ruins` 检查废墟；`--pause` / `--result` / `--victory` 检查界面；`--result-demo` 配合 `--result` 填入 4–5 位输出，压测十行结算数字不被批上限截断
 - 录制画面：`godot --path godot --write-movie <目录>/shot.png --fixed-fps 30 --quit-after <帧数> -- <参数>`

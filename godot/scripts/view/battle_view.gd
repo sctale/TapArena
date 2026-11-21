@@ -13,7 +13,7 @@ const HERO_DESIGN_H := {
 	"tiger": 88.0, "fox": 88.0, "rabbit": 88.0, "bear": 88.0, "frog": 88.0, "cat": 88.0,
 	"panda": 88.0, "owl": 88.0, "axolotl": 88.0, "deer": 88.0,
 	"turtle": 88.0, "hedgehog": 88.0, "redpanda": 88.0, "wolf": 88.0, "crane": 88.0,
-	"croc": 88.0, "giraffe": 132.0, "raccoon": 88.0, "koala": 88.0, "peacock": 88.0,
+	"croc": 88.0, "giraffe": 118.0, "raccoon": 88.0, "koala": 88.0, "peacock": 88.0,
 	"monkey": 88.0, "elephant": 88.0, "penguin": 88.0, "sheep": 88.0, "bat": 88.0,
 }
 
