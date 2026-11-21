@@ -270,7 +270,7 @@
     "support_hp": 640,
     "support_radius": 20,
     "support_height": 56,
-    "support_range": 110,
+    "support_range": 260,
     "support_dmg": 12,
     "support_atk_interval": 1.2,
     "support_speed": 150,
@@ -281,7 +281,10 @@
     "support_heal_self": 0.03,
     "support_buff_time": 6.0,
     "support_buff_dmg": 0.12,
-    "support_guard": 0.12
+    "support_guard": 0.12,
+    "support_follow_gap": 80,
+    "support_knock_radius": 170,
+    "support_knock_distance": 55
   },
   "potion": {
     "heal_pct": 0.35,

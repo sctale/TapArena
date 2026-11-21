@@ -1272,10 +1272,14 @@ func _sync_minion(u, delta: float) -> void:
 	root.visible = true
 	var rp: Vector2 = sim.render_pos(u)
 	if bool(item.get("support", false)):
-		# 叶灵漂浮：小幅上下 + 呼吸缩放，不做小兵的弹跳步伐。
+		# 叶灵漂浮：小幅上下 + 呼吸缩放；放技能时鼓起一圈，不做小兵的弹跳步伐。
 		root.position = Vector3(rp.x, 4.0 + sin(Time.get_ticks_msec() * 0.0025 + float(u.uid)) * 1.8, rp.y)
 		_face_yaw(item, u, delta)
-		root.scale = Vector3.ONE * (1.0 + sin(Time.get_ticks_msec() * 0.002 + float(u.uid)) * 0.02)
+		var breath := 1.0 + sin(Time.get_ticks_msec() * 0.002 + float(u.uid)) * 0.02
+		if u.cast_anim > 0.0:
+			var ck := 1.0 - clampf(u.cast_anim / maxf(0.01, u.cast_total), 0.0, 1.0)
+			breath += sin(ck * PI) * 0.12
+		root.scale = Vector3.ONE * breath
 		return
 	var step := 1.0 / 30.0
 	var wt: float = u.walk_t
@@ -1477,6 +1481,15 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 			var at := pos + Vector3(cos(a) * radius * 0.35, 6.0 + float(i) * 3.0,
 				sin(a) * radius * 0.35)
 			_spawn_spark(at, Color(0.80, 1.0, 0.70), 6.0)
+		return
+	if kind == "support_knock":
+		# 叶灵技能击退：金色冲击环 + 外圈金点。
+		_spawn_ring(pos, color, radius, 0.42)
+		for i in range(8):
+			var a := TAU * float(i) / 8.0
+			var at := pos + Vector3(cos(a) * radius * 0.62, 10.0 + float(i % 3) * 4.0,
+				sin(a) * radius * 0.62)
+			_spawn_spark(at, Color(1.0, 0.90, 0.60), 7.0)
 		return
 	match kind:
 		"ring":

@@ -2043,33 +2043,45 @@ func _comeback_checks() -> Array:
 
 
 func _support_checks() -> Array:
-	# 4.37：推塔奖励叶灵——生成/回血/攻防祝福/减伤/击杀经验/5v5 分路。
+	# 4.38：叶灵随兵线/死亡重排/躲在兵线后/远程叶弹/脉冲击退。
 	var issues: Array = []
 	var sim = BattleSimScript.new()
 	sim.setup("tiger", 0, 9700)
 	var outer = sim.towers_red[0]
 	var blue_hero = sim.player
 	sim.deal_damage(outer, 99999.0, blue_hero)
+	var key := sim.support_key(BattleSimScript.BLUE, int(outer.lane_id))
+	if not bool(sim.support_pending.get(key, false)):
+		issues.append("推塔后没有排队叶灵")
+	for m in sim.minions:
+		if m.support:
+			issues.append("推塔瞬间就生成了叶灵")
+			break
+	# 下一波兵线：叶灵从基地随兵线出现
+	sim.spawn_wave_lane(BattleSimScript.BLUE, int(outer.lane_id))
 	var supports: Array = []
 	for m in sim.minions:
 		if m.support and m.team == BattleSimScript.BLUE:
 			supports.append(m)
 	if supports.size() != 1:
-		issues.append("推掉红方外塔后没有生成 1 只蓝方叶灵（实际 %d）" % supports.size())
+		issues.append("下一波兵线没有生成 1 只叶灵（实际 %d）" % supports.size())
 	else:
 		var sup = supports[0]
-		if sup.lane_id != outer.lane_id:
+		if int(sup.lane_id) != int(outer.lane_id):
 			issues.append("叶灵没有生成在推塔的那一路")
-		# 同一路再推一座塔：仍只有一只（补满血，不叠第二只）
+		if sup.pos.distance_to(outer.pos) < 300.0:
+			issues.append("叶灵没有随兵线从基地出发")
+		if absf(sup.height - 56.0) > 0.1 or sup.attack_range < 250.0:
+			issues.append("叶灵身高/射程不对：h=%.1f r=%.1f" % [sup.height, sup.attack_range])
+		# 同一路再推内塔：存活时不叠，只补满血
+		sup.hp = sup.max_hp * 0.5
 		sim.deal_damage(sim.towers_red[1], 99999.0, blue_hero)
 		var same_lane := 0
 		for m in sim.minions:
 			if m.support and m.team == BattleSimScript.BLUE and int(m.lane_id) == int(outer.lane_id):
 				same_lane += 1
-		if same_lane != 1:
-			issues.append("同一路推两座塔叠了 %d 只叶灵（应 1 只）" % same_lane)
-		if absf(sup.height - 56.0) > 0.1 or sup.height >= 88.0:
-			issues.append("叶灵身高不是 56 / 未小于英雄：%.1f" % sup.height)
+		if same_lane != 1 or sup.hp < sup.max_hp - 0.5:
+			issues.append("同路再推塔叠了叶灵/没有补满血：%d / %.0f" % [same_lane, sup.hp])
 		# 回血 + 攻防祝福
 		blue_hero.hp = blue_hero.max_hp * 0.5
 		blue_hero.guard_t = 0.0
@@ -2113,7 +2125,26 @@ func _support_checks() -> Array:
 		var dealt: float = rhp - red.hp
 		if absf(dealt - 112.0) > 1.0:
 			issues.append("叶灵攻击祝福后 100 伤害应剩 112，实际 %.1f" % dealt)
-		# 击杀叶灵：红方击杀拿 60 经验
+		# 远程叶弹：200 距离不等近战
+		red.pos = sup.pos + Vector2(200, 0)
+		red.prev_pos = red.pos
+		red.hp = red.max_hp
+		sup.atk_timer = 0.0
+		var shots0: int = sim.shots.size()
+		sim.step_support(sup, 0.02)
+		if sim.shots.size() <= shots0:
+			issues.append("叶灵 200 距离没有发出远程叶弹")
+		# 脉冲击退：150 距离（不触发 130 内后撤），推开约 55
+		red.pos = sup.pos + Vector2(150, 0)
+		red.prev_pos = red.pos
+		red.hp = red.max_hp
+		sup.support_pulse_t = 0.01
+		var knock0: float = red.pos.distance_to(sup.pos)
+		sim.step_support(sup, 0.02)
+		var knock1: float = red.pos.distance_to(sup.pos)
+		if knock1 < knock0 + 20.0:
+			issues.append("叶灵脉冲击退没有生效：%.0f→%.0f" % [knock0, knock1])
+		# 击杀叶灵：60 经验；下一波该路兵线重出
 		red.level = 1
 		red.xp = 0.0
 		sup.hp = 1.0
@@ -2122,7 +2153,16 @@ func _support_checks() -> Array:
 			issues.append("叶灵无法被击杀")
 		if absf(red.xp - 60.0) > 0.5:
 			issues.append("击杀叶灵经验不是 60，实际 %.0f" % red.xp)
-	# 5v5 分路：推掉下路塔，叶灵 lane_id 跟随
+		if not bool(sim.support_pending.get(key, false)):
+			issues.append("叶灵死亡后没有排下一波")
+		sim.spawn_wave_lane(BattleSimScript.BLUE, int(outer.lane_id))
+		var reborn := 0
+		for m in sim.minions:
+			if m.support and m.is_alive() and m.team == BattleSimScript.BLUE:
+				reborn += 1
+		if reborn != 1:
+			issues.append("叶灵死亡后下一波没有重出（%d）" % reborn)
+	# 5v5 分路：推掉下路塔，排队后由下路兵线带出
 	var sim5 = BattleSimScript.new()
 	sim5.setup("tiger", 0, 9701, true)
 	var lane_tower = null
@@ -2134,13 +2174,16 @@ func _support_checks() -> Array:
 		issues.append("5v5 找不到下路红塔")
 	else:
 		sim5.deal_damage(lane_tower, 99999.0, sim5.player)
+		if not bool(sim5.support_pending.get(sim5.support_key(BattleSimScript.BLUE, 2), false)):
+			issues.append("5v5 推下路塔后没有排队叶灵")
+		sim5.spawn_wave_lane(BattleSimScript.BLUE, 2)
 		var found := false
 		for m in sim5.minions:
 			if m.support and m.team == BattleSimScript.BLUE and int(m.lane_id) == 2:
 				found = true
 				break
 		if not found:
-			issues.append("5v5 推下路塔后没有在下路生成叶灵")
+			issues.append("5v5 下路兵线没有带出叶灵")
 	# 模型调色板与高度
 	var atlas = PixelAtlas.new()
 	var smesh: ArrayMesh = BlockModels.support_minion(atlas, Color(0.42, 0.72, 0.95))

@@ -216,6 +216,9 @@ var player = null
 var boss = null
 var boss_spawned := false
 var boss_team := -1
+# 叶灵推塔奖励：unlocked 表示该队伍该路推过塔；pending 表示下一波兵线要带一只。
+var support_unlocked: Dictionary = {}
+var support_pending: Dictionary = {}
 # 巨兽本局阵营：出场时随机选边并锁定，之后只帮这一方；击杀后 60 秒回到同一方。
 var boss_home_team := -1
 var boss_side_override := -1
@@ -322,6 +325,8 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	boss_home_team = -1
 	boss_side_override = -1
 	boss_respawn = 60.0
+	support_unlocked.clear()
+	support_pending.clear()
 	_uid = 0
 	_shot_view = 0
 	team_buff_t = [0.0, 0.0]
@@ -1450,6 +1455,17 @@ func spawn_wave_lane(team: int, lane_id: int) -> void:
 		m.move_speed = float(minion_cfg.get("move_speed", 176))
 		m.lane_index = 1 if team == BLUE else path.size() - 2
 		minions.append(m)
+	# 推塔奖励：下一波兵线带上一只叶灵。
+	var skey := support_key(team, lane_id)
+	if bool(support_pending.get(skey, false)):
+		support_pending.erase(skey)
+		var alive := false
+		for old in minions:
+			if old.is_alive() and old.support and old.team == team 					and (not five_v_five or int(old.lane_id) == lane_id):
+				alive = true
+				break
+		if not alive:
+			spawn_support_entity(team, lane_id)
 
 
 func lane_label(lane_id: int) -> String:
@@ -1458,21 +1474,41 @@ func lane_label(lane_id: int) -> String:
 	return ["上路", "中路", "下路"][clampi(lane_id, 0, 2)]
 
 
-func spawn_support(team: int, lane_id: int, at: Vector2) -> void:
-	# 推塔奖励：每路最多一只叶灵；同一路再推塔只把现有叶灵补满。
+func support_key(team: int, lane_id: int) -> String:
+	return "%d_%d" % [team, lane_id]
+
+
+func queue_support(team: int, lane_id: int) -> void:
+	# 推塔奖励先排队，下一波该路兵线出发时叶灵才随行。
+	var key := support_key(team, lane_id)
+	support_unlocked[key] = true
 	for m in minions:
-		if m.is_alive() and m.support and m.team == team and int(m.lane_id) == lane_id:
+		if m.is_alive() and m.support and m.team == team 				and (not five_v_five or int(m.lane_id) == lane_id):
 			m.hp = m.max_hp
 			return
-	var u = new_unit(MINION, team, "叶灵", at)
+	support_pending[key] = true
+	banner.emit("%s推掉%s塔！下一波兵线叶灵来帮忙" % [
+		"蓝方" if team == BLUE else "红方", lane_label(lane_id)], 3.2)
+
+
+func spawn_support_entity(team: int, lane_id: int, at := Vector2.INF) -> void:
+	# 实际生成叶灵：默认在兵线起点（基地）后方，随下一波兵线出发。
+	var path: Array = path_of(lane_id)
+	if path.is_empty():
+		return
+	var pos := at
+	if pos == Vector2.INF:
+		pos = path[0] if team == BLUE else path[path.size() - 1]
+		pos += Vector2(0, 50)
+	var u = new_unit(MINION, team, "叶灵", pos)
 	u.support = true
 	u.lane_id = lane_id
-	u.lane_index = nearest_path_index(lane_id, at)
+	u.lane_index = nearest_path_index(lane_id, pos)
 	u.hp = float(minion_cfg.get("support_hp", 640))
 	u.max_hp = u.hp
 	u.radius = float(minion_cfg.get("support_radius", 20))
 	u.height = float(minion_cfg.get("support_height", 56))
-	u.attack_range = float(minion_cfg.get("support_range", 110))
+	u.attack_range = float(minion_cfg.get("support_range", 260))
 	u.dmg = float(minion_cfg.get("support_dmg", 12))
 	u.atk_interval = float(minion_cfg.get("support_atk_interval", 1.2))
 	u.atk_timer = 0.6
@@ -1480,24 +1516,49 @@ func spawn_support(team: int, lane_id: int, at: Vector2) -> void:
 	u.support_pulse_t = 1.0
 	u.invuln_t = 0.8
 	minions.append(u)
-	banner.emit("%s推掉%s塔！叶灵来帮忙啦" % [
-		"蓝方" if team == BLUE else "红方", lane_label(lane_id)], 3.2)
-	fx.emit("cast_leafheal", Vector3(at.x, 0.0, at.y), _team_color(team), 100.0)
-	sfx.emit("pickup", at)
+	support_unlocked[support_key(team, lane_id)] = true
+	float_text.emit(Vector3(u.pos.x, u.height + 24.0, u.pos.y), "叶灵来了",
+		Color(0.72, 1.0, 0.7))
+	fx.emit("cast_leafheal", Vector3(u.pos.x, 0.0, u.pos.y), _team_color(team), 90.0)
+	sfx.emit("pickup", pos)
+
+
+func _front_ally_minion(m):
+	var lid := int(m.lane_id)
+	var best = null
+	var best_key := -1.0e20
+	for o in minions:
+		if o == m or o.support or not o.is_alive() or o.team != m.team:
+			continue
+		if five_v_five and int(o.lane_id) != lid:
+			continue
+		var p := lane_progress(lid, o.pos)
+		var key := p if m.team == BLUE else -p
+		if key > best_key:
+			best_key = key
+			best = o
+	return best
 
 
 func step_support(m, dt: float) -> void:
-	# 叶灵：周期性回血/攻防祝福；不主动追人，敌近则后退，只做自卫普攻。
+	# 叶灵：周期性回血/攻防祝福 + 瞬发击退；远程叶弹，躲在己方最前小兵后方。
 	m.support_pulse_t -= dt
 	if m.support_pulse_t <= 0.0:
 		m.support_pulse_t = float(minion_cfg.get("support_pulse", 2.5))
 		_support_pulse(m)
-	var foe = nearest_enemy_unit(m, 260.0)
+
+	# 远程自卫：不追人，260 内有敌人就发叶弹；贴脸先退。
+	var foe = nearest_enemy_unit(m, 300.0)
 	if foe != null:
 		var d: float = m.pos.distance_to(foe.pos)
 		m.face_dir = (foe.pos - m.pos).normalized()
 		m.facing = 1.0 if foe.pos.x >= m.pos.x else -1.0
-		if d < 140.0:
+		if d <= m.attack_range + foe.radius and m.atk_timer <= 0.0:
+			m.atk_timer = m.atk_interval
+			m.atk_anim = 0.22
+			shoot(m, m.face_dir, m.dmg, Color("bfe8a0"), 560.0, 0.0, 0.0, 0.0, 0,
+				true, foe, "leaf")
+		if d < 130.0:
 			m.moving = true
 			var away: Vector2 = (m.pos - foe.pos).normalized()
 			if away.length_squared() < 0.001:
@@ -1505,35 +1566,30 @@ func step_support(m, dt: float) -> void:
 			move_to(m, m.pos + away * (m.move_speed * 0.9 * dt))
 			m.walk_t += dt
 			return
+
+	# 躲在己方最前小兵后方约 80 弧长；没有小兵就原地等下一波。
+	var front = _front_ally_minion(m)
+	if front == null:
 		m.moving = false
-		if d <= m.attack_range + foe.radius + 10.0 and m.atk_timer <= 0.0:
-			m.atk_timer = m.atk_interval
-			m.atk_anim = 0.22
-			hit_with_fx(foe, m.dmg, m, 0.0)
 		return
-	var step_dir := 1 if m.team == BLUE else -1
-	var path: Array = path_of(m.lane_id)
-	if path.is_empty():
+	var lid := int(m.lane_id)
+	var path: Array = path_of(lid)
+	if path.size() < 2:
 		return
-	var idx := clampi(m.lane_index, 0, path.size() - 1)
-	var goal: Vector2 = path[idx]
-	for guard in range(path.size()):
-		if (goal - m.pos).length() > 70.0:
-			break
-		var next_idx := idx + step_dir
-		if next_idx < 0 or next_idx >= path.size():
-			break
-		idx = next_idx
-		goal = path[idx]
-	m.lane_index = idx
+	var dir := 1.0 if m.team == BLUE else -1.0
+	var total := path_length(path)
+	var fp := lane_progress(lid, front.pos)
+	var target_p := clampf(fp - dir * float(minion_cfg.get("support_follow_gap", 80.0)),
+		0.0, total)
+	var goal := point_at_progress(lid, target_p)
 	var to: Vector2 = goal - m.pos
 	var d2 := to.length()
-	if d2 < 10.0:
+	if d2 < 14.0:
+		m.moving = false
 		return
 	to = to / d2
 	m.move_dir = to
-	if m.atk_anim <= 0.0:
-		m.face_dir = to
+	m.face_dir = to
 	m.facing = 1.0 if to.x >= 0.0 else -1.0
 	m.moving = true
 	var slow_k := 0.55 if m.slow_t > 0.0 else 1.0
@@ -1546,6 +1602,8 @@ func _support_pulse(m) -> void:
 	var buff_t := float(minion_cfg.get("support_buff_time", 6.0))
 	var dmg_pct := float(minion_cfg.get("support_buff_dmg", 0.12))
 	var guard_pct := float(minion_cfg.get("support_guard", 0.12))
+	m.cast_anim = 0.3
+	m.cast_total = 0.3
 	for a in units:
 		if not a.is_alive() or a.team != m.team:
 			continue
@@ -1568,7 +1626,24 @@ func _support_pulse(m) -> void:
 		a.buff_dmg_pct = maxf(a.buff_dmg_pct, dmg_pct)
 		a.guard_t = maxf(a.guard_t, buff_t)
 		a.guard_pct = maxf(a.guard_pct, guard_pct)
+	# 瞬发击退：170 内敌方英雄/小兵/野怪被推开 55，塔/水晶/巨兽不动。
+	var knock_radius := float(minion_cfg.get("support_knock_radius", 170.0))
+	var knock_dist := float(minion_cfg.get("support_knock_distance", 55.0))
+	for e in units:
+		if not e.is_alive() or e.team == m.team:
+			continue
+		if e.kind != HERO and e.kind != MINION and e.kind != JUNGLE:
+			continue
+		if m.pos.distance_to(e.pos) > knock_radius + e.radius:
+			continue
+		var n: Vector2 = e.pos - m.pos
+		if n.length_squared() < 0.0001:
+			n = Vector2.RIGHT
+		move_to(e, e.pos + n.normalized() * knock_dist)
 	fx.emit("support_pulse", Vector3(m.pos.x, 6.0, m.pos.y), Color(0.62, 1.0, 0.70), radius)
+	if knock_radius > 0.0:
+		fx.emit("support_knock", Vector3(m.pos.x, 8.0, m.pos.y), Color(1.0, 0.92, 0.65),
+			knock_radius)
 
 
 func step_unit(u, dt: float) -> void:
@@ -2738,7 +2813,7 @@ func kill(target, killer) -> void:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
 		# 推塔奖励最后播报，保证「叶灵来帮忙」不会被塔的播报顶掉。
 		var push_team: int = killer.team if killer != null else 1 - target.team
-		spawn_support(push_team, target.lane_id, target.pos)
+		queue_support(push_team, target.lane_id)
 		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
@@ -2750,6 +2825,7 @@ func kill(target, killer) -> void:
 		var minion_gain := xp_minion
 		if target.support:
 			minion_gain = 60.0
+			support_pending[support_key(target.team, int(target.lane_id))] = true
 			banner.emit("%s叶灵被击败了" % ("蓝方" if target.team == BLUE else "红方"), 2.0)
 		if killer != null and killer.kind == HERO:
 			add_xp(killer, minion_gain)

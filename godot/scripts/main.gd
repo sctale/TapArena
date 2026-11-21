@@ -290,7 +290,7 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 			sim.step(1.0 / 60.0)
 	# 调试：直接生成一只叶灵在身边，检查模型与回血光环。
 	if "--support" in OS.get_cmdline_user_args():
-		sim.spawn_support(sim.BLUE, 1, sim.player.pos + Vector2(85, 0))
+		sim.spawn_support_entity(sim.BLUE, 1, sim.player.pos + Vector2(85, 0))
 	# 调试：直接看巨兽第二形态（翅膀 + 陨石/旋风），不用等它先被打倒一次。
 	if "--boss-fly" in OS.get_cmdline_user_args():
 		sim.clock = sim.boss_time - 0.1
