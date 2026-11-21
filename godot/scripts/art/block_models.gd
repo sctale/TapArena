@@ -96,7 +96,7 @@ static func _part_of(b: Dictionary) -> String:
 static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accent: Color,
 		pants := "navy") -> Array:
 	var boxes: Array = []
-	_humanoid_base(boxes, fur, cream, dark, accent, pants)
+	_humanoid_base(boxes, fur, cream, dark, accent, pants, id != "giraffe")
 	match id:
 		"tiger":
 			# 老虎：黑条纹 + 圆耳 + 上翘长尾 + 绿围巾 + 左臂木盾。
@@ -434,10 +434,9 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 			_b(boxes, Vector3(0, 34, 10.3), Vector3(22, 16, 1), "flat", cream)
 			_b(boxes, Vector3(0, 51, 0), Vector3(32, 5, 25), "flat", accent)
 		"giraffe":
-			# 圆头小长颈鹿：粗胸颈 + 细上颈 + 大圆头，短脖子也能一眼认出来。
-			_b(boxes, Vector3(0, 56, 0), Vector3(22, 22, 30), "fur", fur)
-			_b(boxes, Vector3(0, 58, 15.2), Vector3(10, 14, 1.2), "flat", cream)
-			_b(boxes, Vector3(0, 74, 0), Vector3(14, 18, 14), "fur", fur)
+			# 圆头小长颈鹿：细脖子从围巾直接连到大圆头，中间不再有宽块。
+			_b(boxes, Vector3(0, 52, 0), Vector3(14, 38, 14), "fur", fur)
+			_b(boxes, Vector3(0, 58, 7.1), Vector3(8, 24, 1.2), "flat", cream)
 			_b(boxes, Vector3(0, 88, 0), Vector3(24, 22, 22), "fur", fur)
 			_b(boxes, Vector3(0, 88, 11.5), Vector3(14, 8, 5), "flat", cream)
 			_b(boxes, Vector3(0, 92, 14.2), Vector3(5, 3, 2), "flat", dark)
@@ -448,10 +447,11 @@ static func _hero_boxes(id: String, fur: Color, cream: Color, dark: Color, accen
 				_b(boxes, Vector3(13 * sx, 101, 3.2), Vector3(5, 5, 2), "flat", _darker(cream, 0.92))
 				_b(boxes, Vector3(5.5 * sx, 108, 0), Vector3(3, 7, 3), "flat", Color("b28c5c"))
 				_b(boxes, Vector3(5.5 * sx, 114, 0), Vector3(5, 4, 5), "flat", _darker(fur, 0.86))
-				_b(boxes, Vector3(7.6 * sx, 62, 3.4), Vector3(2, 7, 5), "flat", _darker(fur, 0.9))
-				_b(boxes, Vector3(4 * sx, 64, -7.0), Vector3(3, 5, 2), "flat", _darker(fur, 0.9))
-			for k in range(3):
-				_b(boxes, Vector3(0, 60 + k * 9, -7.6), Vector3(5, 8, 3), "flat", _darker(fur, 0.72))
+				_b(boxes, Vector3(7.2 * sx, 62, 2.2), Vector3(1.8, 7, 5), "flat", _darker(fur, 0.9))
+				_b(boxes, Vector3(7.2 * sx, 74, 2.2), Vector3(1.8, 6, 5), "flat", _darker(fur, 0.9))
+				_b(boxes, Vector3(4 * sx, 62, -7.1), Vector3(3, 6, 2), "flat", _darker(fur, 0.9))
+			for k in range(4):
+				_b(boxes, Vector3(0, 58 + k * 9, -7.2), Vector3(4, 8, 3), "flat", _darker(fur, 0.72))
 			for sx in [-1, 1]:
 				_b(boxes, Vector3(7 * sx, 38, 10.3), Vector3(3, 3, 1), "flat", _darker(fur, 0.9))
 				_b(boxes, Vector3(10 * sx, 30, 10.3), Vector3(2, 2, 1), "flat", _darker(fur, 0.9))
@@ -884,7 +884,7 @@ static func _gear_boxes(boxes: Array, id: String, cream: Color, dark: Color) -> 
 
 # 人形骨架：腿 / 鞋 / 躯干 / 腰带 / 手臂 / 手套 / 头 / 眼高光 / 腮红 / 嘴
 static func _humanoid_base(boxes: Array, fur: Color, cream: Color, dark: Color, accent: Color,
-		pants := "navy") -> void:
+		pants := "navy", with_head := true) -> void:
 	for sx in [-1, 1]:
 		# 裤子默认 navy，由 heroes.json 的 pants 字段按角色覆盖；鞋统一深色。
 		_b(boxes, Vector3(8.0 * sx, 0, 0), Vector3(13, 26, 13), pants, Color.WHITE)
@@ -893,15 +893,16 @@ static func _humanoid_base(boxes: Array, fur: Color, cream: Color, dark: Color, 
 		_b(boxes, Vector3(20.0 * sx, 28, 0), Vector3(11, 7, 11), "flat", dark)
 	_b(boxes, Vector3(0, 26, 0), Vector3(30, 26, 20), "fur", fur)
 	_b(boxes, Vector3(0, 26, 0), Vector3(31, 5, 21), pants, Color(0.84, 0.84, 0.84))
-	_b(boxes, Vector3(0, 56, 0), Vector3(26, 22, 24), "fur", fur)
-	_b(boxes, Vector3(0, 58, 12.6), Vector3(18, 10, 2), "flat", cream)
-	for sx in [-1, 1]:
-		_b(boxes, Vector3(5.5 * sx, 68, 12.7), Vector3(4, 4, 2), "flat", dark)
-		# 眼高光：每只眼上内侧 1 颗白点（贴在眼睛最前面）
-		_b(boxes, Vector3(6.4 * sx, 70.2, 14.75), Vector3(1.6, 1.6, 0.6), "flat", Color.WHITE)
-		# 腮红：两颊的粉色小块（贴着头皮正面，避开嘴部）
-		_b(boxes, Vector3(10.8 * sx, 62.6, 12.1), Vector3(3.6, 2.2, 0.8), "blush", Color.WHITE)
-	_b(boxes, Vector3(0, 61, 14.75), Vector3(6, 2, 0.6), "flat", dark)
+	if with_head:
+		_b(boxes, Vector3(0, 56, 0), Vector3(26, 22, 24), "fur", fur)
+		_b(boxes, Vector3(0, 58, 12.6), Vector3(18, 10, 2), "flat", cream)
+		for sx in [-1, 1]:
+			_b(boxes, Vector3(5.5 * sx, 68, 12.7), Vector3(4, 4, 2), "flat", dark)
+			# 眼高光：每只眼上内侧 1 颗白点（贴在眼睛最前面）
+			_b(boxes, Vector3(6.4 * sx, 70.2, 14.75), Vector3(1.6, 1.6, 0.6), "flat", Color.WHITE)
+			# 腮红：两颊的粉色小块（贴着头皮正面，避开嘴部）
+			_b(boxes, Vector3(10.8 * sx, 62.6, 12.1), Vector3(3.6, 2.2, 0.8), "blush", Color.WHITE)
+		_b(boxes, Vector3(0, 61, 14.75), Vector3(6, 2, 0.6), "flat", dark)
 
 
 static func jungle_monster(atlas: PixelAtlas, kind: String) -> ArrayMesh:
