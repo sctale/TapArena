@@ -211,6 +211,8 @@ var player = null
 var boss = null
 var boss_spawned := false
 var boss_team := -1
+# 巨兽认定的「逆风方」：出场时锁定，之后只帮这一方；反超后功成身退。
+var boss_home_team := -1
 var boss_respawn := 25.0
 
 var winner: int = -1
@@ -311,6 +313,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	boss = null
 	boss_spawned = false
 	boss_team = -1
+	boss_home_team = -1
 	boss_respawn = 25.0
 	_uid = 0
 	_shot_view = 0
@@ -888,11 +891,9 @@ func step_potions(dt: float) -> void:
 			break
 
 
-func leading_team() -> int:
-	var b: float = base_blue.hp / base_blue.max_hp
-	var r: float = base_red.hp / base_red.max_hp
-	if absf(b - r) >= 0.01:
-		return BLUE if b > r else RED
+func standing_team() -> int:
+	# 谁领先（巨兽判定用）：塔血总量 → 水晶血量比例 → 比分；完全打平时返回 -1。
+	# 5v5 里「水晶满血但三座塔全掉」的一方其实在挨打，塔的权重必须在水晶之前。
 	var bt := 0.0
 	for t in towers_blue:
 		bt += maxf(t.hp, 0.0) / t.max_hp
@@ -901,9 +902,29 @@ func leading_team() -> int:
 		rt += maxf(t.hp, 0.0) / t.max_hp
 	if absf(bt - rt) >= 0.01:
 		return BLUE if bt > rt else RED
+	var b: float = base_blue.hp / base_blue.max_hp
+	var r: float = base_red.hp / base_red.max_hp
+	if absf(b - r) >= 0.01:
+		return BLUE if b > r else RED
 	if score_blue != score_red:
 		return BLUE if score_blue > score_red else RED
-	return BLUE
+	return -1
+
+
+func leading_team() -> int:
+	var s := standing_team()
+	return BLUE if s < 0 else s
+
+
+func trailing_team() -> int:
+	# 逆风守护兽：巨兽只帮落后方；完全打平时站蓝方（玩家侧）。
+	var s := standing_team()
+	return BLUE if s < 0 else 1 - s
+
+
+func is_trailing_team(team: int) -> bool:
+	var s := standing_team()
+	return s >= 0 and s != team
 
 
 func spawn_boss(team: int) -> void:
@@ -936,16 +957,21 @@ func spawn_boss(team: int) -> void:
 		u.lane_index = 0 if team == BLUE else lane.size() - 1
 	boss = u
 	boss_team = team
+	boss_home_team = team
 	if boss_time < sudden_death_time - 0.01:
 		# 5v5：巨兽 4:00 先出场，终极对决 5:00 只是状态切换。
-		banner.emit("峡谷巨兽出现！%s巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
+		banner.emit("峡谷巨兽出现！加入%s（只帮落后的一方）" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	else:
-		banner.emit("终极对决！%s峡谷巨兽加入战场" % ("蓝方" if team == BLUE else "红方"), 4.2)
+		banner.emit("终极对决！巨兽加入%s（只帮落后的一方）" % ("蓝方" if team == BLUE else "红方"), 4.2)
 	sfx.emit("ult", u.pos)
 	fx.emit("cast_quake", Vector3(u.pos.x, 20.0, u.pos.y), _team_color(team), 200.0)
 
 
 func respawn_boss(u) -> void:
+	# 逆风守护兽：只帮出场时锁定的落后方，击杀后 25 秒回到同一方；反超也不换边。
+	var home_team: int = boss_home_team if boss_home_team >= 0 else u.team
+	u.team = home_team
+	boss_team = home_team
 	var home = base_blue if u.team == BLUE else base_red
 	if home == null or not home.is_alive():
 		return
@@ -1316,7 +1342,7 @@ func step(dt: float) -> void:
 		sfx.emit("ult", Vector2.INF)
 	if not boss_spawned and clock >= boss_time:
 		boss_spawned = true
-		spawn_boss(leading_team())
+		spawn_boss(trailing_team())
 	if not warned_45 and clock >= match_cap - 45.0:
 		warned_45 = true
 		final_push = true
@@ -1901,6 +1927,22 @@ func front_structure(team: int, lane_id := -1):
 	return base_red if team == BLUE else base_blue
 
 
+func own_front_structure(team: int, lane_id := -1):
+	# 己方最靠前、正被对面推进的塔/水晶（判断巨兽是否已经打到家门口）。
+	return front_structure(1 - team, lane_id)
+
+
+func _boss_threatens_own(team: int, b) -> bool:
+	if b == null or b.kind != BOSS:
+		return false
+	var guard := float(ai_cfg.get("boss_defend_dist", 520.0))
+	var own = own_front_structure(team, 1 if five_v_five else -1)
+	if own != null and own.is_alive() and b.pos.distance_to(own.pos) <= guard:
+		return true
+	var home = base_blue if team == BLUE else base_red
+	return home != null and home.is_alive() and b.pos.distance_to(home.pos) <= guard
+
+
 func ai_target(h):
 	var lane_scope: int = h.lane_id if five_v_five and h.lane_id >= 0 else -1
 	var front = front_structure(h.team, lane_scope)
@@ -1921,7 +1963,8 @@ func ai_target(h):
 			continue
 		if five_v_five and o.kind == TOWER and o.lane_id != lane_scope:
 			continue
-		if five_v_five and lane_scope >= 0 and o.kind != TOWER and o.kind != BASE:
+		if five_v_five and lane_scope >= 0 and o.kind != TOWER and o.kind != BASE \
+				and o.kind != BOSS:
 			if o.lane_id != lane_scope and h.pos.distance_to(o.pos) > 320.0:
 				continue
 		if o.kind == TOWER and is_tower_protected(o):
@@ -1966,6 +2009,9 @@ func ai_target(h):
 					score += 500.0
 			BOSS:
 				score = float(ai_cfg.get("boss_weight", 300.0)) - d * float(ai_cfg.get("boss_dist", 0.3))
+				# 逆风守护兽会主动推塔：打到己方前塔/水晶附近时，AI 必须回防。
+				if _boss_threatens_own(h.team, o):
+					score += float(ai_cfg.get("boss_defend_weight", 900.0))
 		if o == h.ai_target:
 			score += sticky
 		if score > best_score:
@@ -2471,7 +2517,13 @@ func kill(target, killer) -> void:
 		if killer != null:
 			killer.kills += 1
 			if killer.kind == HERO:
-				add_xp(killer, xp_hero_kill)
+				# 终结赏金：落后方击杀领先方英雄时额外获得经验（王者式 shutdown）。
+				var xp_gain := xp_hero_kill
+				if is_trailing_team(killer.team):
+					xp_gain *= 1.0 + float(comeback_cfg.get("shutdown_bonus", 0.5))
+					float_text.emit(Vector3(killer.pos.x, killer.height + 28.0, killer.pos.y),
+						"终结赏金！", Color(1.0, 0.86, 0.4))
+				add_xp(killer, xp_gain)
 			for a in heroes:
 				if a != killer and a.is_alive() and a.team == killer.team and a.pos.distance_to(target.pos) < 700.0:
 					add_xp(a, xp_hero_assist)

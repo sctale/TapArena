@@ -337,6 +337,8 @@
     "base_weight": 120,
     "boss_weight": 300,
     "boss_dist": 0.3,
+    "boss_defend_weight": 900,
+    "boss_defend_dist": 520,
     "focus_hp_bonus": 150,
     "target_sticky": 45,
     "retreat_hp": 0.24,
@@ -456,6 +458,7 @@
     "min_respawn": 3.8,
     "sudden_death_structure_mul": 2.4,
     "respawn_growth": 1.0,
-    "respawn_max": 30.0
+    "respawn_max": 30.0,
+    "shutdown_bonus": 0.5
   }
 }

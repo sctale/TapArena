@@ -234,6 +234,14 @@ func _init() -> void:
 		for issue in base_issues:
 			print("BASE_FAIL " + issue)
 
+	var comeback_issues := _comeback_checks()
+	if comeback_issues.is_empty():
+		print("COMEBACK_OK trailing_boss/respawn_loyal/shutdown/ai_defend")
+	else:
+		failures += 1
+		for issue in comeback_issues:
+			print("COMEBACK_FAIL " + issue)
+
 	var respawn_issues := _respawn_checks()
 	if respawn_issues.is_empty():
 		print("RESPAWN_OK death_growth=1s cap=30s")
@@ -388,7 +396,7 @@ func _rule_checks() -> Array:
 	if dash_hero.pos.x > dash_x - 40.0:
 		issues.append("位移技能没有朝移动方向")
 
-	# 3 分钟出现峡谷巨兽，帮助优势方推进；被击败后 25 秒复活。
+	# 3 分钟出现峡谷巨兽，站到落后方（逆风守护兽）；被击败后 25 秒复活仍回到落后方。
 	var sim7 = BattleSimScript.new()
 	sim7.setup("tiger", 0, 784)
 	sim7.clock = 179.9
@@ -396,8 +404,8 @@ func _rule_checks() -> Array:
 	if sim7.boss == null or sim7.boss.kind != BattleSimScript.BOSS:
 		issues.append("3 分钟后没有出现峡谷巨兽")
 	else:
-		if sim7.boss.team != sim7.leading_team():
-			issues.append("峡谷巨兽没有加入优势方")
+		if sim7.boss.team != sim7.trailing_team():
+			issues.append("峡谷巨兽没有加入落后方")
 		if sim7.boss.hp <= 0.0:
 			issues.append("峡谷巨兽初始血量为 0")
 		var foe = sim7.heroes[3] if sim7.boss.team == BattleSimScript.BLUE else sim7.player
@@ -407,6 +415,8 @@ func _rule_checks() -> Array:
 		sim7.step_unit(sim7.boss, 26.0)
 		if not sim7.boss.is_alive() or sim7.boss.hp < sim7.boss.max_hp:
 			issues.append("峡谷巨兽 25 秒后没有复活")
+		if sim7.boss.team != sim7.trailing_team():
+			issues.append("巨兽复活后没有回到当时的落后方")
 
 	# 峡谷巨兽技能：有敌方单位时会先起手，伤害命中并进入冷却。
 	var sim9 = BattleSimScript.new()
@@ -538,6 +548,8 @@ func _rule_checks() -> Array:
 		simf.step_unit(bf, 26.0)
 		if not bf.boss_flying or bf.boss_phase != 2:
 			issues.append("巨兽第二次出现没有切换飞行形态")
+		# 复活时可能转投落后方，按新阵营重新挑对手。
+		bf_foe = simf.heroes[3] if bf.team == BattleSimScript.BLUE else simf.player
 		bf.pos = bf_foe.pos + Vector2(-70.0, 0.0)
 		bf.prev_pos = bf.pos
 		bf.cds = [0.0, 0.0, 0.0]
@@ -1904,4 +1916,76 @@ func _base_collision_checks() -> Array:
 		var need_m: float = b.radius + m.radius * 0.8
 		if m.pos.distance_to(b.pos) < need_m - 0.5:
 			issues.append("小兵穿过了水晶：d=%.1f need=%.1f" % [m.pos.distance_to(b.pos), need_m])
+	return issues
+
+
+func _comeback_checks() -> Array:
+	# 4.34：逆风守护兽 + 终结赏金 + AI 回防。
+	var issues: Array = []
+
+	# 1) 落后方拿到巨兽；击杀后仍回落后方；反超后功成身退（不再复活）。
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 9401)
+	sim.base_blue.hp = sim.base_blue.max_hp * 0.72
+	sim.clock = sim.boss_time - 0.1
+	sim.step(0.2)
+	if sim.boss == null:
+		issues.append("翻盘测试没有生成巨兽")
+	else:
+		if sim.boss.team != BattleSimScript.BLUE:
+			issues.append("蓝方落后时巨兽没有帮蓝方")
+		var red_hero = sim.heroes[3]
+		sim.deal_damage(sim.boss, 99999.0, red_hero)
+		sim.step_unit(sim.boss, 26.0)
+		if not sim.boss.is_alive() or sim.boss.team != BattleSimScript.BLUE:
+			issues.append("巨兽复活后没有回到当时的落后方")
+		# 红方水晶掉到 50%：蓝方反超，巨兽仍然忠于蓝方，不换边、不帮红方。
+		sim.base_red.hp = sim.base_red.max_hp * 0.5
+		sim.deal_damage(sim.boss, 99999.0, red_hero)
+		sim.step_unit(sim.boss, 26.0)
+		if not sim.boss.is_alive() or sim.boss.team != BattleSimScript.BLUE:
+			issues.append("反超后巨兽换边了（应始终忠于落后方）")
+
+	# 2) 终结赏金：落后方击杀领先方英雄 1.5 倍经验；领先方击杀不变。
+	for behind in [true, false]:
+		var s = BattleSimScript.new()
+		s.setup("tiger", 0, 9402)
+		if behind:
+			s.base_blue.hp = s.base_blue.max_hp * 0.72
+		else:
+			s.base_red.hp = s.base_red.max_hp * 0.72
+		var killer = s.player
+		killer.level = 1
+		killer.xp = 0.0
+		var target = s.heroes[3]
+		target.hp = target.max_hp
+		s.kill(target, killer)
+		var want: float = float(s.xp_hero_kill) * (1.5 if behind else 1.0)
+		if absf(killer.xp - want) > 0.5:
+			issues.append("%s击杀经验 %.0f，应为 %.0f" % [
+				"落后方" if behind else "领先方", killer.xp, want])
+
+	# 3) AI 回防：敌方巨兽压到己方前塔附近时，ai_target 应选巨兽。
+	var simd = BattleSimScript.new()
+	simd.setup("tiger", 0, 9403)
+	simd.spawn_boss(BattleSimScript.RED)
+	var bd = simd.boss
+	for h in simd.heroes:
+		if h.team == BattleSimScript.RED:
+			h.hp = 0.0
+	for m in simd.minions:
+		if m.team == BattleSimScript.RED:
+			m.hp = 0.0
+	var own = simd.own_front_structure(BattleSimScript.BLUE)
+	var hb = simd.player
+	hb.pos = own.pos + Vector2(-60, 0)
+	hb.prev_pos = hb.pos
+	bd.pos = own.pos + Vector2(40, 0)
+	bd.prev_pos = bd.pos
+	if simd.ai_target(hb) != bd:
+		issues.append("巨兽压到己方前塔时 AI 没有回防")
+	bd.pos = Vector2(200, 200)
+	bd.prev_pos = bd.pos
+	if simd.ai_target(hb) == bd:
+		issues.append("巨兽远离己方建筑时 AI 仍在追它")
 	return issues

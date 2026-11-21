@@ -723,12 +723,14 @@ func _add_boss(u) -> void:
 		atlas, _team_color(u.team), u.team, flight))
 	var body := _make_instance(mesh)
 	root.add_child(body)
-	boss_nodes[u.uid] = {"root": root, "body": body, "flight": flight}
+	boss_nodes[u.uid] = {"root": root, "body": body, "flight": flight, "team": u.team}
 
 
 func _sync_boss(u, delta: float) -> void:
 	var item = boss_nodes.get(u.uid)
-	if item != null and bool(item.get("flight", false)) != bool(u.boss_flying):
+	# 逆风守护兽复活时可能转投落后方：team 变了要按新阵营颜色重建模型。
+	if item != null and (bool(item.get("flight", false)) != bool(u.boss_flying) \
+			or int(item.get("team", u.team)) != int(u.team)):
 		(item["root"] as Node3D).queue_free()
 		boss_nodes.erase(u.uid)
 		item = null
