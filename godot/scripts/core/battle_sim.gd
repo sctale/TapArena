@@ -2431,7 +2431,12 @@ func kill(target, killer) -> void:
 		var max_tiers := int(comeback_cfg.get("max_tiers", 3))
 		var cut := float(comeback_cfg.get("respawn_cut", 0.55))
 		var min_respawn := float(comeback_cfg.get("min_respawn", 3.8))
-		target.respawn_t = maxf(min_respawn, respawn_time - clampf(float(behind), 0.0, float(max_tiers)) * cut)
+		var growth := float(comeback_cfg.get("respawn_growth", 1.0))
+		var respawn_cap := float(comeback_cfg.get("respawn_max", 30.0))
+		# 每次死亡复活时间 +1 秒（第一次死亡即 6.5 秒），落后方仍按塔数小幅缩短；
+		# 上限 30 秒，避免后期无限复活拉长对局。
+		var scaled := respawn_time + float(target.deaths) * growth 			- clampf(float(behind), 0.0, float(max_tiers)) * cut
+		target.respawn_t = clampf(scaled, min_respawn, respawn_cap)
 		if killer != null:
 			killer.kills += 1
 			if killer.kind == HERO:

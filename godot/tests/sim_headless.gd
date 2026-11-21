@@ -210,6 +210,14 @@ func _init() -> void:
 		for issue in roster_issues:
 			print("HEROES_FAIL " + issue)
 
+	var respawn_issues := _respawn_checks()
+	if respawn_issues.is_empty():
+		print("RESPAWN_OK death_growth=1s cap=30s")
+	else:
+		failures += 1
+		for issue in respawn_issues:
+			print("RESPAWN_FAIL " + issue)
+
 	var minion_issues := _minion_checks()
 	if minion_issues.is_empty():
 		print("MINION_OK lateral_engage")
@@ -1739,4 +1747,30 @@ func _minion_checks() -> Array:
 		sim.step(DT)
 	if blue.hp >= hp0 and red.hp >= hp1:
 		issues.append("错位小兵互相不攻击")
+	return issues
+
+
+func _respawn_checks() -> Array:
+	# 4.27.1：每次死亡复活时间 +1 秒（首次 6.5），上限 30 秒。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 883)
+	var h = sim.player
+	var expect := 6.5
+	for i in range(3):
+		sim.score_blue = 0
+		sim.score_red = 0
+		h.invuln_t = 0.0
+		sim.deal_damage(h, 99999.0, null)
+		if absf(h.respawn_t - expect) > 0.01:
+			issues.append("第 %d 次死亡复活 %.2f，期望 %.2f" % [i + 1, h.respawn_t, expect])
+		sim.respawn(h)
+		expect += 1.0
+	sim.score_blue = 0
+	sim.score_red = 0
+	h.deaths = 40
+	h.invuln_t = 0.0
+	sim.deal_damage(h, 99999.0, null)
+	if h.respawn_t > 30.01:
+		issues.append("复活时间超过上限：%.2f" % h.respawn_t)
 	return issues

@@ -14,35 +14,178 @@
   "xp_minion": 14,
   "xp_minion_assist": 7,
   "lanes_5v5": [
-    [[540, 3060], [450, 2250], [450, 1350], [450, 450], [1350, 450], [2250, 450], [3060, 540]],
-    [[540, 3060], [1050, 2550], [1500, 2100], [1800, 1800], [2100, 1500], [2550, 1050], [3060, 540]],
-    [[540, 3060], [1350, 3150], [2250, 3150], [3150, 3150], [3150, 2250], [3150, 1350], [3060, 540]]
+    [
+      [
+        540,
+        3060
+      ],
+      [
+        450,
+        2250
+      ],
+      [
+        450,
+        1350
+      ],
+      [
+        450,
+        450
+      ],
+      [
+        1350,
+        450
+      ],
+      [
+        2250,
+        450
+      ],
+      [
+        3060,
+        540
+      ]
+    ],
+    [
+      [
+        540,
+        3060
+      ],
+      [
+        1050,
+        2550
+      ],
+      [
+        1500,
+        2100
+      ],
+      [
+        1800,
+        1800
+      ],
+      [
+        2100,
+        1500
+      ],
+      [
+        2550,
+        1050
+      ],
+      [
+        3060,
+        540
+      ]
+    ],
+    [
+      [
+        540,
+        3060
+      ],
+      [
+        1350,
+        3150
+      ],
+      [
+        2250,
+        3150
+      ],
+      [
+        3150,
+        3150
+      ],
+      [
+        3150,
+        2250
+      ],
+      [
+        3150,
+        1350
+      ],
+      [
+        3060,
+        540
+      ]
+    ]
   ],
-  "river_5v5": [[675, 675], [2925, 2925]],
+  "river_5v5": [
+    [
+      675,
+      675
+    ],
+    [
+      2925,
+      2925
+    ]
+  ],
   "mode_5v5": {
     "team_size": 5,
     "match_cap": 480.0,
     "sudden_death_time": 300.0,
     "boss_time": 240.0,
     "level_cap": 5,
-    "xp_levels": [110, 380, 900, 1500],
+    "xp_levels": [
+      110,
+      380,
+      900,
+      1500
+    ],
     "hp_per_level": 0.09,
     "dmg_per_level": 0.08,
-    "skill_per_level": 0.10,
+    "skill_per_level": 0.1,
     "base_open_towers": 1,
     "map_w": 3600,
     "map_h": 3600,
-    "base_blue": [540, 3060],
-    "base_red": [3060, 540],
+    "base_blue": [
+      540,
+      3060
+    ],
+    "base_red": [
+      3060,
+      540
+    ],
     "keep_protection_in_sudden_death": true
   },
   "jungle": [
-    {"kind": "boar", "pos": [930, 1800]},
-    {"kind": "boar", "pos": [2670, 1800]},
-    {"kind": "wolf", "pos": [1800, 2625]},
-    {"kind": "wolf", "pos": [1800, 975]},
-    {"kind": "crab", "pos": [1425, 1425]},
-    {"kind": "crab", "pos": [2175, 2175]}
+    {
+      "kind": "boar",
+      "pos": [
+        930,
+        1800
+      ]
+    },
+    {
+      "kind": "boar",
+      "pos": [
+        2670,
+        1800
+      ]
+    },
+    {
+      "kind": "wolf",
+      "pos": [
+        1800,
+        2625
+      ]
+    },
+    {
+      "kind": "wolf",
+      "pos": [
+        1800,
+        975
+      ]
+    },
+    {
+      "kind": "crab",
+      "pos": [
+        1425,
+        1425
+      ]
+    },
+    {
+      "kind": "crab",
+      "pos": [
+        2175,
+        2175
+      ]
+    }
   ],
   "jungle_stats": {
     "hp": 650,
@@ -53,15 +196,32 @@
     "xp": 90,
     "heal_pct": 0.12,
     "kinds": {
-      "boar": {"xp": 90, "heal_pct": 0.12},
-      "wolf": {"xp": 110, "buff": {"dmg_pct": 0.10, "duration": 20, "label": "猎狼增益"}},
-      "crab": {"xp": 70, "buff": {"speed_pct": 0.15, "duration": 12, "label": "迅捷蟹增益"}}
+      "boar": {
+        "xp": 90,
+        "heal_pct": 0.12
+      },
+      "wolf": {
+        "xp": 110,
+        "buff": {
+          "dmg_pct": 0.1,
+          "duration": 20,
+          "label": "猎狼增益"
+        }
+      },
+      "crab": {
+        "xp": 70,
+        "buff": {
+          "speed_pct": 0.15,
+          "duration": 12,
+          "label": "迅捷蟹增益"
+        }
+      }
     }
   },
   "combat": {
     "mark_amp": 1.22,
     "chain_falloff": 0.82,
-    "spin_tick": 0.30,
+    "spin_tick": 0.3,
     "spin_knock": 6.0,
     "spin_slow": 0.35,
     "fear_speed": 1.15,
@@ -134,13 +294,13 @@
         "radius": 330,
         "dmg": 55,
         "slow": 1.8,
-        "shield_pct": 0.10,
+        "shield_pct": 0.1,
         "shield_time": 5.0
       },
       "charge": {
         "cd": 11.0,
-        "windup": 0.50,
-        "duration": 0.50,
+        "windup": 0.5,
+        "duration": 0.5,
         "speed": 700,
         "dmg": 120,
         "knock": 50,
@@ -178,7 +338,7 @@
     "focus_hp_bonus": 150,
     "target_sticky": 45,
     "retreat_hp": 0.24,
-    "retreat_with_enemy_hp": 0.40,
+    "retreat_with_enemy_hp": 0.4,
     "outnumbered_hp": 0.56,
     "tower_standoff": 100
   },
@@ -210,13 +370,34 @@
     "lead_scale": 0.85
   },
   "lane": [
-    [300, 800],
-    [760, 800],
-    [1180, 800],
-    [1500, 800],
-    [1900, 800],
-    [2320, 800],
-    [2700, 800]
+    [
+      300,
+      800
+    ],
+    [
+      760,
+      800
+    ],
+    [
+      1180,
+      800
+    ],
+    [
+      1500,
+      800
+    ],
+    [
+      1900,
+      800
+    ],
+    [
+      2320,
+      800
+    ],
+    [
+      2700,
+      800
+    ]
   ],
   "difficulty": {
     "easy": {
@@ -227,18 +408,20 @@
     "challenge": {
       "ai_think": 0.17,
       "ai_skill_mul": 1.15,
-      "enemy_dmg_mul": 1.10
+      "enemy_dmg_mul": 1.1
     }
   },
   "hitstop": {
     "threshold": 90,
     "scale": 0.35,
-    "duration": 0.030
+    "duration": 0.03
   },
   "comeback": {
     "max_tiers": 3,
     "respawn_cut": 0.55,
     "min_respawn": 3.8,
-    "sudden_death_structure_mul": 2.4
+    "sudden_death_structure_mul": 2.4,
+    "respawn_growth": 1.0,
+    "respawn_max": 30.0
   }
 }
