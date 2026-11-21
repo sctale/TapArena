@@ -688,11 +688,16 @@ func _add_minion(u) -> void:
 	var root := Node3D.new()
 	root.name = "Minion_%d" % u.uid
 	add_child(root)
-	var mesh = _model("minion_%d" % u.team, func(): return BlockModels.minion(
-		atlas, _team_color(u.team), u.radius, u.team))
+	var mesh
+	if u.support:
+		mesh = _model("support_%d" % u.team, func(): return BlockModels.support_minion(
+			atlas, _team_color(u.team)))
+	else:
+		mesh = _model("minion_%d" % u.team, func(): return BlockModels.minion(
+			atlas, _team_color(u.team), u.radius, u.team))
 	var body := _make_instance(mesh)
 	root.add_child(body)
-	minion_nodes[u.uid] = {"root": root, "body": body}
+	minion_nodes[u.uid] = {"root": root, "body": body, "support": bool(u.support)}
 
 
 func _add_jungle(u) -> void:
@@ -1266,6 +1271,12 @@ func _sync_minion(u, delta: float) -> void:
 	var root: Node3D = item["root"]
 	root.visible = true
 	var rp: Vector2 = sim.render_pos(u)
+	if bool(item.get("support", false)):
+		# 叶灵漂浮：小幅上下 + 呼吸缩放，不做小兵的弹跳步伐。
+		root.position = Vector3(rp.x, 4.0 + sin(Time.get_ticks_msec() * 0.0025 + float(u.uid)) * 1.8, rp.y)
+		_face_yaw(item, u, delta)
+		root.scale = Vector3.ONE * (1.0 + sin(Time.get_ticks_msec() * 0.002 + float(u.uid)) * 0.02)
+		return
 	var step := 1.0 / 30.0
 	var wt: float = u.walk_t
 	if u.moving:
@@ -1457,6 +1468,15 @@ func _on_fx(kind: String, pos: Vector3, color: Color, radius: float) -> void:
 		return
 	if kind == "punch":
 		_flash_screen(color)
+		return
+	if kind == "support_pulse":
+		# 叶灵回血：叶绿光环 + 五颗上升光点。
+		_spawn_ring(pos, color, radius, 0.6)
+		for i in range(5):
+			var a := TAU * float(i) / 5.0
+			var at := pos + Vector3(cos(a) * radius * 0.35, 6.0 + float(i) * 3.0,
+				sin(a) * radius * 0.35)
+			_spawn_spark(at, Color(0.80, 1.0, 0.70), 6.0)
 		return
 	match kind:
 		"ring":

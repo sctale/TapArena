@@ -258,6 +258,14 @@ func _init() -> void:
 		for issue in minion_issues:
 			print("MINION_FAIL " + issue)
 
+	var support_issues := _support_checks()
+	if support_issues.is_empty():
+		print("SUPPORT_OK spawn/heal/buff/guard/kill/5v5")
+	else:
+		failures += 1
+		for issue in support_issues:
+			print("SUPPORT_FAIL " + issue)
+
 	var new_issues := _new_hero_matches()
 	if new_issues.is_empty():
 		print("NEW_OK 10hero_matches 3v3")
@@ -2031,4 +2039,115 @@ func _comeback_checks() -> Array:
 	bd.prev_pos = bd.pos
 	if simd.ai_target(hb) == bd:
 		issues.append("巨兽远离己方建筑时 AI 仍在追它")
+	return issues
+
+
+func _support_checks() -> Array:
+	# 4.37：推塔奖励叶灵——生成/回血/攻防祝福/减伤/击杀经验/5v5 分路。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 9700)
+	var outer = sim.towers_red[0]
+	var blue_hero = sim.player
+	sim.deal_damage(outer, 99999.0, blue_hero)
+	var supports: Array = []
+	for m in sim.minions:
+		if m.support and m.team == BattleSimScript.BLUE:
+			supports.append(m)
+	if supports.size() != 1:
+		issues.append("推掉红方外塔后没有生成 1 只蓝方叶灵（实际 %d）" % supports.size())
+	else:
+		var sup = supports[0]
+		if sup.lane_id != outer.lane_id:
+			issues.append("叶灵没有生成在推塔的那一路")
+		# 同一路再推一座塔：仍只有一只（补满血，不叠第二只）
+		sim.deal_damage(sim.towers_red[1], 99999.0, blue_hero)
+		var same_lane := 0
+		for m in sim.minions:
+			if m.support and m.team == BattleSimScript.BLUE and int(m.lane_id) == int(outer.lane_id):
+				same_lane += 1
+		if same_lane != 1:
+			issues.append("同一路推两座塔叠了 %d 只叶灵（应 1 只）" % same_lane)
+		if absf(sup.height - 56.0) > 0.1 or sup.height >= 88.0:
+			issues.append("叶灵身高不是 56 / 未小于英雄：%.1f" % sup.height)
+		# 回血 + 攻防祝福
+		blue_hero.hp = blue_hero.max_hp * 0.5
+		blue_hero.guard_t = 0.0
+		blue_hero.guard_pct = 0.0
+		blue_hero.buff_dmg_t = 0.0
+		blue_hero.buff_dmg_pct = 0.0
+		sup.pos = blue_hero.pos + Vector2(40, 0)
+		sup.support_pulse_t = 0.01
+		var hp0: float = blue_hero.hp
+		sim.step_support(sup, 0.02)
+		if blue_hero.hp <= hp0:
+			issues.append("叶灵脉冲没有回血")
+		if blue_hero.guard_t < 5.9 or blue_hero.buff_dmg_t < 5.9:
+			issues.append("叶灵攻防祝福没有挂上")
+		if blue_hero.buff_dmg_pct < 0.119 or blue_hero.guard_pct < 0.119:
+			issues.append("叶灵祝福倍率不是 12%%")
+		# 减伤：同源 100 伤害，带祝福时是平时的 88%（难度增伤在两边同一系数）。
+		var red = sim.heroes[3]
+		blue_hero.hp = blue_hero.max_hp
+		blue_hero.shield = 0.0
+		blue_hero.invuln_t = 0.0
+		blue_hero.guard_t = 0.0
+		blue_hero.guard_pct = 0.0
+		var bhp: float = blue_hero.hp
+		sim.deal_damage(blue_hero, 100.0, red)
+		var base_taken: float = bhp - blue_hero.hp
+		blue_hero.hp = blue_hero.max_hp
+		blue_hero.guard_t = 6.0
+		blue_hero.guard_pct = 0.12
+		bhp = blue_hero.hp
+		sim.deal_damage(blue_hero, 100.0, red)
+		var guarded_taken: float = bhp - blue_hero.hp
+		if base_taken <= 0.0 or absf(guarded_taken / base_taken - 0.88) > 0.01:
+			issues.append("叶灵减伤比例不是 12%%：%.1f/%.1f" % [guarded_taken, base_taken])
+		# 攻击祝福：100 伤害变 112
+		red.hp = red.max_hp
+		red.shield = 0.0
+		red.guard_t = 0.0
+		var rhp: float = red.hp
+		sim.deal_damage(red, 100.0, blue_hero)
+		var dealt: float = rhp - red.hp
+		if absf(dealt - 112.0) > 1.0:
+			issues.append("叶灵攻击祝福后 100 伤害应剩 112，实际 %.1f" % dealt)
+		# 击杀叶灵：红方击杀拿 60 经验
+		red.level = 1
+		red.xp = 0.0
+		sup.hp = 1.0
+		sim.deal_damage(sup, 99999.0, red)
+		if sup.is_alive():
+			issues.append("叶灵无法被击杀")
+		if absf(red.xp - 60.0) > 0.5:
+			issues.append("击杀叶灵经验不是 60，实际 %.0f" % red.xp)
+	# 5v5 分路：推掉下路塔，叶灵 lane_id 跟随
+	var sim5 = BattleSimScript.new()
+	sim5.setup("tiger", 0, 9701, true)
+	var lane_tower = null
+	for t in sim5.towers_red:
+		if int(t.lane_id) == 2:
+			lane_tower = t
+			break
+	if lane_tower == null:
+		issues.append("5v5 找不到下路红塔")
+	else:
+		sim5.deal_damage(lane_tower, 99999.0, sim5.player)
+		var found := false
+		for m in sim5.minions:
+			if m.support and m.team == BattleSimScript.BLUE and int(m.lane_id) == 2:
+				found = true
+				break
+		if not found:
+			issues.append("5v5 推下路塔后没有在下路生成叶灵")
+	# 模型调色板与高度
+	var atlas = PixelAtlas.new()
+	var smesh: ArrayMesh = BlockModels.support_minion(atlas, Color(0.42, 0.72, 0.95))
+	var pal: PackedColorArray = smesh.get_meta("palette", PackedColorArray())
+	if pal.size() > 64 or int(smesh.get_meta("palette_overflow", 0)) > 0:
+		issues.append("叶灵调色板超 64 / 溢出")
+	var sab: AABB = smesh.get_aabb()
+	if sab.end.y > 60.0 or sab.end.y >= 88.0:
+		issues.append("叶灵模型自然高度 %.1f 不符合小体型" % sab.end.y)
 	return issues

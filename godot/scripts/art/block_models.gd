@@ -944,6 +944,54 @@ static func jungle_monster(atlas: PixelAtlas, kind: String) -> ArrayMesh:
 	return VoxelModel.mesh(atlas, boxes)
 
 
+static func support_minion(atlas: PixelAtlas, team_color: Color) -> ArrayMesh:
+	# 叶灵：推塔奖励的漂浮辅助兵；约 56 高，大圆头/叶芽帽/叶翼/发光短杖/小挎包。
+	var boxes: Array = []
+	var leaf := Color("a8d878")
+	var leaf_dark := Color("7cbf4a")
+	var glow_c := Color("eaffc0")
+	var wood := Color("8a5a3b")
+	# 漂浮尾光
+	_b(boxes, Vector3(0, 6, 0), Vector3(10, 3, 10), "glow", glow_c)
+	_b(boxes, Vector3(0, 9, 0), Vector3(6, 3, 6), "glow", Color("d8ffb0"))
+	# 小袍 + 队伍色围巾/披风
+	_b(boxes, Vector3(0, 14, 0), Vector3(16, 14, 14), "cream", Color.WHITE)
+	# 叶绿小袍前襟 + 金腰带，避免正面只剩一块白
+	_b(boxes, Vector3(0, 15, 7.4), Vector3(14, 12, 1.4), "leaves", leaf)
+	_b(boxes, Vector3(0, 16, 8.2), Vector3(14, 2, 0.8), "gold", Color.WHITE)
+	_b(boxes, Vector3(0, 20, 8.7), Vector3(2.4, 2.4, 0.8), "gold", Color.WHITE)
+	_b(boxes, Vector3(0, 26, 0), Vector3(20, 5, 17), "flat", team_color)
+	_b(boxes, Vector3(0, 19, 8.2), Vector3(6, 10, 1.4), "flat", team_color)
+	# 小手
+	for sx in [-1, 1]:
+		_b(boxes, Vector3(9.0 * sx, 20, 0), Vector3(4, 9, 4), "cream", Color.WHITE)
+	# 大圆头 + 眼睛/高光/腮红/嘴
+	_b(boxes, Vector3(0, 30, 0), Vector3(22, 20, 20), "cream", Color.WHITE)
+	for sx in [-1, 1]:
+		_b(boxes, Vector3(5.2 * sx, 38, 10.2), Vector3(4, 5, 1), "flat", Color("2a2420"))
+		_b(boxes, Vector3(6.0 * sx, 40.4, 10.9), Vector3(1.5, 1.5, 0.6), "flat", Color.WHITE)
+		_b(boxes, Vector3(8.0 * sx, 34.5, 9.9), Vector3(3.5, 2.2, 0.8), "blush", Color.WHITE)
+	_b(boxes, Vector3(0, 33.2, 10.6), Vector3(5, 1.8, 0.6), "flat", Color("6a4a3a"))
+	# 叶芽帽
+	_b(boxes, Vector3(0, 49, 0), Vector3(4, 5, 4), "leaves", leaf_dark)
+	_b(boxes, Vector3(0, 53, 0), Vector3(12, 3, 8), "leaves", leaf)
+	_b(boxes, Vector3(6, 54, 0), Vector3(5, 2, 4), "leaves", Color("c8e878"))
+	_b(boxes, Vector3(-6, 53, 0), Vector3(4, 2, 3), "leaves", leaf_dark)
+	# 叶翼
+	for sx in [-1, 1]:
+		_b(boxes, Vector3(12.5 * sx, 31, -4), Vector3(2, 12, 10), "leaves", leaf)
+		_b(boxes, Vector3(13.5 * sx, 34, -5), Vector3(1.2, 6, 6), "leaves", Color("c8e878"))
+	# 小挎包
+	_b(boxes, Vector3(-9, 16, 8), Vector3(6, 7, 4), "wood", wood)
+	_b(boxes, Vector3(-9, 18, 10.2), Vector3(2, 2, 1), "gold", Color.WHITE)
+	# 发光短杖（右手）
+	_b(boxes, Vector3(12, 15, 7), Vector3(2, 20, 2), "wood", wood)
+	_b(boxes, Vector3(12, 35, 7), Vector3(8, 2, 8), "gold", Color.WHITE)
+	_b(boxes, Vector3(12, 37, 7), Vector3(6, 6, 6), "glow", glow_c)
+	_b(boxes, Vector3(12, 38.5, 8.2), Vector3(2.2, 2.2, 1.2), "glow", Color.WHITE)
+	return VoxelModel.mesh(atlas, boxes)
+
+
 static func minion(atlas: PixelAtlas, color: Color, radius: float, team: int) -> ArrayMesh:
 	# 蓝方：圆润小果冻 + 头顶嫩芽；红方：高瘦尖刺怪 + 怒脸。
 	var boxes: Array = []

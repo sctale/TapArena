@@ -90,6 +90,11 @@ class Unit:
 	var buff_dmg_pct: float = 0.0
 	var buff_speed_t: float = 0.0
 	var buff_speed_pct: float = 0.0
+	# 叶灵（推塔超级兵）：回血脉冲计时 + 攻防祝福减伤。
+	var support: bool = false
+	var support_pulse_t: float = 0.0
+	var guard_t: float = 0.0
+	var guard_pct: float = 0.0
 	var vanish_t: float = 0.0
 	var ambush_t: float = 0.0
 	var ambush_pending: float = 0.0
@@ -1447,6 +1452,125 @@ func spawn_wave_lane(team: int, lane_id: int) -> void:
 		minions.append(m)
 
 
+func lane_label(lane_id: int) -> String:
+	if not five_v_five:
+		return "中路"
+	return ["上路", "中路", "下路"][clampi(lane_id, 0, 2)]
+
+
+func spawn_support(team: int, lane_id: int, at: Vector2) -> void:
+	# 推塔奖励：每路最多一只叶灵；同一路再推塔只把现有叶灵补满。
+	for m in minions:
+		if m.is_alive() and m.support and m.team == team and int(m.lane_id) == lane_id:
+			m.hp = m.max_hp
+			return
+	var u = new_unit(MINION, team, "叶灵", at)
+	u.support = true
+	u.lane_id = lane_id
+	u.lane_index = nearest_path_index(lane_id, at)
+	u.hp = float(minion_cfg.get("support_hp", 640))
+	u.max_hp = u.hp
+	u.radius = float(minion_cfg.get("support_radius", 20))
+	u.height = float(minion_cfg.get("support_height", 56))
+	u.attack_range = float(minion_cfg.get("support_range", 110))
+	u.dmg = float(minion_cfg.get("support_dmg", 12))
+	u.atk_interval = float(minion_cfg.get("support_atk_interval", 1.2))
+	u.atk_timer = 0.6
+	u.move_speed = float(minion_cfg.get("support_speed", 150))
+	u.support_pulse_t = 1.0
+	u.invuln_t = 0.8
+	minions.append(u)
+	banner.emit("%s推掉%s塔！叶灵来帮忙啦" % [
+		"蓝方" if team == BLUE else "红方", lane_label(lane_id)], 3.2)
+	fx.emit("cast_leafheal", Vector3(at.x, 0.0, at.y), _team_color(team), 100.0)
+	sfx.emit("pickup", at)
+
+
+func step_support(m, dt: float) -> void:
+	# 叶灵：周期性回血/攻防祝福；不主动追人，敌近则后退，只做自卫普攻。
+	m.support_pulse_t -= dt
+	if m.support_pulse_t <= 0.0:
+		m.support_pulse_t = float(minion_cfg.get("support_pulse", 2.5))
+		_support_pulse(m)
+	var foe = nearest_enemy_unit(m, 260.0)
+	if foe != null:
+		var d: float = m.pos.distance_to(foe.pos)
+		m.face_dir = (foe.pos - m.pos).normalized()
+		m.facing = 1.0 if foe.pos.x >= m.pos.x else -1.0
+		if d < 140.0:
+			m.moving = true
+			var away: Vector2 = (m.pos - foe.pos).normalized()
+			if away.length_squared() < 0.001:
+				away = Vector2.LEFT if m.team == BLUE else Vector2.RIGHT
+			move_to(m, m.pos + away * (m.move_speed * 0.9 * dt))
+			m.walk_t += dt
+			return
+		m.moving = false
+		if d <= m.attack_range + foe.radius + 10.0 and m.atk_timer <= 0.0:
+			m.atk_timer = m.atk_interval
+			m.atk_anim = 0.22
+			hit_with_fx(foe, m.dmg, m, 0.0)
+		return
+	var step_dir := 1 if m.team == BLUE else -1
+	var path: Array = path_of(m.lane_id)
+	if path.is_empty():
+		return
+	var idx := clampi(m.lane_index, 0, path.size() - 1)
+	var goal: Vector2 = path[idx]
+	for guard in range(path.size()):
+		if (goal - m.pos).length() > 70.0:
+			break
+		var next_idx := idx + step_dir
+		if next_idx < 0 or next_idx >= path.size():
+			break
+		idx = next_idx
+		goal = path[idx]
+	m.lane_index = idx
+	var to: Vector2 = goal - m.pos
+	var d2 := to.length()
+	if d2 < 10.0:
+		return
+	to = to / d2
+	m.move_dir = to
+	if m.atk_anim <= 0.0:
+		m.face_dir = to
+	m.facing = 1.0 if to.x >= 0.0 else -1.0
+	m.moving = true
+	var slow_k := 0.55 if m.slow_t > 0.0 else 1.0
+	move_to(m, m.pos + to * (m.move_speed * slow_k * dt))
+	m.walk_t += dt
+
+
+func _support_pulse(m) -> void:
+	var radius := float(minion_cfg.get("support_pulse_radius", 230.0))
+	var buff_t := float(minion_cfg.get("support_buff_time", 6.0))
+	var dmg_pct := float(minion_cfg.get("support_buff_dmg", 0.12))
+	var guard_pct := float(minion_cfg.get("support_guard", 0.12))
+	for a in units:
+		if not a.is_alive() or a.team != m.team:
+			continue
+		if a.kind != HERO and a.kind != MINION:
+			continue
+		if m.pos.distance_to(a.pos) > radius + a.radius:
+			continue
+		var pct := float(minion_cfg.get("support_heal_self", 0.03))
+		if a.kind == HERO:
+			pct = float(minion_cfg.get("support_heal_hero", 0.04))
+		elif a != m:
+			pct = float(minion_cfg.get("support_heal_minion", 0.08))
+		var before: float = a.hp
+		a.hp = minf(a.max_hp, a.hp + a.max_hp * pct)
+		var gained: float = a.hp - before
+		if gained >= 1.0 and a.kind == HERO:
+			float_text.emit(Vector3(a.pos.x, a.height + 24.0, a.pos.y),
+				"+" + str(roundi(gained)), Color(0.55, 1.0, 0.65))
+		a.buff_dmg_t = maxf(a.buff_dmg_t, buff_t)
+		a.buff_dmg_pct = maxf(a.buff_dmg_pct, dmg_pct)
+		a.guard_t = maxf(a.guard_t, buff_t)
+		a.guard_pct = maxf(a.guard_pct, guard_pct)
+	fx.emit("support_pulse", Vector3(m.pos.x, 6.0, m.pos.y), Color(0.62, 1.0, 0.70), radius)
+
+
 func step_unit(u, dt: float) -> void:
 	u.prev_pos = u.pos
 	u.atk_anim = maxf(0.0, u.atk_anim - dt)
@@ -1463,6 +1587,7 @@ func step_unit(u, dt: float) -> void:
 	u.taunt_t = maxf(0.0, u.taunt_t - dt)
 	u.buff_dmg_t = maxf(0.0, u.buff_dmg_t - dt)
 	u.buff_speed_t = maxf(0.0, u.buff_speed_t - dt)
+	u.guard_t = maxf(0.0, u.guard_t - dt)
 	u.ambush_t = maxf(0.0, u.ambush_t - dt)
 	u.jungle_gank_t = maxf(0.0, u.jungle_gank_t - dt)
 	if u.vanish_t > 0.0:
@@ -1510,7 +1635,10 @@ func step_unit(u, dt: float) -> void:
 	if u.kind == HERO:
 		step_hero(u, dt)
 	elif u.kind == MINION:
-		step_minion(u, dt)
+		if u.support:
+			step_support(u, dt)
+		else:
+			step_minion(u, dt)
 	elif u.kind == BOSS:
 		step_boss(u, dt)
 	elif u.kind == JUNGLE:
@@ -2481,9 +2609,12 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 	if src != null and src.kind == HERO and int(src.team) >= 0 and int(src.team) < 2 \
 			and float(team_buff_t[src.team]) > 0.0:
 		amount *= 1.0 + float(boss_cfg.get("team_buff_dmg", 0.15))
-	# 野区增益：灰狼营的猎狼 buff。
-	if src != null and src.kind == HERO and src.buff_dmg_t > 0.0:
+	# 野区/叶灵增益：攻击加成（英雄与小兵都生效）。
+	if src != null and src.buff_dmg_t > 0.0 and (src.kind == HERO or src.kind == MINION):
 		amount *= 1.0 + src.buff_dmg_pct
+	# 叶灵祝福：受到伤害降低。
+	if target.guard_t > 0.0:
+		amount *= 1.0 - clampf(target.guard_pct, 0.0, 0.6)
 	# 猎杀标记：被狼盯上的目标承受更多伤害。
 	if target.mark_t > 0.0:
 		amount *= float(combat_cfg.get("mark_amp", 1.22))
@@ -2605,6 +2736,9 @@ func kill(target, killer) -> void:
 
 	elif target.kind == TOWER:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
+		# 推塔奖励最后播报，保证「叶灵来帮忙」不会被塔的播报顶掉。
+		var push_team: int = killer.team if killer != null else 1 - target.team
+		spawn_support(push_team, target.lane_id, target.pos)
 		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
@@ -2613,12 +2747,16 @@ func kill(target, killer) -> void:
 				add_xp(a, xp_tower)
 
 	elif target.kind == MINION:
+		var minion_gain := xp_minion
+		if target.support:
+			minion_gain = 60.0
+			banner.emit("%s叶灵被击败了" % ("蓝方" if target.team == BLUE else "红方"), 2.0)
 		if killer != null and killer.kind == HERO:
-			add_xp(killer, xp_minion)
+			add_xp(killer, minion_gain)
 		if killer != null:
 			for a in heroes:
 				if a != killer and a.is_alive() and a.team == killer.team and a.pos.distance_to(target.pos) < 450.0:
-					add_xp(a, xp_minion_assist)
+					add_xp(a, minion_gain * 0.5)
 
 	elif target.kind == BASE:
 		sfx.emit("boom", target.pos)
@@ -2696,6 +2834,8 @@ func respawn(h) -> void:
 	h.ambush_t = 0.0
 	h.ambush_pending = 0.0
 	h.buff_dmg_t = 0.0
+	h.guard_t = 0.0
+	h.guard_pct = 0.0
 	h.buff_speed_t = 0.0
 	h.jungle_gank_t = 0.0
 	h.move_dir = Vector2.ZERO

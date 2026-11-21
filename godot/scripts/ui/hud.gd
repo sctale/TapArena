@@ -1111,6 +1111,12 @@ func _draw_minimap(safe: Rect2, h: float) -> void:
 	for un in sim.units:
 		if un.is_alive() and un.kind == sim.JUNGLE:
 			_add_ui_disc(_mini_pos(inner, sim.render_pos(un)), 2.4 * us, Color("e2c46a"))
+	# 叶灵：叶绿描边的队伍色小圆点。
+	for m in sim.minions:
+		if m.is_alive() and m.support:
+			var mp := _mini_pos(inner, sim.render_pos(m))
+			_add_ui_disc(mp, 4.2 * us, Color("eaffc0"))
+			_add_ui_disc(mp, 3.2 * us, BLUE if m.team == sim.BLUE else enemy_c)
 	# 药剂：绿色十字。
 	for pt in sim.potions:
 		if not pt.active:
@@ -1207,6 +1213,22 @@ func _draw_world_bars(safe: Rect2, h: float) -> void:
 		var hp_k := clampf(u.hp / u.max_hp, 0.0, 1.0)
 		_add_rect(Rect2(br.position, Vector2(br.size.x * hp_k, br.size.y)),
 			BLUE if u.team == sim.BLUE else Color("f07a63"))
+	for m in sim.minions:
+		if not m.is_alive() or not m.support:
+			continue
+		var rp2: Vector2 = sim.render_pos(m)
+		var wp2 := Vector3(rp2.x, m.height + 18.0, rp2.y)
+		if cam.is_position_behind(wp2):
+			continue
+		var sp2 := cam.unproject_position(wp2)
+		var bw2 := h * 0.042
+		var bh2 := h * 0.0055
+		var br2 := Rect2(sp2.x - bw2 * 0.5, sp2.y, bw2, bh2)
+		_add_rect(Rect2(br2.position - Vector2(2, 2), br2.size + Vector2(4, 4)), PANEL_DARK)
+		_add_rect(br2, Color(0.08, 0.10, 0.09, 0.95))
+		var hp_k2 := clampf(m.hp / m.max_hp, 0.0, 1.0)
+		_add_rect(Rect2(br2.position, Vector2(br2.size.x * hp_k2, br2.size.y)),
+			BLUE if m.team == sim.BLUE else Color("f07a63"))
 
 
 func _draw_skill_bg(safe: Rect2, h: float) -> void:
