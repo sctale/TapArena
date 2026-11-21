@@ -1510,7 +1510,7 @@
       "atk_interval": 0.76,
       "move_speed": 255,
       "radius": 30,
-      "height": 92,
+      "height": 80,
       "difficulty": 2,
       "fur": "#3FA8A0",
       "dark": "#1F5F5A",

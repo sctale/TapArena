@@ -292,6 +292,30 @@ func _check_roster_art() -> void:
 				failures.append("%s/%s 调色板溢出" % [id, part])
 		if not main.view.HERO_DESIGN_H.has(str(id)):
 			failures.append(str(id) + " 缺少设计身高")
+		# 视觉身高守卫：装配后的包围盒（身体 + 各枢轴抬升）× height / 设计身高。
+		# 新模型加高脖子/冠羽时必须同步改 HERO_DESIGN_H 或 height，避免二次放大。
+		var top := 0.0
+		var pivots: Dictionary = parts["pivots"]
+		for part_key in parts["mesh"].keys():
+			var pm: ArrayMesh = parts["mesh"][part_key]
+			var lift := 0.0
+			if str(part_key) != "body":
+				var pv: Vector3 = pivots.get(part_key, Vector3.ZERO)
+				lift = pv.y
+			top = maxf(top, pm.get_aabb().end.y + lift)
+		var design := float(main.view.HERO_DESIGN_H.get(str(id), 76.0))
+		var visual := top * float(d.get("height", 0)) / design
+		var limits := {
+			"坦克": Vector2(72.0, 110.0), "战士": Vector2(65.0, 96.0),
+			"法师": Vector2(55.0, 90.0), "辅助": Vector2(55.0, 108.0),
+			"控制": Vector2(55.0, 80.0), "射手": Vector2(50.0, 82.0),
+			"刺客": Vector2(55.0, 82.0), "打野": Vector2(60.0, 88.0),
+			"法坦": Vector2(60.0, 88.0),
+		}
+		var lim: Vector2 = limits.get(str(d.get("role", "")), Vector2(50.0, 110.0))
+		if visual < lim.x or visual > lim.y:
+			failures.append("%s 视觉身高 %.1f 超出 %s 档 %.0f–%.0f（模型 %.1f）" % [
+				id, visual, str(d.get("role", "")), lim.x, lim.y, top])
 		if portraits.portrait(str(id), fur, cream, dark, accent) == null:
 			failures.append(str(id) + " 头像生成失败")
 		if icons.ult_icon(str(id)) == null:

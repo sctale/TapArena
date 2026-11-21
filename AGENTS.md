@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\godot-build.ps1 -VersionCode <�
 
 - **只用本地脚本，不加 GitHub Actions。**
 - APK 命名固定 `TapArena-v<版本>.apk`，放在项目根目录。
-- `versionCode` 单调递增（当前 75），版本名与 `project.godot` 完全一致。
+- `versionCode` 单调递增（当前 76），版本名与 `project.godot` 完全一致。
 - 必须实际核验：包名 `com.sctale.taparena`、versionCode、versionName、`arm64-v8a`、签名证书 `CN=TapArena`；不能只看脚本退出码。
 - 发布后必须 `git push` 并创建 GitHub Release，APK 作为资产上传：
   ```powershell
@@ -84,6 +84,7 @@ godot --path godot -- --skip-home --auto-run
 
 - 无头输出必须包含 `SIM_OK`、`RULE_OK`、`FLOW_OK`，且无 `SCRIPT ERROR` / `Parse Error`。
 - 涉及 UI/相机/播报的改动，要用 `--write-movie` 逐帧录屏核对，不能只凭代码判断。
+- 英雄身高守卫：`flow_headless.gd` 会计算「装配后包围盒高度 × heroes.json height ÷ HERO_DESIGN_H」，并按定位卡范围（法师 55–90、辅助 55–108、坦克 72–110、战士 65–96、刺客/射手 50–82 等）；超出即 `FLOW_FAIL`，新模型必须过这一关。
 - 相机相关改动的判据：机位高度、俯角、朝向恒定；行走录像背景位移稳定，无停顿/回跳帧。
 - 播报相关改动的判据：顶部玩家面板、小地图、比分、状态标签、播报条互不叠字。
 
@@ -100,6 +101,8 @@ godot --path godot -- --skip-home --auto-run
 - 播报条固定位于 `h*0.245`，宽度 0.52w；3v3 巨兽与终极对决同帧，合并为一条播报；5v5 巨兽 4:00 单独播报，5:00 终极对决不再叠一条横幅。
 - HUD 以 1920×1080 为基准，必须适配 Android 安全区；触摸热区不小于 44vp。
 - 像素美术、音效均为项目自制或运行时合成；不引入任何第三方游戏素材。
+- 新英雄建模以 88 单位人形模板为基准：长脖子、高冠、尾屏等超出模板的结构，必须在 `HERO_DESIGN_H` 登记**模型实测自然高度**（例：长长 132），`heroes.json.height` 填期望的进游戏身高；两者任一填错都会被 `height/设计身高` 二次放大。登记条目本身不代表尺寸正确，必须用模拟器同屏对比同定位老英雄。
+- 体素模型的「视觉身高」以装配后 AABB 为准（body 的世界高度 + head/tail 等枢轴抬升），不是单个 mesh 的局部包围盒；调尺寸时用 `flow_headless` 的守卫输出核对。
 - GDScript 用 Tab 缩进，注释用中文；数值改 `data/*.json`，不要散落在脚本里。
 - PowerShell 脚本必须保存为 **UTF-8 with BOM**（Windows PowerShell 5.x 否则解析中文报错）。
 
