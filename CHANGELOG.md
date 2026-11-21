@@ -28,7 +28,7 @@
 
 - `CAST_OK` / `ROSTER_OK` / `SIM_OK` / `FLOW_OK` / `MINION_OK` / `JGL_OK` / `RESPAWN_OK`。
 - 逐帧：阿狮大招整屏闪 + 火花；阿跳横扫旋转棍影；5v5 弹道拖尾/起手光。
-- 模拟器 5v5 FPS 与 4.27.1 持平（约 27fps），0 条脚本错误。
+- 模拟器 5v5 FPS 与 4.27.1 持平（同一模拟器 A/B 约 19–21fps），0 条脚本错误。
 - APK：28,229,395 字节，versionCode 73 / versionName 4.28.0 / arm64-v8a / `CN=TapArena`，
       SHA-256 `116D68E92A9FF9FD0C3127FF714617A54FF64C5785F3462B89E72D101A3B2ABF`。
 
