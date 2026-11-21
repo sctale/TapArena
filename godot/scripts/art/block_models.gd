@@ -894,6 +894,9 @@ static func _humanoid_base(boxes: Array, fur: Color, cream: Color, dark: Color, 
 	_b(boxes, Vector3(0, 26, 0), Vector3(30, 26, 20), "fur", fur)
 	_b(boxes, Vector3(0, 26, 0), Vector3(31, 5, 21), pants, Color(0.84, 0.84, 0.84))
 	if with_head:
+		# 脖子：躯干顶（y52）到头底（y56）之间必须有实体，否则首页详情 3D 展示台
+		# 近距离会从头身之间透出背景。顶端 58 藏进头里，头部左右摆动也不露缝。
+		_b(boxes, Vector3(0, 50, 0), Vector3(14, 8, 12), "fur", fur)
 		_b(boxes, Vector3(0, 56, 0), Vector3(26, 22, 24), "fur", fur)
 		_b(boxes, Vector3(0, 58, 12.6), Vector3(18, 10, 2), "flat", cream)
 		for sx in [-1, 1]:

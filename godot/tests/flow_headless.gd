@@ -324,6 +324,13 @@ func _check_roster_art() -> void:
 				var pv: Vector3 = pivots.get(part_key, Vector3.ZERO)
 				lift = pv.y
 			top = maxf(top, pm.get_aabb().end.y + lift)
+		# 头身相连守卫：body（含脖子）顶端必须接住头底，否则首页详情 3D 展示台
+		# 近距离会从头身之间透出背景（4.33.1 修过狐狸/兔子/青蛙/小鹿）。
+		var head_bottom: float = (parts["mesh"]["head"] as ArrayMesh).get_aabb().position.y \
+			+ (pivots["head"] as Vector3).y
+		var body_top: float = (parts["mesh"]["body"] as ArrayMesh).get_aabb().end.y
+		if body_top < head_bottom - 0.5:
+			failures.append("%s 头身断开：body 顶 %.1f < 头底 %.1f" % [id, body_top, head_bottom])
 		var design := float(main.view.HERO_DESIGN_H.get(str(id), 76.0))
 		var visual := top * float(d.get("height", 0)) / design
 		var limits := {
