@@ -198,6 +198,9 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	# 调试：直接触发 3 分钟峡谷巨兽，检查模型与推进。
 	# 放在 HUD/相机信号连接之后，这样巨兽播报、震屏与变形都能一起验收。
 	# 调试：直接升到 2 级并释放大招，检查冷却显示。
+	# 调试：--buff 给自己加满巨兽增益，检查英雄随身光环。
+	if "--buff" in OS.get_cmdline_user_args():
+		sim.team_buff_t[sim.player.team] = 99.0
 	if "--ult" in OS.get_cmdline_user_args():
 		sim.player.level = 2
 		sim.player.xp = sim.xp_to_level2

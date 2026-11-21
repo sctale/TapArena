@@ -210,6 +210,22 @@ func _init() -> void:
 		for issue in roster_issues:
 			print("HEROES_FAIL " + issue)
 
+	var buff_issues := _boss_buff_checks()
+	if buff_issues.is_empty():
+		print("BUFF_OK boss_counterattack=15s/15%")
+	else:
+		failures += 1
+		for issue in buff_issues:
+			print("BUFF_FAIL " + issue)
+
+	var base_issues := _base_collision_checks()
+	if base_issues.is_empty():
+		print("BASE_OK crystal_solid")
+	else:
+		failures += 1
+		for issue in base_issues:
+			print("BASE_FAIL " + issue)
+
 	var respawn_issues := _respawn_checks()
 	if respawn_issues.is_empty():
 		print("RESPAWN_OK death_growth=1s cap=30s")
@@ -1773,4 +1789,70 @@ func _respawn_checks() -> Array:
 	sim.deal_damage(h, 99999.0, null)
 	if h.respawn_t > 30.01:
 		issues.append("复活时间超过上限：%.2f" % h.respawn_t)
+	return issues
+
+
+func _boss_buff_checks() -> Array:
+	# 4.29：击败巨兽的一方全员 15 秒伤害 +15%。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 884)
+	sim.spawn_boss(BattleSimScript.RED)
+	var boss = sim.boss
+	var killer = sim.player
+	boss.hp = 1.0
+	boss.invuln_t = 0.0
+	sim.deal_damage(boss, 99999.0, killer)
+	if absf(float(sim.team_buff_t[BattleSimScript.BLUE]) - 15.0) > 0.05:
+		issues.append("蓝方巨兽增益计时不是 15 秒：%.2f" % sim.team_buff_t[BattleSimScript.BLUE])
+	if float(sim.team_buff_t[BattleSimScript.RED]) > 0.01:
+		issues.append("红方不应获得巨兽增益")
+	var red = null
+	for u in sim.heroes:
+		if u.team == BattleSimScript.RED:
+			red = u
+			break
+	if red == null:
+		issues.append("缺少红方英雄")
+		return issues
+	red.hp = red.max_hp
+	red.invuln_t = 0.0
+	red.shield = 0.0
+	var before: float = red.hp
+	sim.deal_damage(red, 100.0, killer)
+	var got: float = before - red.hp
+	if absf(got - 115.0) > 1.0:
+		issues.append("巨兽增益伤害不是 115：%.1f" % got)
+	for i in range(960):
+		sim.step(DT)
+	if float(sim.team_buff_t[BattleSimScript.BLUE]) > 0.01:
+		issues.append("巨兽增益 16 秒后没有结束")
+	return issues
+
+
+func _base_collision_checks() -> Array:
+	# 4.29：水晶底座实体，英雄/小兵不能从正中穿过去。
+	var issues: Array = []
+	var sim = BattleSimScript.new()
+	sim.setup("tiger", 0, 885)
+	var b = sim.base_blue
+	var h = sim.player
+	h.pos = b.pos + Vector2(300, 0)
+	h.prev_pos = h.pos
+	sim.move_to(h, b.pos)
+	var need: float = b.radius + h.radius * 0.8
+	if h.pos.distance_to(b.pos) < need - 0.5:
+		issues.append("英雄穿过了水晶：d=%.1f need=%.1f" % [h.pos.distance_to(b.pos), need])
+	var m = null
+	for u in sim.minions:
+		if u.team == BattleSimScript.BLUE:
+			m = u
+			break
+	if m != null:
+		m.pos = b.pos + Vector2(200, 0)
+		m.prev_pos = m.pos
+		sim.move_to(m, b.pos)
+		var need_m: float = b.radius + m.radius * 0.8
+		if m.pos.distance_to(b.pos) < need_m - 0.5:
+			issues.append("小兵穿过了水晶：d=%.1f need=%.1f" % [m.pos.distance_to(b.pos), need_m])
 	return issues

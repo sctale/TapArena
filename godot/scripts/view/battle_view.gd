@@ -614,8 +614,45 @@ func _add_hero(u) -> void:
 
 	var s := _hero_scale(u)
 	root.scale = Vector3(s, s, s)
+	# 巨兽增益的随身光环：金环 + 半透明光柱 + 三颗环绕金点，只在该方 15 秒增益期间显示。
+	var aura := Node3D.new()
+	aura.visible = false
+	var aura_ring := MeshInstance3D.new()
+	var atorus := TorusMesh.new()
+	atorus.inner_radius = 30.0
+	atorus.outer_radius = 37.0
+	atorus.rings = 24
+	atorus.ring_segments = 4
+	aura_ring.mesh = atorus
+	aura_ring.material_override = _fx_glow(Color("ffd76a"), 0.65)
+	aura_ring.position.y = 4.0
+	aura_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	aura.add_child(aura_ring)
+	var aura_glow := MeshInstance3D.new()
+	var acol := CylinderMesh.new()
+	acol.top_radius = 24.0
+	acol.bottom_radius = 24.0
+	acol.height = 72.0
+	acol.radial_segments = 12
+	aura_glow.mesh = acol
+	aura_glow.material_override = _fx_glow(Color("ffd76a"), 0.10)
+	aura_glow.position.y = 36.0
+	aura_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	aura.add_child(aura_glow)
+	var aura_sparks: Array = []
+	for k in range(3):
+		var sp := MeshInstance3D.new()
+		var sbox := BoxMesh.new()
+		sbox.size = Vector3(5, 5, 5)
+		sp.mesh = sbox
+		sp.material_override = _fx_glow(Color("ffe8a8"), 0.95)
+		sp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		aura.add_child(sp)
+		aura_sparks.append(sp)
+	root.add_child(aura)
 	var item := {"root": root, "body": body, "limbs": limbs, "scale": s, "atk_active": false,
-		"entrance_t": 0.0, "hero_id": u.hero_id}
+		"entrance_t": 0.0, "hero_id": u.hero_id,
+		"aura": aura, "aura_ring": aura_ring, "aura_sparks": aura_sparks}
 	if u.hero_id in ["turtle", "hedgehog", "redpanda", "wolf", "crane"]:
 		# 5v5 五位英雄的开局招牌姿势：1.1 秒，仅首次创建时播放。
 		item["entrance_t"] = 1.1
@@ -922,6 +959,21 @@ func _sync_hero(u, delta: float) -> void:
 		if float(item["ghost_t"]) >= 0.07:
 			item["ghost_t"] = 0.0
 			_spawn_ghost(Vector3(rp.x, 0.0, rp.y), u.accent)
+	var aura = item.get("aura")
+	if aura != null:
+		var buffed := float(sim.team_buff_t[int(u.team)]) > 0.0
+		aura.visible = buffed
+		if buffed:
+			var at := Time.get_ticks_msec() * 0.001
+			aura.rotation.y = at * 2.4
+			var ar = item.get("aura_ring")
+			if ar != null:
+				ar.scale = Vector3.ONE * (1.0 + sin(at * 6.0) * 0.06)
+			var asp: Array = item.get("aura_sparks", [])
+			for k in range(asp.size()):
+				var ang := at * 3.0 + TAU * float(k) / float(maxi(1, asp.size()))
+				(asp[k] as Node3D).position = Vector3(cos(ang) * 28.0,
+					30.0 + float(k) * 14.0 + sin(at * 4.0 + float(k)) * 4.0, sin(ang) * 28.0)
 	# 攻击起始帧：按英雄的主武器放一次挥砍/弓弦/法杖闪光。
 	var atk_now: bool = u.atk_anim > 0.0
 	if atk_now and not bool(item.get("atk_active", false)):

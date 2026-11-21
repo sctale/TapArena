@@ -326,7 +326,9 @@
         "slow": 1.5,
         "knock": 60.0
       }
-    }
+    },
+    "team_buff_time": 15.0,
+    "team_buff_dmg": 0.15
   },
   "ai": {
     "hero_weight": 330,

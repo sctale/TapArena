@@ -280,6 +280,8 @@ var hitstop_duration: float = 0.045
 
 var _uid: int = 0
 var _shot_view: int = 0
+# 击败峡谷巨兽后，击杀方全员 15 秒伤害提升。
+var team_buff_t: Array = [0.0, 0.0]
 var _potion_view: int = 0
 var pending: Array = []
 
@@ -312,6 +314,7 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 	boss_respawn = 25.0
 	_uid = 0
 	_shot_view = 0
+	team_buff_t = [0.0, 0.0]
 	_potion_view = 0
 	clock = 0.0
 	wave_t = 0.0
@@ -1334,6 +1337,8 @@ func step(dt: float) -> void:
 
 	step_pending(dt)
 	step_potions(dt)
+	team_buff_t[BLUE] = maxf(0.0, float(team_buff_t[BLUE]) - dt)
+	team_buff_t[RED] = maxf(0.0, float(team_buff_t[RED]) - dt)
 
 	if not over and clock >= match_cap:
 		var b: float = base_blue.hp / base_blue.max_hp
@@ -2219,8 +2224,23 @@ func step_structure(s) -> void:
 
 func move_to(u, p: Vector2) -> void:
 	# 单位之间不做碰撞：身体可互相穿透（王者荣耀式），只有普攻/技能造成伤害与推挤。
+	# 但水晶底座是实体：所有单位都不能从水晶正中穿过去。
 	p.x = clampf(p.x, 60.0, map_w - 60.0)
 	p.y = clampf(p.y, 60.0, map_h - 60.0)
+	for b in units:
+		if b.kind != BASE or not b.is_alive():
+			continue
+		var min_d: float = b.radius + u.radius * 0.8
+		var d: Vector2 = p - b.pos
+		if d.length_squared() < min_d * min_d:
+			var dir: Vector2 = d
+			if dir.length_squared() < 0.01:
+				dir = p - u.pos
+			if dir.length_squared() < 0.01:
+				dir = u.face_dir if u.face_dir.length_squared() > 0.01 else Vector2.RIGHT
+			p = b.pos + dir.normalized() * min_d
+			p.x = clampf(p.x, 60.0, map_w - 60.0)
+			p.y = clampf(p.y, 60.0, map_h - 60.0)
 	u.pos = p
 
 
@@ -2380,6 +2400,10 @@ func deal_damage(target, amount: float, src, reflect := true) -> void:
 
 	if src != null and src.team == RED and target.team == BLUE:
 		amount *= enemy_dmg_mul
+	# 击败巨兽的团队反击加成：英雄造成的伤害 +15%，持续 15 秒。
+	if src != null and src.kind == HERO and int(src.team) >= 0 and int(src.team) < 2 \
+			and float(team_buff_t[src.team]) > 0.0:
+		amount *= 1.0 + float(boss_cfg.get("team_buff_dmg", 0.15))
 	# 野区增益：灰狼营的猎狼 buff。
 	if src != null and src.kind == HERO and src.buff_dmg_t > 0.0:
 		amount *= 1.0 + src.buff_dmg_pct
@@ -2475,7 +2499,21 @@ func kill(target, killer) -> void:
 		sfx.emit("pickup", target.pos)
 	elif target.kind == BOSS:
 		target.respawn_t = boss_respawn
-		banner.emit("峡谷巨兽被击退了！", 2.4)
+		var buff_team: int = killer.team if killer != null else 1 - target.team
+		if buff_team != target.team:
+			var buff_time := float(boss_cfg.get("team_buff_time", 15.0))
+			team_buff_t[buff_team] = maxf(float(team_buff_t[buff_team]), buff_time)
+			var pct := int(round(float(boss_cfg.get("team_buff_dmg", 0.15)) * 100.0))
+			banner.emit("峡谷巨兽被击败！%s全体英雄能力 +%d%%（%d 秒）" % [
+				"蓝方" if buff_team == BLUE else "红方", pct, int(buff_time)], 3.6)
+			for a in heroes:
+				if a.is_alive() and a.team == buff_team:
+					float_text.emit(Vector3(a.pos.x, a.height + 28.0, a.pos.y),
+						"巨兽之力！", Color(1.0, 0.92, 0.6))
+			fx.emit("ring", Vector3(target.pos.x, 6.0, target.pos.y),
+				Color(1.0, 0.86, 0.4), 260.0)
+		else:
+			banner.emit("峡谷巨兽被击退了！", 2.4)
 		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
