@@ -212,7 +212,7 @@ func _init() -> void:
 
 	var roster_issues := _roster_checks()
 	if roster_issues.is_empty():
-		print("HEROES_OK roster=25 skills=3")
+		print("HEROES_OK roster=25 skills=3 range<=500")
 	else:
 		failures += 1
 		for issue in roster_issues:
@@ -1785,6 +1785,11 @@ func _roster_checks() -> Array:
 		if h.skills.size() != 3:
 			issues.append(id + " 技能不是 3 条")
 			continue
+		# 4.40：地图尺寸不变，远程普攻最长 500；近战 ≤170，不允许落在中间空档。
+		if h.attack_range > 500.0:
+			issues.append("%s 射程 %.0f 超过 500" % [id, h.attack_range])
+		if h.attack_range > 170.0 and h.attack_range < 270.0:
+			issues.append("%s 射程 %.0f 落在近战/远程空档" % [id, h.attack_range])
 		h.level = 2
 		h.xp = sim.xp_to_level2
 		var foe = null

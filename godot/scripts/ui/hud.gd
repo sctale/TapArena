@@ -721,14 +721,20 @@ func _update_panel_labels() -> void:
 	elif show_result:
 		# 结算页：标题 → 比分条 → 双方战绩卡（每队独立行区）→ 提示与按钮。
 		var p := _result_panel()
-		var win: bool = sim.winner == sim.BLUE
+		var blue_win: bool = sim.winner == sim.BLUE
+		var win: bool = blue_win  # 玩家固定蓝方
 		_place(lbl_res_title, Rect2(p.position.x, p.position.y + p.size.y * 0.012,
 			p.size.x, p.size.y * 0.073))
-		_set_label(lbl_res_title, "胜利！" if win else "差一点点！")
-		lbl_res_title.add_theme_color_override("font_color", GOLD if win else Color("ffb3a6"))
+		# 标题直接写获胜方，一眼可辨；颜色沿用该队主色。
+		_set_label(lbl_res_title, "★ 蓝队胜利！" if blue_win else "★ 红队胜利！")
+		lbl_res_title.add_theme_color_override("font_color",
+			Color("9fd6f5") if blue_win else Color("ff9a8a"))
 		_place(lbl_res_reason, Rect2(p.position.x, p.position.y + p.size.y * 0.088,
 			p.size.x, p.size.y * 0.044))
-		_set_label(lbl_res_reason, sim.end_reason if not sim.end_reason.is_empty() else "水晶被摧毁")
+		var reason: String = sim.end_reason if not sim.end_reason.is_empty() else "水晶被摧毁"
+		_set_label(lbl_res_reason, ("你赢了 · %s" if win else "你输了 · %s") % reason)
+		lbl_res_reason.add_theme_color_override("font_color",
+			GOLD if win else Color("ffb3a6"))
 
 		var strip := _result_score_rect()
 		_place(lbl_res_score, Rect2(strip.position.x + strip.size.x * 0.02, strip.position.y,
@@ -744,7 +750,11 @@ func _update_panel_labels() -> void:
 			var team_l: Label = lbl_res_team_blue if team == sim.BLUE else lbl_res_team_red
 			_place(team_l, Rect2(c.position.x + c.size.x * 0.04, c.position.y,
 				c.size.x * 0.60, _result_team_head_h(c)))
-			_set_label(team_l, "蓝队" if team == sim.BLUE else "红队")
+			var team_win: bool = team == sim.winner
+			var team_name := "蓝队" if team == sim.BLUE else "红队"
+			_set_label(team_l, (team_name + " · 胜利") if team_win else team_name)
+			team_l.add_theme_color_override("font_color",
+				GOLD if team_win else (Color("9fd6f5") if team == sim.BLUE else Color("ffb3a6")))
 			var col_base := 0 if team == sim.BLUE else 4
 			var col_y := c.position.y + _result_team_head_h(c)
 			var col_rect := Rect2(c.position.x + 6.0, col_y, c.size.x - 12.0,
@@ -787,7 +797,7 @@ func _update_panel_labels() -> void:
 
 		_place(lbl_res_hint, Rect2(p.position.x, p.position.y + p.size.y * 0.872,
 			p.size.x, p.size.y * 0.033))
-		_set_label(lbl_res_hint, "金色边框 = 你 · ★ = 输出最高")
+		_set_label(lbl_res_hint, "金框行 = 你 · ★ = 输出最高 · 金色队伍卡 = 获胜方")
 		_place(lbl_res_btn, result_restart_rect())
 		_set_label(lbl_res_btn, "再来一局")
 		_place(lbl_res_home, result_home_rect())
@@ -1403,9 +1413,15 @@ func _draw_result_bg(safe: Rect2) -> void:
 	for team in [sim.BLUE, sim.RED]:
 		var c := _result_team_rect(team)
 		var team_c: Color = BLUE if team == sim.BLUE else Color("f07a63")
-		_add_rect(c, Color(0.10, 0.15, 0.13, 0.94))
+		var team_win: bool = team == sim.winner
+		# 获胜方整卡加深 + 金色描边与金色顶条，失败方保持队色并压暗。
+		_add_rect(c, Color(0.12, 0.17, 0.14, 0.94) if team_win else Color(0.08, 0.12, 0.10, 0.88))
 		_add_box(c, Color(1, 1, 1, 0.10), 1.0)
-		_add_rect(Rect2(c.position.x, c.position.y, c.size.x, 4.0), team_c)
+		if team_win:
+			_add_box(Rect2(c.position.x - 2.0, c.position.y - 2.0,
+				c.size.x + 4.0, c.size.y + 4.0), GOLD, 2.0)
+		_add_rect(Rect2(c.position.x, c.position.y, c.size.x, 4.0),
+			GOLD if team_win else team_c)
 		_add_rect(Rect2(c.position.x, c.position.y + 4.0, c.size.x, _result_team_head_h(c) - 4.0),
 			Color(0.16, 0.24, 0.21, 0.95))
 		var col_y := c.position.y + _result_team_head_h(c)

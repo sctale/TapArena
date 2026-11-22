@@ -307,8 +307,9 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 	# 开发用：直接查看暂停/结算界面。
 	if "--pause" in OS.get_cmdline_user_args():
 		_toggle_pause()
-	if "--result" in OS.get_cmdline_user_args():
-		if "--result-demo" in OS.get_cmdline_user_args():
+	var rargs := OS.get_cmdline_user_args()
+	if "--result" in rargs or "--result-red" in rargs:
+		if "--result-demo" in rargs:
 			# 结算排版压测：填入 4–5 位输出与不同等级，验证十行数字不会被批上限截断。
 			for i in range(sim.heroes.size()):
 				var u = sim.heroes[i]
@@ -316,7 +317,8 @@ func _start_match(hero_id: String, difficulty: int, seed_value: int, mode_5v5 :=
 				u.deaths = 1 + i % 4
 				u.level = 2 + i % 4
 				u.damage_dealt = 12345.0 + float(i) * 789.0
-		sim.end_match(sim.BLUE, "调试结算")
+		# --result 蓝方胜；--result-red 红方胜（核对结算页两边都清楚）。
+		sim.end_match(sim.RED if "--result-red" in rargs else sim.BLUE, "调试结算")
 	# 开发用：直接摧毁红方水晶，检查结束动画与结算页。
 	var vargs := OS.get_cmdline_user_args()
 	if "--victory" in vargs or "--victory-minion" in vargs:
