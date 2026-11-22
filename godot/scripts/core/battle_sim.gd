@@ -1495,17 +1495,32 @@ func support_key(team: int, lane_id: int) -> String:
 	return "%d_%d" % [team, lane_id]
 
 
-func queue_support(team: int, lane_id: int) -> void:
-	# 推塔奖励先排队，下一波该路兵线出发时叶灵才随行。
+func queue_support_lane(team: int, lane_id: int) -> bool:
+	# 单路排队：该路有存活叶灵就补满血，否则下一波该路兵线随行。返回是否新排队。
 	var key := support_key(team, lane_id)
 	support_unlocked[key] = true
 	for m in minions:
 		if m.is_alive() and m.support and m.team == team 				and (not five_v_five or int(m.lane_id) == lane_id):
 			m.hp = m.max_hp
-			return
+			return false
+	if bool(support_pending.get(key, false)):
+		return false
 	support_pending[key] = true
-	banner.emit("%s推掉%s塔！下一波兵线叶灵来帮忙" % [
-		"蓝方" if team == BLUE else "红方", lane_label(lane_id)], 3.2)
+	return true
+
+
+func queue_support_all(team: int, lane_id: int) -> void:
+	# 推塔奖励：推掉任意一路塔，全队三路下一波兵线都带叶灵（每路最多一只）。
+	var lanes: Array = [0, 1, 2] if five_v_five else [1]
+	var queued := 0
+	for lid in lanes:
+		if queue_support_lane(team, lid):
+			queued += 1
+	if queued <= 0:
+		return
+	var msg := "下一波三路兵线叶灵来帮忙" if five_v_five else "下一波兵线叶灵来帮忙"
+	banner.emit("%s推掉%s塔！%s" % [
+		"蓝方" if team == BLUE else "红方", lane_label(lane_id), msg], 3.2)
 
 
 func spawn_support_entity(team: int, lane_id: int, at := Vector2.INF) -> void:
@@ -1563,6 +1578,19 @@ func step_support(m, dt: float) -> void:
 	if m.support_pulse_t <= 0.0:
 		m.support_pulse_t = float(minion_cfg.get("support_pulse", 2.5))
 		_support_pulse(m)
+
+	# 敌塔/敌水晶射程内不站桩：沿兵线退回安全距离，别跟着兵线在塔下白挨打。
+	# 最后 45 秒防御塔停火（final_push），这时不躲，让叶灵参与终极对推。
+	if not final_push:
+		for s in units:
+			if not s.is_alive() or s.team == m.team:
+				continue
+			if s.kind != TOWER and s.kind != BASE:
+				continue
+			if m.pos.distance_to(s.pos) <= s.attack_range + m.radius + 40.0:
+				var dir_safe := -1.0 if m.team == BLUE else 1.0
+				_lane_move_along(m, dir_safe * 220.0, m.move_speed, dt)
+				return
 
 	# 远程自卫：不追人，260 内有敌人就发叶弹；贴脸沿兵线后撤，绝不横向进野区。
 	var foe = nearest_enemy_unit(m, 300.0)
@@ -2844,7 +2872,7 @@ func kill(target, killer) -> void:
 		banner.emit("我方蘑菇塔被拆了！" if target.team == BLUE else "拆掉一座敌方蘑菇塔！", 2.0)
 		# 推塔奖励最后播报，保证「叶灵来帮忙」不会被塔的播报顶掉。
 		var push_team: int = killer.team if killer != null else 1 - target.team
-		queue_support(push_team, target.lane_id)
+		queue_support_all(push_team, int(target.lane_id))
 		sfx.emit("boom", target.pos)
 		fx.emit("debris", Vector3(target.pos.x, target.height * 0.45, target.pos.y),
 			_team_color(target.team), target.radius)
@@ -2856,7 +2884,7 @@ func kill(target, killer) -> void:
 		var minion_gain := xp_minion
 		if target.support:
 			minion_gain = 60.0
-			support_pending[support_key(target.team, int(target.lane_id))] = true
+			queue_support_lane(target.team, int(target.lane_id))
 			banner.emit("%s叶灵被击败了" % ("蓝方" if target.team == BLUE else "红方"), 2.0)
 		if killer != null and killer.kind == HERO:
 			add_xp(killer, minion_gain)

@@ -260,7 +260,7 @@ func _init() -> void:
 
 	var support_issues := _support_checks()
 	if support_issues.is_empty():
-		print("SUPPORT_OK spawn/lane/heal/buff/guard/kill/5v5")
+		print("SUPPORT_OK spawn/all_lanes/lane/tower_safe/heal/buff/guard/kill/5v5")
 	else:
 		failures += 1
 		for issue in support_issues:
@@ -2122,6 +2122,22 @@ func _support_checks() -> Array:
 				issues.append("叶灵被侧面敌人带离兵线 %.1f（应 ≤30）" % off_max)
 			if s_end > s_start - 60.0:
 				issues.append("叶灵没有沿兵线后撤：%.0f→%.0f" % [s_start, s_end])
+		# 敌塔射程内不站桩：沿兵线退回安全距离
+		var inner = sim.towers_red[1]
+		var tower_s: float = sim.lane_progress(lid2, inner.pos)
+		sup.pos = sim.point_at_progress(lid2, clampf(tower_s - 300.0, 0.0, total2))
+		sup.prev_pos = sup.pos
+		sup.support_pulse_t = 999.0
+		var s_t0: float = sim.lane_progress(lid2, sup.pos)
+		var off_t := 0.0
+		for step_i in range(30):
+			sim.step_support(sup, 0.05)
+			off_t = maxf(off_t, sim.lane_distance(lid2, sup.pos))
+		var s_t1: float = sim.lane_progress(lid2, sup.pos)
+		if s_t1 > s_t0 - 80.0:
+			issues.append("叶灵站在敌塔射程内没有沿兵线后撤：%.0f→%.0f" % [s_t0, s_t1])
+		if off_t > 30.0:
+			issues.append("叶灵躲塔时离路 %.1f（应 ≤30）" % off_t)
 		# 同一路再推内塔：存活时不叠，只补满血
 		sup.hp = sup.max_hp * 0.5
 		sim.deal_damage(sim.towers_red[1], 99999.0, blue_hero)
@@ -2211,7 +2227,7 @@ func _support_checks() -> Array:
 				reborn += 1
 		if reborn != 1:
 			issues.append("叶灵死亡后下一波没有重出（%d）" % reborn)
-	# 5v5 分路：推掉下路塔，排队后由下路兵线带出
+	# 5v5 全路：推掉任意一路塔，三路下一波都带叶灵
 	var sim5 = BattleSimScript.new()
 	sim5.setup("tiger", 0, 9701, true)
 	var lane_tower = null
@@ -2223,9 +2239,19 @@ func _support_checks() -> Array:
 		issues.append("5v5 找不到下路红塔")
 	else:
 		sim5.deal_damage(lane_tower, 99999.0, sim5.player)
-		if not bool(sim5.support_pending.get(sim5.support_key(BattleSimScript.BLUE, 2), false)):
-			issues.append("5v5 推下路塔后没有排队叶灵")
-		sim5.spawn_wave_lane(BattleSimScript.BLUE, 2)
+		for lid3 in range(3):
+			if not bool(sim5.support_pending.get(sim5.support_key(BattleSimScript.BLUE, lid3), false)):
+				issues.append("5v5 推一路塔后第 %d 路没有排队叶灵" % lid3)
+		for lid3 in range(3):
+			sim5.spawn_wave_lane(BattleSimScript.BLUE, lid3)
+		var per_lane := {}
+		for m in sim5.minions:
+			if m.support and m.team == BattleSimScript.BLUE:
+				var l3 := int(m.lane_id)
+				per_lane[l3] = int(per_lane.get(l3, 0)) + 1
+		for lid3 in range(3):
+			if int(per_lane.get(lid3, 0)) != 1:
+				issues.append("5v5 第 %d 路叶灵数量 %d（应 1）" % [lid3, int(per_lane.get(lid3, 0))])
 		var sup5 = null
 		for m in sim5.minions:
 			if m.support and m.team == BattleSimScript.BLUE and int(m.lane_id) == 2:
