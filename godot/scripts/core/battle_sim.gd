@@ -1536,7 +1536,7 @@ func spawn_support_entity(team: int, lane_id: int, at := Vector2.INF) -> void:
 	u.support = true
 	u.lane_id = lane_id
 	u.lane_index = nearest_path_index(lane_id, pos)
-	u.hp = float(minion_cfg.get("support_hp", 640))
+	u.hp = float(minion_cfg.get("support_hp", 420))
 	u.max_hp = u.hp
 	u.radius = float(minion_cfg.get("support_radius", 20))
 	u.height = float(minion_cfg.get("support_height", 56))
@@ -1576,7 +1576,7 @@ func step_support(m, dt: float) -> void:
 	# 叶灵：周期性回血/攻防祝福 + 瞬发击退；远程叶弹，躲在己方最前小兵后方。
 	m.support_pulse_t -= dt
 	if m.support_pulse_t <= 0.0:
-		m.support_pulse_t = float(minion_cfg.get("support_pulse", 2.5))
+		m.support_pulse_t = float(minion_cfg.get("support_pulse", 4.0))
 		_support_pulse(m)
 
 	# 敌塔/敌水晶射程内不站桩：沿兵线退回安全距离，别跟着兵线在塔下白挨打。
@@ -1657,10 +1657,10 @@ func _lane_move_along(m, delta: float, speed: float, dt: float) -> bool:
 
 
 func _support_pulse(m) -> void:
-	var radius := float(minion_cfg.get("support_pulse_radius", 230.0))
-	var buff_t := float(minion_cfg.get("support_buff_time", 6.0))
-	var dmg_pct := float(minion_cfg.get("support_buff_dmg", 0.12))
-	var guard_pct := float(minion_cfg.get("support_guard", 0.12))
+	var radius := float(minion_cfg.get("support_pulse_radius", 200.0))
+	var buff_t := float(minion_cfg.get("support_buff_time", 2.5))
+	var dmg_pct := float(minion_cfg.get("support_buff_dmg", 0.06))
+	var guard_pct := float(minion_cfg.get("support_guard", 0.06))
 	m.cast_anim = 0.3
 	m.cast_total = 0.3
 	for a in units:
@@ -1670,11 +1670,11 @@ func _support_pulse(m) -> void:
 			continue
 		if m.pos.distance_to(a.pos) > radius + a.radius:
 			continue
-		var pct := float(minion_cfg.get("support_heal_self", 0.03))
+		var pct := float(minion_cfg.get("support_heal_self", 0.02))
 		if a.kind == HERO:
-			pct = float(minion_cfg.get("support_heal_hero", 0.04))
+			pct = float(minion_cfg.get("support_heal_hero", 0.02))
 		elif a != m:
-			pct = float(minion_cfg.get("support_heal_minion", 0.08))
+			pct = float(minion_cfg.get("support_heal_minion", 0.03))
 		var before: float = a.hp
 		a.hp = minf(a.max_hp, a.hp + a.max_hp * pct)
 		var gained: float = a.hp - before
@@ -1685,9 +1685,9 @@ func _support_pulse(m) -> void:
 		a.buff_dmg_pct = maxf(a.buff_dmg_pct, dmg_pct)
 		a.guard_t = maxf(a.guard_t, buff_t)
 		a.guard_pct = maxf(a.guard_pct, guard_pct)
-	# 瞬发击退：170 内敌方英雄/小兵/野怪被推开 55，塔/水晶/巨兽不动。
-	var knock_radius := float(minion_cfg.get("support_knock_radius", 170.0))
-	var knock_dist := float(minion_cfg.get("support_knock_distance", 55.0))
+	# 瞬发击退：140 内敌方英雄/小兵/野怪被推开 30，塔/水晶/巨兽不动。
+	var knock_radius := float(minion_cfg.get("support_knock_radius", 140.0))
+	var knock_dist := float(minion_cfg.get("support_knock_distance", 30.0))
 	for e in units:
 		if not e.is_alive() or e.team == m.team:
 			continue

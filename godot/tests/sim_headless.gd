@@ -260,7 +260,7 @@ func _init() -> void:
 
 	var support_issues := _support_checks()
 	if support_issues.is_empty():
-		print("SUPPORT_OK spawn/all_lanes/lane/tower_safe/heal/buff/guard/kill/5v5")
+		print("SUPPORT_OK spawn/all_lanes/lane/tower_safe/balance/kill/5v5")
 	else:
 		failures += 1
 		for issue in support_issues:
@@ -2073,6 +2073,12 @@ func _support_checks() -> Array:
 			issues.append("叶灵没有随兵线从基地出发")
 		if absf(sup.height - 56.0) > 0.1 or sup.attack_range < 250.0:
 			issues.append("叶灵身高/射程不对：h=%.1f r=%.1f" % [sup.height, sup.attack_range])
+		if absf(sup.max_hp - 420.0) > 0.5:
+			issues.append("叶灵生命不是 420：%.0f" % sup.max_hp)
+		var cfg_pulse := float(sim.minion_cfg.get("support_pulse", 0.0))
+		var cfg_buff := float(sim.minion_cfg.get("support_buff_time", 0.0))
+		if cfg_buff >= cfg_pulse:
+			issues.append("叶灵祝福时长 %.1f 不应覆盖脉冲间隔 %.1f" % [cfg_buff, cfg_pulse])
 		# 只走兵线：出生就在折线上
 		var lid2 := int(sup.lane_id)
 		if sim.lane_distance(lid2, sup.pos) > 1.0:
@@ -2159,10 +2165,13 @@ func _support_checks() -> Array:
 		sim.step_support(sup, 0.02)
 		if blue_hero.hp <= hp0:
 			issues.append("叶灵脉冲没有回血")
-		if blue_hero.guard_t < 5.9 or blue_hero.buff_dmg_t < 5.9:
-			issues.append("叶灵攻防祝福没有挂上")
-		if blue_hero.buff_dmg_pct < 0.119 or blue_hero.guard_pct < 0.119:
-			issues.append("叶灵祝福倍率不是 12%%")
+		var heal_expect: float = blue_hero.max_hp * 0.02
+		if absf((blue_hero.hp - hp0) - heal_expect) > heal_expect * 0.15 + 1.0:
+			issues.append("叶灵回血不是 2%%：%.0f（应 %.0f）" % [blue_hero.hp - hp0, heal_expect])
+		if blue_hero.guard_t < 2.4 or blue_hero.buff_dmg_t < 2.4:
+			issues.append("叶灵攻防祝福没有挂上 / 时长不是 2.5s")
+		if blue_hero.buff_dmg_pct < 0.059 or blue_hero.guard_pct < 0.059:
+			issues.append("叶灵祝福倍率不是 6%%")
 		# 减伤：同源 100 伤害，带祝福时是平时的 88%（难度增伤在两边同一系数）。
 		var red = sim.heroes[3]
 		blue_hero.hp = blue_hero.max_hp
@@ -2174,22 +2183,22 @@ func _support_checks() -> Array:
 		sim.deal_damage(blue_hero, 100.0, red)
 		var base_taken: float = bhp - blue_hero.hp
 		blue_hero.hp = blue_hero.max_hp
-		blue_hero.guard_t = 6.0
-		blue_hero.guard_pct = 0.12
+		blue_hero.guard_t = 2.5
+		blue_hero.guard_pct = 0.06
 		bhp = blue_hero.hp
 		sim.deal_damage(blue_hero, 100.0, red)
 		var guarded_taken: float = bhp - blue_hero.hp
-		if base_taken <= 0.0 or absf(guarded_taken / base_taken - 0.88) > 0.01:
-			issues.append("叶灵减伤比例不是 12%%：%.1f/%.1f" % [guarded_taken, base_taken])
-		# 攻击祝福：100 伤害变 112
+		if base_taken <= 0.0 or absf(guarded_taken / base_taken - 0.94) > 0.01:
+			issues.append("叶灵减伤比例不是 6%%：%.1f/%.1f" % [guarded_taken, base_taken])
+		# 攻击祝福：100 伤害变 106
 		red.hp = red.max_hp
 		red.shield = 0.0
 		red.guard_t = 0.0
 		var rhp: float = red.hp
 		sim.deal_damage(red, 100.0, blue_hero)
 		var dealt: float = rhp - red.hp
-		if absf(dealt - 112.0) > 1.0:
-			issues.append("叶灵攻击祝福后 100 伤害应剩 112，实际 %.1f" % dealt)
+		if absf(dealt - 106.0) > 1.0:
+			issues.append("叶灵攻击祝福后 100 伤害应剩 106，实际 %.1f" % dealt)
 		# 远程叶弹：200 距离不等近战
 		red.pos = sup.pos + Vector2(200, 0)
 		red.prev_pos = red.pos
@@ -2207,7 +2216,7 @@ func _support_checks() -> Array:
 		var knock0: float = red.pos.distance_to(sup.pos)
 		sim.step_support(sup, 0.02)
 		var knock1: float = red.pos.distance_to(sup.pos)
-		if knock1 < knock0 + 20.0:
+		if knock1 < knock0 + 25.0:
 			issues.append("叶灵脉冲击退没有生效：%.0f→%.0f" % [knock0, knock1])
 		# 击杀叶灵：60 经验；下一波该路兵线重出
 		red.level = 1
