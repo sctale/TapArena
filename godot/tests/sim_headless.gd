@@ -260,7 +260,7 @@ func _init() -> void:
 
 	var support_issues := _support_checks()
 	if support_issues.is_empty():
-		print("SUPPORT_OK spawn/heal/buff/guard/kill/5v5")
+		print("SUPPORT_OK spawn/lane/heal/buff/guard/kill/5v5")
 	else:
 		failures += 1
 		for issue in support_issues:
@@ -2073,6 +2073,55 @@ func _support_checks() -> Array:
 			issues.append("叶灵没有随兵线从基地出发")
 		if absf(sup.height - 56.0) > 0.1 or sup.attack_range < 250.0:
 			issues.append("叶灵身高/射程不对：h=%.1f r=%.1f" % [sup.height, sup.attack_range])
+		# 只走兵线：出生就在折线上
+		var lid2 := int(sup.lane_id)
+		if sim.lane_distance(lid2, sup.pos) > 1.0:
+			issues.append("叶灵出生点不在兵线路径上：%.1f" % sim.lane_distance(lid2, sup.pos))
+		# 跟随最前小兵：沿折线推进，拐弯不抄近路
+		var total2: float = sim.path_length(sim.path_of(lid2))
+		var lead = null
+		for m in sim.minions:
+			if m.is_alive() and not m.support and m.team == BattleSimScript.BLUE:
+				lead = m
+				break
+		if lead != null and total2 > 400.0:
+			sup.pos = sim.point_at_progress(lid2, total2 * 0.12)
+			sup.prev_pos = sup.pos
+			lead.pos = sim.point_at_progress(lid2, total2 * 0.30)
+			lead.prev_pos = lead.pos
+			sup.support_pulse_t = 999.0
+			var p0: float = sim.lane_progress(lid2, sup.pos)
+			var max_off := 0.0
+			for step_i in range(160):
+				sim.step_support(sup, 0.05)
+				max_off = maxf(max_off, sim.lane_distance(lid2, sup.pos))
+			var p1: float = sim.lane_progress(lid2, sup.pos)
+			if max_off > 30.0:
+				issues.append("叶灵跟随小兵时离路 %.1f（应 ≤30）" % max_off)
+			if p1 <= p0 + 60.0:
+				issues.append("叶灵没有沿兵线跟上小兵：%.0f→%.0f" % [p0, p1])
+		# 侧面有敌人：只沿兵线后撤，不横向进野区
+		if total2 > 900.0:
+			var red = sim.heroes[3]
+			sup.pos = sim.point_at_progress(lid2, total2 * 0.45)
+			sup.prev_pos = sup.pos
+			sup.support_pulse_t = 999.0
+			var s_start: float = sim.lane_progress(lid2, sup.pos)
+			var off_max := 0.0
+			for step_i in range(40):
+				var ss: float = sim.lane_progress(lid2, sup.pos)
+				var tan: Vector2 = (sim.point_at_progress(lid2, ss + 20.0)
+					- sim.point_at_progress(lid2, ss - 20.0)).normalized()
+				var side := Vector2(-tan.y, tan.x)
+				red.pos = sup.pos + side * 120.0
+				red.prev_pos = red.pos
+				sim.step_support(sup, 0.05)
+				off_max = maxf(off_max, sim.lane_distance(lid2, sup.pos))
+			var s_end: float = sim.lane_progress(lid2, sup.pos)
+			if off_max > 30.0:
+				issues.append("叶灵被侧面敌人带离兵线 %.1f（应 ≤30）" % off_max)
+			if s_end > s_start - 60.0:
+				issues.append("叶灵没有沿兵线后撤：%.0f→%.0f" % [s_start, s_end])
 		# 同一路再推内塔：存活时不叠，只补满血
 		sup.hp = sup.max_hp * 0.5
 		sim.deal_damage(sim.towers_red[1], 99999.0, blue_hero)
@@ -2177,13 +2226,34 @@ func _support_checks() -> Array:
 		if not bool(sim5.support_pending.get(sim5.support_key(BattleSimScript.BLUE, 2), false)):
 			issues.append("5v5 推下路塔后没有排队叶灵")
 		sim5.spawn_wave_lane(BattleSimScript.BLUE, 2)
-		var found := false
+		var sup5 = null
 		for m in sim5.minions:
 			if m.support and m.team == BattleSimScript.BLUE and int(m.lane_id) == 2:
-				found = true
+				sup5 = m
 				break
-		if not found:
+		if sup5 == null:
 			issues.append("5v5 下路兵线没有带出叶灵")
+		else:
+			if sim5.lane_distance(2, sup5.pos) > 1.0:
+				issues.append("5v5 叶灵出生点不在下路路径上")
+			var t5: float = sim5.path_length(sim5.path_of(2))
+			var lead5 = null
+			for m in sim5.minions:
+				if m.is_alive() and not m.support and m.team == BattleSimScript.BLUE 						and int(m.lane_id) == 2:
+					lead5 = m
+					break
+			if lead5 != null and t5 > 400.0:
+				sup5.pos = sim5.point_at_progress(2, t5 * 0.15)
+				sup5.prev_pos = sup5.pos
+				lead5.pos = sim5.point_at_progress(2, t5 * 0.35)
+				lead5.prev_pos = lead5.pos
+				sup5.support_pulse_t = 999.0
+				var off5 := 0.0
+				for step_i in range(120):
+					sim5.step_support(sup5, 0.05)
+					off5 = maxf(off5, sim5.lane_distance(2, sup5.pos))
+				if off5 > 30.0:
+					issues.append("5v5 叶灵移动离路 %.1f（应 ≤30）" % off5)
 	# 模型调色板与高度
 	var atlas = PixelAtlas.new()
 	var smesh: ArrayMesh = BlockModels.support_minion(atlas, Color(0.42, 0.72, 0.95))

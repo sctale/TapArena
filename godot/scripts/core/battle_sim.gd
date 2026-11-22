@@ -703,6 +703,23 @@ func lane_progress(lane_id: int, p: Vector2) -> float:
 	return best_s
 
 
+func lane_distance(lane_id: int, p: Vector2) -> float:
+	# 点到兵线折线的最短距离：叶灵只允许贴着路径活动。
+	var path: Array = path_of(lane_id)
+	if path.size() < 2:
+		return 0.0
+	var best := 1.0e20
+	for i in range(path.size() - 1):
+		var a: Vector2 = path[i]
+		var b: Vector2 = path[i + 1]
+		var ab: Vector2 = b - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		var d: float = (a + ab * t).distance_to(p)
+		if d < best:
+			best = d
+	return best
+
+
 func point_at_progress(lane_id: int, s: float) -> Vector2:
 	var path: Array = path_of(lane_id)
 	if path.is_empty():
@@ -1498,8 +1515,8 @@ func spawn_support_entity(team: int, lane_id: int, at := Vector2.INF) -> void:
 		return
 	var pos := at
 	if pos == Vector2.INF:
+		# 直接出生在兵线起点（不再横向偏移），之后只沿路径行走，不会进野区。
 		pos = path[0] if team == BLUE else path[path.size() - 1]
-		pos += Vector2(0, 50)
 	var u = new_unit(MINION, team, "叶灵", pos)
 	u.support = true
 	u.lane_id = lane_id
@@ -1547,7 +1564,7 @@ func step_support(m, dt: float) -> void:
 		m.support_pulse_t = float(minion_cfg.get("support_pulse", 2.5))
 		_support_pulse(m)
 
-	# 远程自卫：不追人，260 内有敌人就发叶弹；贴脸先退。
+	# 远程自卫：不追人，260 内有敌人就发叶弹；贴脸沿兵线后撤，绝不横向进野区。
 	var foe = nearest_enemy_unit(m, 300.0)
 	if foe != null:
 		var d: float = m.pos.distance_to(foe.pos)
@@ -1559,12 +1576,9 @@ func step_support(m, dt: float) -> void:
 			shoot(m, m.face_dir, m.dmg, Color("bfe8a0"), 560.0, 0.0, 0.0, 0.0, 0,
 				true, foe, "leaf")
 		if d < 130.0:
-			m.moving = true
-			var away: Vector2 = (m.pos - foe.pos).normalized()
-			if away.length_squared() < 0.001:
-				away = Vector2.LEFT if m.team == BLUE else Vector2.RIGHT
-			move_to(m, m.pos + away * (m.move_speed * 0.9 * dt))
-			m.walk_t += dt
+			# 只沿兵线向己方基地退，哪怕敌人从侧面/野区摸过来也不会被带走。
+			var dir_back := -1.0 if m.team == BLUE else 1.0
+			_lane_move_along(m, dir_back * 220.0, m.move_speed, dt)
 			return
 
 	# 躲在己方最前小兵后方约 80 弧长；没有小兵就原地等下一波。
@@ -1573,28 +1587,45 @@ func step_support(m, dt: float) -> void:
 		m.moving = false
 		return
 	var lid := int(m.lane_id)
-	var path: Array = path_of(lid)
-	if path.size() < 2:
+	var total := path_length(path_of(lid))
+	if total <= 0.0:
 		return
 	var dir := 1.0 if m.team == BLUE else -1.0
-	var total := path_length(path)
 	var fp := lane_progress(lid, front.pos)
 	var target_p := clampf(fp - dir * float(minion_cfg.get("support_follow_gap", 80.0)),
 		0.0, total)
-	var goal := point_at_progress(lid, target_p)
-	var to: Vector2 = goal - m.pos
-	var d2 := to.length()
-	if d2 < 14.0:
+	var delta := target_p - lane_progress(lid, m.pos)
+	if absf(delta) < 12.0:
 		m.moving = false
 		return
-	to = to / d2
+	_lane_move_along(m, delta, m.move_speed, dt)
+
+
+func _lane_move_along(m, delta: float, speed: float, dt: float) -> bool:
+	# 叶灵只在兵线折线上移动：按弧长推进，目标点永远取自 point_at_progress。
+	# 即使被特效挤离路径，也是朝折线上的点收回，不可能自由走进野区。
+	var lid := int(m.lane_id)
+	var path: Array = path_of(lid)
+	if path.size() < 2:
+		return false
+	var total := path_length(path)
+	var s := lane_progress(lid, m.pos)
+	var step := clampf(delta, -speed * dt, speed * dt)
+	var goal := point_at_progress(lid, clampf(s + step, 0.0, total))
+	var to: Vector2 = goal - m.pos
+	var d := to.length()
+	if d < 0.5:
+		m.moving = false
+		return false
+	to = to / d
 	m.move_dir = to
 	m.face_dir = to
 	m.facing = 1.0 if to.x >= 0.0 else -1.0
 	m.moving = true
 	var slow_k := 0.55 if m.slow_t > 0.0 else 1.0
-	move_to(m, m.pos + to * (m.move_speed * slow_k * dt))
+	move_to(m, m.pos + to * minf(speed * slow_k * dt, d))
 	m.walk_t += dt
+	return true
 
 
 func _support_pulse(m) -> void:
