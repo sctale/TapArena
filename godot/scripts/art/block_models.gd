@@ -944,12 +944,15 @@ static func jungle_monster(atlas: PixelAtlas, kind: String) -> ArrayMesh:
 	return VoxelModel.mesh(atlas, boxes)
 
 
-static func support_minion(atlas: PixelAtlas, team_color: Color) -> ArrayMesh:
+static func support_minion(atlas: PixelAtlas, team_color: Color, team := 0) -> ArrayMesh:
 	# 叶灵：推塔奖励的漂浮辅助兵；约 56 高，大圆头/叶芽帽/叶翼/发光短杖/小挎包。
+	# 红蓝参考小兵做区分：蓝方嫩绿叶芽 + 双叶翼；红方秋叶橙红 + 单尖芽 + 刺叶翼。
 	var boxes: Array = []
-	var leaf := Color("a8d878")
-	var leaf_dark := Color("7cbf4a")
-	var glow_c := Color("eaffc0")
+	var red := team == 1
+	var leaf := Color("e8a24a") if red else Color("a8d878")
+	var leaf_dark := Color("c06a2e") if red else Color("7cbf4a")
+	var leaf_light := Color("f4c878") if red else Color("c8e878")
+	var glow_c := Color("ffd9a0") if red else Color("eaffc0")
 	var wood := Color("8a5a3b")
 	# 漂浮尾光
 	_b(boxes, Vector3(0, 6, 0), Vector3(10, 3, 10), "glow", glow_c)
@@ -972,15 +975,24 @@ static func support_minion(atlas: PixelAtlas, team_color: Color) -> ArrayMesh:
 		_b(boxes, Vector3(6.0 * sx, 40.4, 10.9), Vector3(1.5, 1.5, 0.6), "flat", Color.WHITE)
 		_b(boxes, Vector3(8.0 * sx, 34.5, 9.9), Vector3(3.5, 2.2, 0.8), "blush", Color.WHITE)
 	_b(boxes, Vector3(0, 33.2, 10.6), Vector3(5, 1.8, 0.6), "flat", Color("6a4a3a"))
-	# 叶芽帽
+	# 叶芽帽：蓝方双叶芽，红方单尖芽 + 两侧短刺叶
 	_b(boxes, Vector3(0, 49, 0), Vector3(4, 5, 4), "leaves", leaf_dark)
 	_b(boxes, Vector3(0, 53, 0), Vector3(12, 3, 8), "leaves", leaf)
-	_b(boxes, Vector3(6, 54, 0), Vector3(5, 2, 4), "leaves", Color("c8e878"))
-	_b(boxes, Vector3(-6, 53, 0), Vector3(4, 2, 3), "leaves", leaf_dark)
-	# 叶翼
+	if red:
+		_b(boxes, Vector3(0, 55.5, 0), Vector3(4, 4, 4), "leaves", leaf_light)
+		_b(boxes, Vector3(6.5, 52, 0), Vector3(6, 1.6, 3), "leaves", leaf_dark)
+		_b(boxes, Vector3(-6.5, 52, 0), Vector3(6, 1.6, 3), "leaves", leaf_dark)
+	else:
+		_b(boxes, Vector3(6, 54, 0), Vector3(5, 2, 4), "leaves", leaf_light)
+		_b(boxes, Vector3(-6, 53, 0), Vector3(4, 2, 3), "leaves", leaf_dark)
+	# 叶翼：红方更尖、多一小段刺叶
 	for sx in [-1, 1]:
 		_b(boxes, Vector3(12.5 * sx, 31, -4), Vector3(2, 12, 10), "leaves", leaf)
-		_b(boxes, Vector3(13.5 * sx, 34, -5), Vector3(1.2, 6, 6), "leaves", Color("c8e878"))
+		if red:
+			_b(boxes, Vector3(14.0 * sx, 37, -5), Vector3(1.2, 7, 5), "leaves", leaf_dark)
+			_b(boxes, Vector3(13.0 * sx, 26, -4), Vector3(1.2, 5, 4), "leaves", leaf_light)
+		else:
+			_b(boxes, Vector3(13.5 * sx, 34, -5), Vector3(1.2, 6, 6), "leaves", leaf_light)
 	# 小挎包
 	_b(boxes, Vector3(-9, 16, 8), Vector3(6, 7, 4), "wood", wood)
 	_b(boxes, Vector3(-9, 18, 10.2), Vector3(2, 2, 1), "gold", Color.WHITE)

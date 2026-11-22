@@ -260,7 +260,7 @@ func _init() -> void:
 
 	var support_issues := _support_checks()
 	if support_issues.is_empty():
-		print("SUPPORT_OK spawn/all_lanes/lane/tower_safe/balance/kill/5v5")
+		print("SUPPORT_OK spawn/all_lanes/lane/tower_safe/idle/redblue/balance/kill/5v5")
 	else:
 		failures += 1
 		for issue in support_issues:
@@ -347,6 +347,9 @@ func _rule_checks() -> Array:
 	if sim4.potions.size() != 2:
 		issues.append("回血药剂数量不是 2")
 	else:
+		for p3 in sim4.potions:
+			if p3.guard != null and absf(p3.pos.distance_to(p3.guard.pos) - 100.0) > 2.0:
+				issues.append("3v3 血瓶离塔 %.0f（应 100）" % p3.pos.distance_to(p3.guard.pos))
 		var pot = sim4.potions[0]
 		var ph = sim4.player
 		ph.pos = pot.pos
@@ -1331,6 +1334,22 @@ func _fix_checks() -> Array:
 			active += 1
 	if active != 2:
 		issues.append("拆上路塔后蓝方仍活跃药剂不是 2，实际 %d" % active)
+	# 5v5 血瓶贴到塔后半个路段（上下 450 / 中 318），不再离塔 636–900。
+	for p in s1.potions:
+		if p.guard == null:
+			continue
+		var lid := int(p.guard.lane_id)
+		var path: Array = s1.lane_paths[lid]
+		if path.size() < 3:
+			continue
+		var half: float = 0.0
+		if p.team == BattleSimScript.BLUE:
+			half = path[1].distance_to(path[2]) * 0.5
+		else:
+			half = path[path.size() - 2].distance_to(path[path.size() - 3]) * 0.5
+		var pd: float = p.pos.distance_to(p.guard.pos)
+		if absf(pd - half) > 2.0:
+			issues.append("5v5 %d 路血瓶离塔 %.0f（应 %.0f）" % [lid, pd, half])
 	# 复活清状态。
 	var s2 = BattleSimScript.new()
 	s2.setup("hedgehog", 0, 9801, true)
@@ -2133,6 +2152,23 @@ func _support_checks() -> Array:
 				issues.append("叶灵被侧面敌人带离兵线 %.1f（应 ≤30）" % off_max)
 			if s_end > s_start - 60.0:
 				issues.append("叶灵没有沿兵线后撤：%.0f→%.0f" % [s_start, s_end])
+		# 没有己方小兵：不原地发呆，沿兵线向己方慢慢回撤
+		for m in sim.minions:
+			if m != sup and m.team == BattleSimScript.BLUE and not m.support:
+				m.hp = 0.0
+		sup.pos = sim.point_at_progress(lid2, total2 * 0.5)
+		sup.prev_pos = sup.pos
+		sup.support_pulse_t = 999.0
+		var s_n0: float = sim.lane_progress(lid2, sup.pos)
+		var off_n := 0.0
+		for step_i in range(40):
+			sim.step_support(sup, 0.05)
+			off_n = maxf(off_n, sim.lane_distance(lid2, sup.pos))
+		var s_n1: float = sim.lane_progress(lid2, sup.pos)
+		if s_n1 > s_n0 - 40.0:
+			issues.append("没有己方小兵时叶灵原地发呆：%.0f→%.0f" % [s_n0, s_n1])
+		if off_n > 30.0:
+			issues.append("叶灵无兵回撤时离路 %.1f（应 ≤30）" % off_n)
 		# 敌塔射程内不站桩：沿兵线退回安全距离
 		var inner = sim.towers_red[1]
 		var tower_s: float = sim.lane_progress(lid2, inner.pos)
@@ -2294,13 +2330,20 @@ func _support_checks() -> Array:
 					off5 = maxf(off5, sim5.lane_distance(2, sup5.pos))
 				if off5 > 30.0:
 					issues.append("5v5 叶灵移动离路 %.1f（应 ≤30）" % off5)
-	# 模型调色板与高度
+	# 模型调色板与高度：红蓝两队独立配色（参考小兵），调色板 ≤64、高度 <60
 	var atlas = PixelAtlas.new()
-	var smesh: ArrayMesh = BlockModels.support_minion(atlas, Color(0.42, 0.72, 0.95))
-	var pal: PackedColorArray = smesh.get_meta("palette", PackedColorArray())
-	if pal.size() > 64 or int(smesh.get_meta("palette_overflow", 0)) > 0:
-		issues.append("叶灵调色板超 64 / 溢出")
-	var sab: AABB = smesh.get_aabb()
-	if sab.end.y > 60.0 or sab.end.y >= 88.0:
-		issues.append("叶灵模型自然高度 %.1f 不符合小体型" % sab.end.y)
+	var palettes: Array = []
+	for team in [BattleSimScript.BLUE, BattleSimScript.RED]:
+		var tc: Color = Color(0.42, 0.72, 0.95) if team == BattleSimScript.BLUE \
+			else Color(0.92, 0.44, 0.38)
+		var smesh: ArrayMesh = BlockModels.support_minion(atlas, tc, team)
+		var pal: PackedColorArray = smesh.get_meta("palette", PackedColorArray())
+		palettes.append(pal)
+		if pal.size() > 64 or int(smesh.get_meta("palette_overflow", 0)) > 0:
+			issues.append("叶灵（队%d）调色板超 64 / 溢出" % team)
+		var sab: AABB = smesh.get_aabb()
+		if sab.end.y > 60.0 or sab.end.y >= 88.0:
+			issues.append("叶灵（队%d）模型自然高度 %.1f 不符合小体型" % [team, sab.end.y])
+	if palettes.size() == 2 and palettes[0] == palettes[1]:
+		issues.append("红蓝叶灵模型配色相同")
 	return issues

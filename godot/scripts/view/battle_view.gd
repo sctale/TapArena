@@ -691,7 +691,7 @@ func _add_minion(u) -> void:
 	var mesh
 	if u.support:
 		mesh = _model("support_%d" % u.team, func(): return BlockModels.support_minion(
-			atlas, _team_color(u.team)))
+			atlas, _team_color(u.team), u.team))
 	else:
 		mesh = _model("minion_%d" % u.team, func(): return BlockModels.minion(
 			atlas, _team_color(u.team), u.radius, u.team))

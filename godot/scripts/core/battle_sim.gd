@@ -448,8 +448,9 @@ func setup(player_hero: String, difficulty: int, seed_value: int, mode_5v5 := fa
 				continue
 			towers_blue.append(make_tower(BLUE, 0, path[2], lane_id))
 			towers_red.append(make_tower(RED, 0, path[4], lane_id))
-			make_potion(BLUE, path[1], towers_blue[towers_blue.size() - 1])
-			make_potion(RED, path[5], towers_red[towers_red.size() - 1])
+			# 血瓶贴着塔后半个路段（原来在 path[1]/path[5]，离塔 636–900 太远）。
+			make_potion(BLUE, (path[1] + path[2]) * 0.5, towers_blue[towers_blue.size() - 1])
+			make_potion(RED, (path[5] + path[4]) * 0.5, towers_red[towers_red.size() - 1])
 		for camp in rules.get("jungle", []):
 			var cp = camp.get("pos", [0, 0])
 			make_jungle(str(camp.get("kind", "boar")), Vector2(float(cp[0]), float(cp[1])))
@@ -1609,9 +1610,12 @@ func step_support(m, dt: float) -> void:
 			_lane_move_along(m, dir_back * 220.0, m.move_speed, dt)
 			return
 
-	# 躲在己方最前小兵后方约 80 弧长；没有小兵就原地等下一波。
+	# 躲在己方最前小兵后方约 80 弧长；没有小兵就沿兵线慢慢退回己方，等下一波。
 	var front = _front_ally_minion(m)
 	if front == null:
+		var dir_home := -1.0 if m.team == BLUE else 1.0
+		if _lane_move_along(m, dir_home * 220.0, m.move_speed * 0.7, dt):
+			return
 		m.moving = false
 		return
 	var lid := int(m.lane_id)
